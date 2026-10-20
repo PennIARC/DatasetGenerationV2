@@ -51,6 +51,30 @@ def apply_camera(img, p):
     return np.clip(img, 0, 1)
 
 
+def apply_camera_crop(img, p, crop):
+    """OUTPUT_CROP: camera model on a window (x0, y0, w, h) of the full composite. The blur runs on the window plus a
+    context pad (so it equals blurring the full frame and cutting afterwards); noise, colour, contrast and vignette
+    act on the crop as the camera's own frame; the chromatic-aberration shift keeps its full-frame pixel size
+    (p["aberration"] is in units of the full width). -> float32 RGB (h, w, 3)."""
+    x0, y0, cw, ch = crop
+    H, W = img.shape[:2]
+    rng = np.random.default_rng(p["noise_seed"])
+    if p["blur"]:
+        pad = int(np.ceil(4.5 * p["psf_sigma"] + p["motion_px"])) + 4
+        ya, yb, xa, xb = max(0, y0 - pad), min(H, y0 + ch + pad), max(0, x0 - pad), min(W, x0 + cw + pad)
+        sub = apply_blur(np.ascontiguousarray(img[ya:yb, xa:xb]), p["psf_sigma"], p["motion_px"], p["motion_angle"])
+        out = np.ascontiguousarray(sub[y0 - ya:y0 - ya + ch, x0 - xa:x0 - xa + cw])
+    else:
+        out = np.ascontiguousarray(img[y0:y0 + ch, x0:x0 + cw])
+    if p["post"]:
+        q = dict(p, aberration=p["aberration"] * W / cw)
+        if p["photometric"]:
+            out = fx.photometric(out, rng, q)
+        else:
+            out = fx.v1_shader(out, rng, p["v1_noise_strength"], q["aberration"], p["vignette"], p["contrast"])
+    return np.clip(out, 0, 1)
+
+
 def encode_jpeg(rgb_u8, quality):
     """-> JPEG bytes (BGR order handled here)."""
     ok, buf = cv2.imencode(".jpg", cv2.cvtColor(rgb_u8, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, int(quality)])

@@ -374,6 +374,27 @@ BG_SATURATION = (0.8, 1.2)
 BG_BRIGHTNESS = (0.8, 1.2)
 BG_CHANNEL_GAIN = (0.95, 1.05)
 
+# --- SCENE ZOOM COUPLING + NATIVE OUTPUT CROP (features/zoom.py; ADR 0016) ---
+# Both default OFF: with them off every image, label and sidecar is unchanged (own random streams R(11) / R(12) / R(13)).
+# SCENE_ZOOM_COUPLING: "camera moved closer". Per image z = image mine scale (the R(9) draw that also sets the ground
+# px/mm) / SCENE_ZOOM_REF_SCALE. Rock / grass clipping / leaf clump / dirt snippet / ground-dirt sizes and the mine's
+# pixel-sized soil / contact / AO / berm / soft-grain-blur / grain sizes are multiplied by z (grass blades are sized in
+# mm and already follow px/mm); debris counts x z ** -SCENE_ZOOM_COUNT_EXP (2 = same density per ground area); the
+# background texture is magnified by z, capped at SCENE_ZOOM_BG_MAX_MAG output px per source px. Sensor / optics
+# effects (PSF, motion blur, noise, aberration, vignette, JPEG, penumbra base, cut-out feather) stay in pixels.
+SCENE_ZOOM_COUPLING = False
+SCENE_ZOOM_REF_SCALE = 0.2          # old median mine scale of the v2 plan (log bins 0.1-0.4)
+SCENE_ZOOM_COUNT_EXP = 2.0          # debris counts x z ** -this (0 = keep counts per frame)
+SCENE_ZOOM_BG = True                # magnify the background texture by z as well (needs SCENE_ZOOM_COUPLING)
+SCENE_ZOOM_BG_MAX_MAG = 1.5         # cap: output px per background source px (never below the uncoupled value);
+                                    # 2.0 looked visibly soft on soft / close-up photos (ADR 0016)
+SOIL_GRAIN_PX = 1.5                 # fBm feature size (px) of the soil grains on the mine (SOIL_BLEND)
+# OUTPUT_CROP = (w, h): render at SCREEN_WIDTH x SCREEN_HEIGHT, cut a w x h window (uniform position, stream R(11))
+# that contains every mine (placed inside it with CROP_MINE_MARGIN px), apply the camera model to the crop, return the
+# crop and labels normalised to it. None = full frame.
+OUTPUT_CROP = None
+CROP_MINE_MARGIN = 8
+
 # --- LABELS ---
 LABEL_ALPHA_THRESHOLD = 0.5         # pixel counts as mine if alpha > this (v1: pygame mask threshold 127/255)
 LABEL_MIN_VISIBLE_PX = 1            # drop the box if fewer visible mine pixels remain (only with LABEL_VISIBLE_MASK)

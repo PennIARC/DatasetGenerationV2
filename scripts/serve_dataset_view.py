@@ -331,7 +331,20 @@ def describe(it):
 
 
 def make_thumb(src, dst, width):
+    """Downscaled JPEG for the grid; an image that is already at most `width` wide (e.g. the 640x640 dataset crops)
+    is served as its own bytes (no re-encode, no resize)."""
     from PIL import Image
+    with Image.open(src) as im:
+        small = im.width <= width
+    if small:
+        with open(src, "rb") as f:
+            data = f.read()
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        tmp = "%s.%d.%d.tmp" % (dst, os.getpid(), threading.get_ident())
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, dst)
+        return data
     with Image.open(src) as im:
         im.draft("RGB", (width, width))       # fast JPEG DCT downscale
         im = im.convert("RGB")

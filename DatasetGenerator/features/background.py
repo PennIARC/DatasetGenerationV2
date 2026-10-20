@@ -87,6 +87,8 @@ def make_background(p, W, H, smooth=True):
     ox, oy = int(p["off_x"] * (w - cw)), int(p["off_y"] * (h - ch))
     crop = np.ascontiguousarray(src[oy:oy + ch, ox:ox + cw])
     interp = (cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR) if smooth else cv2.INTER_NEAREST
+    if smooth and scale > 1 and p.get("upscale_cubic"):   # SCENE_ZOOM_BG: sharper upscale of the magnified texture
+        interp = cv2.INTER_CUBIC
     bg = cv2.resize(crop, (W, H), interpolation=interp).astype(np.float32) / 255.0
     if p["colour_jitter"]:
         bg = np.clip(fx.apply_matrix(bg, fx.colour_matrix(p["hue"], p["sat"], p["bright"], p["gains"])), 0, 1)

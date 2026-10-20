@@ -2,7 +2,9 @@
 
 Date: 2026-10-20 (uncommitted at the time of writing; the lead commits)
 
-Status: **plan awaiting confirmation**. The 3000-row plan exists (`output_dataset/v2_3000/plan/`, gitignored, rebuilt
+Status: **superseded in part by [0016](0016-zoomed-640-dataset.md)** (640x640 native crop, mine scale 0.25-0.40 in
+4 linear bins, scene zoom coupling, 0-4 mines per image); the rest of this plan was kept. Original status:
+**plan awaiting confirmation**. The 3000-row plan exists (`output_dataset/v2_3000/plan/`, gitignored, rebuilt
 by `python3 scripts/generate_dataset.py --plan-only`); no dataset images have been rendered.
 
 ## Context

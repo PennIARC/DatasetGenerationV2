@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Fake dataset (same layout as output_dataset/v2_3000) for testing scripts/serve_dataset_view.py.
 
-    python3 make_fake_dataset.py OUT_DIR [--n 30] [--start 0] [--spread 600] [--partial]
+    python3 make_fake_dataset.py OUT_DIR [--n 30] [--start 0] [--spread 600] [--partial] [--size 640x640]
 
-Images come from docs/showcase/images/v2/review2/c*.jpg (upscaled to 1920x1080; grey placeholders if absent),
+Images come from docs/showcase/images/v2/review2/c*.jpg (resized to --size, default 1920x1080; grey placeholders if absent),
 labels from the review manifest boxes (+ random extra boxes), sidecars with the keys the server reads.
 Modification times are spread over the last --spread seconds (oldest first) so rate / ETA are non-trivial.
 --partial also writes one image without label/sidecar and one with a truncated sidecar (must NOT be counted).
@@ -29,7 +29,9 @@ def main():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--spread", type=float, default=600.0)
     ap.add_argument("--partial", action="store_true")
+    ap.add_argument("--size", default="1920x1080", help="image size WxH (the zoomed dataset is 640x640)")
     a = ap.parse_args()
+    WH = tuple(int(v) for v in a.size.lower().split("x"))
     out = Path(a.out)
     for d in ("images/train", "images/val", "labels/train", "labels/val", "meta", "plan"):
         (out / d).mkdir(parents=True, exist_ok=True)
@@ -48,10 +50,10 @@ def main():
         name, split = "v2_%05d" % k, "val" if k % 10 == 9 else "train"
         if srcs:
             src = srcs[k % len(srcs)]
-            im = Image.open(src).convert("RGB").resize((1920, 1080), Image.LANCZOS)
+            im = Image.open(src).convert("RGB").resize(WH, Image.LANCZOS)
             b0 = boxes.get(src.stem)
         else:
-            im, b0 = Image.new("RGB", (1920, 1080), (90 + k % 60, 110, 80)), None
+            im, b0 = Image.new("RGB", WH, (90 + k % 60, 110, 80)), None
         lab = []
         if b0:
             x, y, w, h = b0
@@ -78,9 +80,9 @@ def main():
             os.utime(p, (t, t))
     if a.partial:
         k = a.start + a.n
-        Image.new("RGB", (1920, 1080), (40, 40, 40)).save(out / "images" / "train" / ("v2_%05d.jpg" % k))   # no label/meta
+        Image.new("RGB", WH, (40, 40, 40)).save(out / "images" / "train" / ("v2_%05d.jpg" % k))   # no label/meta
         k += 1
-        Image.new("RGB", (1920, 1080), (60, 40, 40)).save(out / "images" / "train" / ("v2_%05d.jpg" % k))
+        Image.new("RGB", WH, (60, 40, 40)).save(out / "images" / "train" / ("v2_%05d.jpg" % k))
         (out / "labels" / "train" / ("v2_%05d.txt" % k)).write_text("0 0.5 0.5 0.1 0.1\n")
         (out / "meta" / ("v2_%05d.json" % k)).write_text('{"index": %d, "seed": [2026, ' % k)            # truncated
     print("fake dataset: %d images (+%s partial) in %s" % (a.n, 2 if a.partial else 0, out))

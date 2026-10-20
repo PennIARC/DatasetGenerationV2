@@ -418,3 +418,23 @@ saved_look = jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"])
 | v2 engine, `--v1` | 0.33 |
 `--workers N` parallelises (50 images with 4 workers: 0.32 s / image wall clock). The extra time is mostly the
 on-the-fly blades (capped at 3 per image), ~100 more debris elements with shadows, and the soft dirt grains.
+
+## 10. Scene zoom coupling (`SCENE_ZOOM_COUPLING`) and native output crop (`OUTPUT_CROP`)
+ADR `docs/history/0016-zoomed-640-dataset.md`; code `features/zoom.py`; both default off (flag off = bit-identical
+images, labels and sidecars; own random streams R(11) crop window, R(12) / R(13) debris count rounding).
+- **Zoom coupling** ("camera moved closer"): z = image mine scale (the R(9) draw that sets px/mm) /
+  `SCENE_ZOOM_REF_SCALE` 0.2. Sizes x z: rocks, grass clippings, leaf clumps, dirt snippets, ground dirt specks
+  (their shadows / contact shadows / rims follow), and the mine's `CONTACT_BAND_PX`, `BERM_WIDTH_PX`,
+  `EXPOSED_AO_PX`, `CONTACT_AO_SIGMA`, `SOFT_GRAIN_BLUR_PX`, `SOIL_GRAIN_PX` (new, 1.5 = the old hard-coded grain
+  size), `MINE_PLACEMENT_MARGIN`. Debris counts x z^-`SCENE_ZOOM_COUNT_EXP` (2: same density per ground area).
+  Grass blades are in mm and already follow px/mm. Background magnification x z, capped at
+  max(`SCENE_ZOOM_BG_MAX_MAG` 1.5, uncoupled value), bicubic upscale. Sensor effects (PSF, motion blur, noise,
+  aberration px shift, vignette, JPEG, penumbra base, cut-out feather) stay in pixels. Sidecar: `zoom`.
+- **Output crop** `OUTPUT_CROP = (w, h)` (+ `CROP_MINE_MARGIN` 8 px): full 1920x1080 render, uniform window drawn
+  before the mines, every mine placed fully inside it, window cut out with no resize (camera blur on the window +
+  context pad = identical to blurring the full frame; noise / colour / vignette on the crop; aberration keeps its
+  pixel shift). Labels: only pixels inside the window count (same visibility policy), boxes normalised to the
+  crop. Sidecar: `crop`, per mine `box_px_full`, `rect_full`. `render_scene` signature unchanged.
+- The v2 dataset (`scripts/generate_dataset.py`) turns both on: 640x640 native crops, mine scale 0.25-0.40 in 4
+  linear bins, 0-4 mines per image. Review sheet: `docs/zoomed_look.png` (`scripts/zoomed_look_sheet.py`).
+  Test: `tests/test_zoom_crop.py`.

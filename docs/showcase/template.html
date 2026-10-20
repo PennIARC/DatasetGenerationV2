@@ -260,6 +260,17 @@ function placeholder(label, cls, why){
   return el("div", {"class": "ph " + (cls || ""), role: "img", "aria-label": (label || "image") + " (" + why + ")"},
     [(label || "image") + " — " + why]);
 }
+/* frame follows the image's own aspect ratio (e.g. 16:9 renders, 640x640 dataset crops); CSS value = fallback */
+function fitAspect(box, im, maxVh){
+  if (!box || !im || im.tagName !== "IMG") return;
+  var set = function(){
+    if (!(im.naturalWidth && im.naturalHeight)) return;
+    var r = im.naturalWidth / im.naturalHeight;
+    box.style.aspectRatio = im.naturalWidth + " / " + im.naturalHeight;
+    if (maxVh) box.style.maxWidth = "min(900px, " + (maxVh * r).toFixed(2) + "vh)";   /* tall images: cap the height */
+  };
+  if (im.complete) set(); else im.addEventListener("load", set);
+}
 function img(src, alt, cls){
   if (!src) return placeholder(alt, cls, "no image");
   if (ASSETS[src]) src = ASSETS[src];
@@ -366,8 +377,9 @@ function beforeAfter(ba){
   function render(){
     body.textContent = "";
     if (st.sbs){
-      var mk = function(s){ return el("figure", null, [el("div", {"class": "im"}, [img(s.src, title + " " + s.label, "")]),
-        el("figcaption", {text: s.label})]); };
+      var mk = function(s){ var im = img(s.src, title + " " + s.label, ""), box = el("div", {"class": "im"}, [im]);
+        fitAspect(box, im);
+        return el("figure", null, [box, el("figcaption", {text: s.label})]); };
       body.appendChild(el("div", {"class": "sbs"}, [mk(st.b), mk(st.a)]));
       return;
     }
@@ -380,6 +392,7 @@ function beforeAfter(ba){
     if (top.tagName === "IMG") top.classList.add("top");
     else top.classList.add("top");
     slider.appendChild(bottom); slider.appendChild(top);
+    fitAspect(slider, bottom, 75);
     slider.appendChild(el("span", {"class": "tag l", text: st.b.label}));
     slider.appendChild(el("span", {"class": "tag r", text: st.a.label}));
     slider.appendChild(el("div", {"class": "handle"}));
@@ -980,6 +993,7 @@ function renderDataset(page){
       var thumb = el("button", {"class": "thumb", type: "button", "aria-label": "Enlarge " + v.id,
         onclick: function(ev){ lbOpen(lbItems, i, ev.currentTarget); }}, [img(v.thumb, v.id, "")]);
       v.boxes.forEach(function(b){ thumb.appendChild(boxDiv(b)); });
+      fitAspect(thumb, thumb.querySelector("img"));   /* boxes are % of the frame: frame = image aspect, nothing cropped */
       grid.appendChild(el("article", {"class": "gcard", role: "listitem", "data-id": v.id}, [thumb, el("div", {"class": "gb"}, [
         el("div", {"class": "gm"}, [el("b", {text: v.id}), " · seed " + seedText(p) + " · " + v.boxes.length + " mine" + (v.boxes.length === 1 ? "" : "s") + " · " + v.split]),
         el("div", {"class": "gpar", text: parText(p)})])]));

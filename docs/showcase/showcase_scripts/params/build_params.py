@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Build the "Dataset v2: parameters" showcase tab: one card per sampled parameter with a distribution graph drawn
-from the 3000-row sampling PLAN (output_dataset/v2_3000/plan, made by scripts/generate_dataset.py --plan-only), plus
+"""Build the "Dataset v2: parameters" showcase tab (zoomed 640x640 revision, ADR 0016): one card per sampled parameter
+with a distribution graph drawn from the 3000-row sampling PLAN (output_dataset/v2_3000/plan, made by scripts/generate_dataset.py --plan-only), plus
 before / after renders (render_scene, same seed, one parameter changed) and a few planned rows rendered as samples.
 
     python3 docs/showcase/showcase_scripts/params/build_params.py            # graphs + renders + manifest
@@ -181,7 +181,9 @@ DEMO_SEED, DEMO_INDEX = 11, 0
 BASE = {"N_MINES": 1, "MINE_POSITIONS": [(960, 540)], "mine_scale": 0.3, "BURIAL_PROB": 0.0, "flip": False,
         "OVERCAST_PROB": 0.0, "SUN_ELEVATION": 40.0, "SUN_AZIMUTH": 135.0, "SHADOW_STRENGTH": 0.45,
         "PSF_SIGMA": 0.4, "MOTION_BLUR_PROB": 0.0, "MINE_POSE": (3.0, 2.0, 30.0, False), "BLADES_OVER_ON_MINE": 0.0,
-        "BG_FAMILY_WEIGHTS": {"grass": 1.0}}
+        "BG_FAMILY_WEIGHTS": {"grass": 1.0}, "SCENE_ZOOM_COUPLING": True}
+# before / after renders use the dataset's zoom coupling (scale 0.3 -> zoom 1.5) on the full frame with the mine at the
+# centre and show a native 640x640 window around it (= the dataset's crop size; no resize)
 
 
 def crop(rgb, spec):
@@ -215,7 +217,7 @@ def render_pair(key, before_ov, after_ov, spec, jpeg=(95, 95), seed=DEMO_SEED, i
 
 def spec_text(spec):
     if spec[0] == "frame":
-        return f"whole 1920x1080 frame shown at 1/{spec[1]} size"
+        return f"whole 1920x1080 render (before the 640x640 crop) shown at 1/{spec[1]} size"
     s = 2 * spec[1]
     return f"native-resolution {s}x{s} px crop around the mine" + (f", {spec[2]}x nearest-neighbour zoom" if spec[2] != 1 else "")
 
@@ -243,31 +245,31 @@ def build_cards(imgs, mines, meta, do_render):
         return {"label": label, "before": b, "after": a, "before_label": bl, "after_label": al,
                 "caption": caption + " " + spec_text(spec) + f"; seed {DEMO_SEED}, one mine at the centre."}
 
-    M = ("mine", 180, 1)
+    M = ("mine", 320, 1)
     Z = ("mine", 70, 3)
     # ---------------------------------------------------------------- stratified
     nm = col(imgs, "n_mines", int)
     q = meta["factors"]["n_mines"]["quota"]
-    card("n_mines", "Mines per image", "N_MINES", "stratified", "9 (0..8)", "0-8 mines",
-         "Exact quota: 600 images with 0 mines, 300 with each of 1..8. This is the generator's own distribution "
-         "(ZERO_MINE_PROB 0.10 plus a uniform draw of 0..8, i.e. P(0) = 0.2, P(k) = 0.1) made exact.",
-         "How many PFM-1 mines are placed in the image (positions by rejection sampling, 50 attempts).",
-         plot_bar("n_mines.png", [str(k) for k in range(9)], np.bincount(nm, minlength=9), "mines in the image",
-                  "Mines per image (planned)", target=q, target_label="quota (600 for 0, 300 each for 1-8)"),
-         notes=f"Planned mines in total: {n_mines_total}. Placement can fail for 8 large mines (50 attempts each); "
-               "the rendered manifest will record placed vs planned.")
+    card("n_mines", "Mines per image", "N_MINES", "stratified", "5 (0..4)", "0-4 mines",
+         "Exact quota: 600 images (20 %) with 0 mines and 600 with each of 1..4 (user decision for the zoomed "
+         "640x640 dataset; was 0-8 with 600 / 300 x 8).",
+         "How many PFM-1 mines are placed in the 640x640 crop (rejection sampling inside the crop, 50 attempts).",
+         plot_bar("n_mines.png", [str(k) for k in range(5)], np.bincount(nm, minlength=5), "mines in the image",
+                  "Mines per image (planned)", target=q, target_label="quota (600 each for 0-4)"),
+         notes=f"Planned mines in total: {n_mines_total}. 4 mines of up to 171 px fit easily in the 624x624 placement "
+               "area; the rendered manifest will record placed vs planned.")
     sc = col(mines, "scale")
     card("mine_scale", "Mine scale (altitude)", "MINE_SCALE_MIN / MINE_SCALE_MAX (per-image bucket)", "stratified",
-         "5 log-spaced", "0.10-0.40 (mine length ~43-171 px at 1080p)",
-         "Each image gets one log-spaced bucket (600 images per bucket); every mine in it draws its scale uniformly "
-         "inside that bucket. Equal counts per log bucket = roughly log-uniform overall (DELIBERATE CHANGE from the "
-         "generator's linear uniform 0.1-0.4: more small, hard mines; median 0.20 instead of 0.25).",
-         "Mine size in the frame (proxy for flight altitude). The ground blade scale (px per mm) is drawn from the "
-         "same bucket, so grass and mines agree in scale within an image.",
-         plot_stratified("mine_scale.png", sc, E["scale"], "mine scale (log axis; x 426.7 = mine length in px)",
-                         "Mine scale per mine (planned)", unit="mines", logx=True),
-         ba=[BA("scale", "Scale 0.10 vs 0.40", {"mine_scale": 0.1}, {"mine_scale": 0.4}, "scale 0.10",
-                "scale 0.40", M, "Smallest vs largest end of the range.")],
+         "4 linear", "0.25-0.40 (mine length ~107-171 px in the 640x640 crop)",
+         "Each image gets one of 4 equal-width buckets (750 images per bucket); every mine in it draws its scale "
+         "uniformly inside that bucket, i.e. uniform 0.25-0.40 overall (user decision: was 5 log bins over 0.1-0.4, "
+         "where mines were often barely visible).",
+         "Mine size in the frame (proxy for flight altitude). The ground blade scale (px per mm) and the zoom "
+         "coupling factor (scale / 0.2) come from the same bucket, so grass, rocks, debris and mines agree in scale.",
+         plot_stratified("mine_scale.png", sc, E["scale"], "mine scale (x 426.7 = mine length in px)",
+                         "Mine scale per mine (planned)", unit="mines"),
+         ba=[BA("scale", "Scale 0.25 vs 0.40", {"mine_scale": 0.25}, {"mine_scale": 0.4}, "scale 0.25 (zoom 1.25)",
+                "scale 0.40 (zoom 2.0)", M, "Smallest vs largest end of the range, both zoom-coupled.")],
          notes="Per-image buckets mean all mines in one image share a scale range (like one flight altitude). Mine "
                "counts per bucket are exact because the n_mines x scale table is balanced.")
     bf = col(buried, "burial_fraction")
@@ -341,7 +343,7 @@ def build_cards(imgs, mines, meta, do_render):
     card("psf_sigma", "Lens blur (PSF sigma)", "PSF_SIGMA (per-image bucket)", "stratified", "3", "0-1.5 px",
          "1000 images per 0.5-px bucket, uniform inside (same shape as the generator's U(0, 1.5), made exact).",
          "Gaussian defocus of the whole composite (point-spread function).",
-         plot_stratified("psf_sigma.png", ps, E["psf_sigma"], "Gaussian blur sigma (px at 1080p)",
+         plot_stratified("psf_sigma.png", ps, E["psf_sigma"], "Gaussian blur sigma (px, same in the crop)",
                          "Lens blur per image (planned)", sub=4),
          ba=[BA("psf", "Sigma 0 vs 1.5 px", {"PSF_SIGMA": 0.0}, {"PSF_SIGMA": 1.5}, "sigma 0", "sigma 1.5", Z,
                 "Sharp vs most blurred.")])
@@ -377,8 +379,8 @@ def build_cards(imgs, mines, meta, do_render):
             ("saturation", "SATURATION", (0.75, 1.25), "Colour saturation multiplier.", 0.75, 1.25),
             ("contrast", "CONTRAST", (0.95, 1.2), "Contrast around mid-grey (replaces v1's fixed 1.1).", 0.95, 1.2),
             ("vignette", "VIGNETTE", (0.0, 0.5), "Corner darkening.", 0.0, 0.5),
-            ("aberration", "ABERRATION", (0.0, 0.002), "Chromatic aberration: R / B shift in uv units (0.002 = "
-             "3.8 px).", 0.0, 0.002)]:
+            ("aberration", "ABERRATION", (0.0, 0.002), "Chromatic aberration: R / B shift in units of the 1920 px "
+             "render width (0.002 = 3.8 px; the crop keeps the pixel shift).", 0.0, 0.002)]:
         v = col(imgs, k)
         spec = ("frame", 3) if k == "vignette" else (Z if k == "aberration" else M)
         card(k, k.capitalize() if k != "aberration" else "Chromatic aberration", flag, "randomized", "-",
@@ -418,10 +420,18 @@ def build_cards(imgs, mines, meta, do_render):
          "Geometric augmentation of the ground photo (16 combinations).",
          plot_bar("bg_flip_rot.png", cats, [flips.count(c) for c in cats],
                   "flip H / flip V / rotation (multiples of 90 deg)", "Background flip / rotation (planned)", rot=45))
-    card("bg_zoom", "Background zoom", "BG_ZOOM", "randomized", "-", "1.0-2.0", "Uniform per image, random offset.",
+    mag = col(imgs, "bg_magnification")
+    card("bg_zoom", "Background zoom", "BG_ZOOM x zoom coupling (SCENE_ZOOM_BG, SCENE_ZOOM_BG_MAX_MAG)", "randomized",
+         "-", "BG_ZOOM 1.0-2.0, then x mine scale / 0.2, capped at 1.5 output px per source px",
+         "Uniform BG_ZOOM per image, random offset; zoom coupling multiplies it by z (camera closer), but the "
+         "magnification (output px per photo px) is capped at max(1.5, uncoupled value) so the texture does not "
+         "get blurrier than the generator already allowed; upscaling uses bicubic interpolation.",
          "Zoom-crop into the ground photo on top of scale-to-cover (texture scale).",
-         plot_random("bg_zoom.png", col(imgs, "bg_zoom"), "zoom factor", "Background zoom (planned)", bins=20,
-                     rng_lim=(1, 2), ref=N / 20, ref_label="uniform expectation"),
+         plot_random("bg_zoom.png", mag, "background magnification (output px per source px, log y)",
+                     f"Background magnification after zoom coupling (planned; {int((col(imgs, 'bg_mag_capped', bool)).sum())} "
+                     f"of {N} at the cap)", bins=35, rng_lim=(0.5, 7.5), logy=True,
+                     note="Values above 1.5 come from small / 90-degree-rotated photos that are already above the cap "
+                          "without coupling (unchanged)."),
          ba=[BA("bgzoom", "Zoom 1.0 vs 2.0", {"BG_ZOOM": 1.0}, {"BG_ZOOM": 2.0}, "1.0", "2.0", ("frame", 3),
                 "Ground texture scale.")])
     card("bg_colour", "Background colour jitter", "BG_HUE_SHIFT, BG_SATURATION, BG_BRIGHTNESS, BG_CHANNEL_GAIN",
@@ -434,20 +444,70 @@ def build_cards(imgs, mines, meta, do_render):
          ba=[BA("bgbright", "Background brightness 0.8 vs 1.2", {"BG_BRIGHTNESS": 0.8}, {"BG_BRIGHTNESS": 1.2},
                 "0.8", "1.2", M, "Ground only; the mine is harmonised to the ground's brightness.")])
     card("ground_scale", "Ground scale (px per mm)", "derived from the scale bucket", "stratified (via scale)",
-         "5 (same as mine scale)", "0.36-1.42 px/mm",
+         "4 (same as mine scale)", "0.89-1.42 px/mm",
          "Drawn per image inside the image's mine-scale bucket (not separately planned).",
          "Size of grass blades / tufts / wisps (specified in mm) on screen.",
          plot_stratified("ground_scale.png", col(imgs, "ground_px_per_mm"),
-                         [e * 512 / 1.2 / 120 for e in E["scale"]], "ground px per mm (log axis)",
-                         "Ground scale per image (planned)", logx=True, sub=3),
+                         [e * 512 / 1.2 / 120 for e in E["scale"]], "ground px per mm",
+                         "Ground scale per image (planned)", sub=3),
          notes="In the default generator this value is drawn independently of the mines' scale, so blades could be "
                "drawn at a different 'altitude' than the mines of the same image; the per-image scale bucket keeps "
                "the two within one bucket.")
+    # ---------------------------------------------------------------- zoom coupling + native crop (ADR 0016)
+    zz = col(imgs, "zoom")
+    card("zoom", "Scene zoom coupling (camera closer)", "SCENE_ZOOM_COUPLING, SCENE_ZOOM_REF_SCALE 0.2, "
+         "SCENE_ZOOM_COUNT_EXP 2", "stratified (via scale)", "4 (same as mine scale)", "z = 1.25-2.0",
+         "z = the image's mine scale / 0.2 (0.2 = the old plan's median scale), so it follows the scale bucket.",
+         "Like moving the camera closer: rocks, grass clippings, leaf clumps, dirt snippets and specks are drawn z "
+         "times larger and z^2 times rarer (same density per ground area); the mine's contact band, contact AO, berm "
+         "lip, exposed-part AO, soil-grain size and soft-grain blur grow by z; the background texture is magnified by "
+         "z (capped, see 'Background zoom'). Grass blades are sized in mm and already follow px/mm. Sensor effects "
+         "(PSF, motion blur, noise, aberration shift, vignette, JPEG) stay in pixels.",
+         plot_stratified("zoom.png", zz, [e / 0.2 for e in E["scale"]], "zoom factor z = scale / 0.2",
+                         "Zoom coupling factor per image (planned)", sub=3),
+         ba=[BA("zoom_old_new", "Old look vs zoomed look", {"SCENE_ZOOM_COUPLING": False, "mine_scale": 0.2},
+                {"mine_scale": 0.3}, "old: scale 0.20, no coupling", "new: scale 0.30, zoom 1.5", M,
+                "The old median look vs the middle of the new range (debris counts / sizes differ by design)."),
+             BA("zoom_coupling", "Scale 0.40 without vs with coupling", {"SCENE_ZOOM_COUPLING": False,
+                                                                          "mine_scale": 0.4},
+                {"mine_scale": 0.4}, "scale 0.40, coupling off", "scale 0.40, coupling on (z 2.0)", M,
+                "Same mine size: without coupling rocks, clippings and the ground texture keep the old pixel size, "
+                "so the mine looks out of scale.")],
+         notes="Default OFF in controlPanel (existing seeds and the earlier outputs are bit-identical with it off); "
+               "the dataset driver turns it on. Debris count rounding and the crop window use new random streams "
+               "R(11) / R(12) / R(13), so no existing stream changes.")
+    cx0, cy0 = col(imgs, "crop_x0"), col(imgs, "crop_y0")
+    fig, ax = plt.subplots(figsize=(7.2, 3.6))
+    hb = ax.hist2d(cx0 + 320, cy0 + 320, bins=[32, 18], range=[[0, 1920], [0, 1080]], cmap="Blues")
+    fig.colorbar(hb[3], ax=ax, label="images per cell (count)")
+    ax.invert_yaxis()
+    ax.add_patch(plt.Rectangle((320, 320), 1280, 440, fill=False, ec=C2, lw=1.5, ls="--"))
+    ax.text(330, 335, "possible crop centres", color=C2, fontsize=8, va="top")
+    ax.set_xlabel("crop centre x in the 1920x1080 render (px)")
+    ax.set_ylabel("crop centre y (px)")
+    ax.set_title("640x640 crop window position (planned)", loc="left", fontsize=11)
+    ax.grid(False)
+    card("crop", "Native 640x640 crop", "OUTPUT_CROP (640, 640), CROP_MINE_MARGIN 8", "randomized", "-",
+         "window anywhere in the 1920x1080 render",
+         "Uniform window position per image (own stream R(11)), drawn before the mines; every mine is then placed "
+         "fully inside the window (8 px margin).",
+         "The saved image: a 640x640 window cut out of the 1920x1080 render without any resize or resampling. "
+         "Labels are converted to the crop's normalised YOLO coordinates (a box crossing the edge would be clipped "
+         "and kept only if visible pixels remain inside, the usual label policy; with the margin none do). The camera "
+         "model (blur with a context pad, noise, colour, vignette) is applied to the crop as the camera's frame.",
+         _save(fig, "crop.png"))
+    if do_render:
+        crop_demo()
+    cards[-1]["ba"] = [{"label": "Render vs saved crop", "before": REL + "crop_full.jpg", "after": REL + "crop_crop.jpg",
+                        "before_label": "1920x1080 render (1/3 size, letterboxed), orange = crop window",
+                        "after_label": "saved 640x640 image (native pixels), red = YOLO boxes",
+                        "caption": "Plan row rendered with OUTPUT_CROP; the full frame on the left is the same scene "
+                                   "re-rendered without the crop (mines pinned at the same positions)."}]
     # ---------------------------------------------------------------- random, per mine
     yaw = col(mines, "yaw")
     card("yaw", "Mine yaw (in-plane rotation)", "MINE_POSE (yaw part)", "randomized (per mine)", "-", "0-360 deg",
          "Uniform per mine. Drawn per mine inside the renderer, so it cannot be bucketed by per-image overrides "
-         "without a generator change; with 10800 mines every 30-degree bin is within a few % of equal.",
+         "without a generator change; with " + f"{n_mines_total} mines every 30-degree bin is within a few % of equal.",
          "Rotation of the mine about the vertical axis.",
          plot_random("yaw.png", yaw, "yaw (degrees)", "Mine yaw (planned)", unit="mines", bins=12, rng_lim=(0, 360),
                      ref=len(yaw) / 12, ref_label="equal count per 30-deg bin (12 bins)"),
@@ -470,7 +530,7 @@ def build_cards(imgs, mines, meta, do_render):
                   target_label="expected (FLIP_PROB 0.30)"),
          ba=[BA("flip", "Face up vs face down", {}, {"MINE_POSE": (3.0, 2.0, 30.0, True)}, "face up", "face down",
                 M, "Same pose otherwise.")],
-         notes="Kept random per mine (realistic mixed orientations in one image); 10800 Bernoulli draws give "
+         notes=f"Kept random per mine (realistic mixed orientations in one image); {len(fd)} Bernoulli draws give "
                f"{100 * fd.mean():.1f}% face down.")
     fams = [m["colour_family"] for m in mines]
     names = list(G.make_config().PALETTE)
@@ -516,10 +576,11 @@ def build_cards(imgs, mines, meta, do_render):
          ba=[BA("dust", "Dust 0.25 vs 0.50", {"DUST_STRENGTH": 0.25}, {"DUST_STRENGTH": 0.5}, "0.25", "0.50", M,
                 "Range ends.")])
     card("grain", "Soil grains and contact band", "GRAIN_DENSITY, CONTACT_BAND_PX, CONTACT_BAND_DARKEN",
-         "randomized (per mine)", "-", "grains 0-5 % of mine pixels; band 1.5-4 px, darken 0.1-0.3",
-         "Uniform per mine.", "Soil specks on the mine and the darker band where it meets the ground.",
+         "randomized (per mine)", "-", "grains 0-5 % of mine pixels; band (1.5-4 px) x zoom, darken 0.1-0.3",
+         "Uniform per mine; band width, grain size and soft-grain blur are multiplied by the zoom factor.",
+         "Soil specks on the mine and the darker band where it meets the ground.",
          plot_small_multiples("grain.png", [(col(mines, "grain_density"), "grain density", (0, 0.05)),
-                                            (col(mines, "band_px"), "contact band (px)", (1.5, 4)),
+                                            (col(mines, "band_px"), "contact band before zoom (px)", (1.5, 4)),
                                             (col(mines, "band_darken"), "band darkening", (0.1, 0.3))],
                               "Grains and contact band (planned)", unit="mines"),
          ba=[BA("grain", "Grains 0 vs 5 %", {"GRAIN_DENSITY": 0.0}, {"GRAIN_DENSITY": 0.05}, "0", "0.05", Z,
@@ -543,19 +604,22 @@ def build_cards(imgs, mines, meta, do_render):
     # mine position: drawn at render time; approximate with the planned box sizes and uniform placement
     rng = np.random.default_rng(0)
     L = col(mines, "length_px")
-    cx = rng.uniform(0, 1920 - 0.8 * L) + 0.4 * L
-    cy = rng.uniform(0, 1080 - 0.8 * L) + 0.4 * L
-    fig, ax = plt.subplots(figsize=(7.2, 3.6))
-    hb = ax.hist2d(cx, cy, bins=[32, 18], range=[[0, 1920], [0, 1080]], cmap="Blues")
+    cx = rng.uniform(8, 632 - 0.8 * L) + 0.4 * L
+    cy = rng.uniform(8, 632 - 0.8 * L) + 0.4 * L
+    fig, ax = plt.subplots(figsize=(5.6, 4.4))
+    hb = ax.hist2d(cx, cy, bins=[16, 16], range=[[0, 640], [0, 640]], cmap="Blues")
     fig.colorbar(hb[3], ax=ax, label="mines per cell (count)")
     ax.invert_yaxis()
-    ax.set_xlabel("box centre x (px)")
+    ax.set_aspect("equal")
+    ax.set_xlabel("box centre x in the 640x640 crop (px)")
     ax.set_ylabel("box centre y (px)")
-    ax.set_title("Mine position (approximation: uniform placement of the planned box sizes)", loc="left", fontsize=11)
+    ax.set_title("Mine position in the crop (approximation:\nuniform placement of the planned box sizes)", loc="left",
+                 fontsize=11)
     ax.grid(False)
-    card("position", "Mine position", "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN", "randomized (per mine)",
-         "-", "anywhere with the box fully inside the frame",
-         "Uniform over the frame, rejection sampling against already-placed boxes (50 attempts, 10 px margin).",
+    card("position", "Mine position", "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN, CROP_MINE_MARGIN",
+         "randomized (per mine)", "-", "anywhere with the box fully inside the 640x640 crop (8 px margin)",
+         "Uniform inside the crop window, rejection sampling against already-placed boxes (50 attempts, 10 px x zoom "
+         "overlap margin).",
          "Where the mine lands in the image.", _save(fig, "position.png"),
          notes="Not replicated in the plan (it depends on the rendered silhouette and on the other mines); the graph "
                "is an approximation. Fixing positions (MINE_POSITIONS) would skip the overlap test, so position is "
@@ -567,14 +631,18 @@ def build_cards(imgs, mines, meta, do_render):
     def ri(a, b, n=K):
         return rr.integers(a, b + 1, n)
     cfgd = "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+    zc = ("Configured distribution per 1920x1080 render BEFORE zoom coupling (drawn inside the renderer, not "
+          "replicated in the plan; 20000 draws). With zoom z = scale / 0.2 (1.25-2.0) the count is multiplied by z^-2 "
+          "(stochastic rounding) and sizes by z; about 20 % of the render lands in the 640x640 crop.")
     card("blades", "Grass blades, tufts, wisps", "BLADES_UNDER, BLADES_OVER, BLADE_KIND_PROBS", "randomized", "-",
-         "under 20-80, over 15-60 per image", "Uniform integer counts per image; kind blade 0.6 / tuft 0.25 / wisp 0.15.",
+         "under 20-80, over 15-60 per 1920x1080 render, x z^-2",
+         "Uniform integer counts per image; kind blade 0.6 / tuft 0.25 / wisp 0.15. Sizes in mm (follow px/mm).",
          "Thin grass under and over the mines (over-layer blades partly occlude mines; labels use the visible mask).",
          plot_two("blades.png", ri(20, 80).astype(float), ri(15, 60).astype(float), "under the mines",
                   "over the mines", "blades per image", "Grass blade counts per image (configured)", bins=33,
                   rng_lim=(14.5, 80.5)),
          ba=[BA("blades", "No over-layer blades vs 60", {"BLADES_OVER": 0}, {"BLADES_OVER": 60}, "0 over", "60 over",
-                ("mine", 270, 1), "Over-layer count only.")], notes=cfgd)
+                M, "Over-layer count only.")], notes=zc)
     on = (rr.random(K) < 0.6) * ri(1, 4)
     card("blades_on_mine", "Blades crossing a mine", "BLADES_OVER_ON_MINE, BLADES_ON_MINE_COUNT", "randomized (per mine)",
          "-", "60 % of mines get 1-4", "Bernoulli(0.6) per mine, then U{1..4}.",
@@ -585,36 +653,71 @@ def build_cards(imgs, mines, meta, do_render):
                 {"BLADES_OVER_ON_MINE": 1.0, "BLADES_ON_MINE_COUNT": 4}, "0", "4", M, "Partial occlusion.")],
          notes=cfgd)
     card("leaf_clumps", "Leaf-litter clumps", "LEAF_CLUMPS_UNDER, LEAF_CLUMPS_OVER, LEAF_CLUMP_SIZE", "randomized", "-",
-         "under 2-8, over 0-2 per image; 25-60 px", "Uniform integer counts per image.",
+         "under 2-8, over 0-2 per render, x z^-2; 25-60 px x z", "Uniform integer counts per image.",
          "RGBA leaf-litter clumps, colour-adapted to the ground.",
          plot_bar("leaf_clumps.png", [str(k) for k in range(2, 11)],
                   np.bincount(ri(2, 8) + ri(0, 2), minlength=11)[2:], "clumps per image (under + over)",
                   "Leaf clumps per image (configured)", unit="images (of 20000)"),
          ba=[BA("leaf", "0 vs 8 leaf clumps", {"LEAF_CLUMPS_UNDER": 0, "LEAF_CLUMPS_OVER": 0},
-                {"LEAF_CLUMPS_UNDER": 8, "LEAF_CLUMPS_OVER": 2}, "0", "10", ("mine", 270, 1), "Range ends.")],
-         notes=cfgd)
+                {"LEAF_CLUMPS_UNDER": 8, "LEAF_CLUMPS_OVER": 2}, "0", "10 (x z^-2)", M, "Range ends.")],
+         notes=zc)
     card("rocks", "Rocks", "ROCKS_TO_SPAWN_MIN / MAX, ROCK_OUTPUT_SIZE_MIN / MAX", "randomized", "-",
-         "5-20 per layer (two layers), 40-100 px", "Uniform integer per layer; under and over layer each draw.",
+         "5-20 per layer (two layers) x z^-2, 40-100 px x z", "Uniform integer per layer; under and over layer each draw.",
          "Rock photos with cast and contact shadows.",
          plot_random("rocks.png", (ri(5, 20) + ri(5, 20)).astype(float), "rocks per image (both layers)",
                      "Rocks per image (configured)", unit="images (of 20000)", discrete=True),
          ba=[BA("rocks", "5 vs 20 rocks per layer", {"ROCKS_TO_SPAWN_MIN": 5, "ROCKS_TO_SPAWN_MAX": 5},
-                {"ROCKS_TO_SPAWN_MIN": 20, "ROCKS_TO_SPAWN_MAX": 20}, "5 per layer", "20 per layer", ("frame", 3),
-                "Range ends.")],
-         notes=cfgd + " Rocks, grass clippings and dirt are drawn in BOTH debris layers (v1 behaviour), so some "
+                {"ROCKS_TO_SPAWN_MIN": 20, "ROCKS_TO_SPAWN_MAX": 20}, "5 per layer", "20 per layer", M,
+                "Range ends (before x z^-2).")],
+         notes=zc + " Rocks, grass clippings and dirt are drawn in BOTH debris layers (v1 behaviour), so some "
                       "land on top of mines.")
     card("dirt", "Dirt snippets and specks", "DIRT_SNIPPETS_PER_LAYER, DIRT_RECTS_PER_LAYER", "randomized", "-",
-         "2-10 snippets and 50-200 soft specks per layer", "Uniform integer per layer.",
+         "2-10 snippets (15-60 px) and 50-200 soft specks (4-12 px) per layer; counts x z^-2, sizes x z",
+         "Uniform integer per layer.",
          "Soil clod photos and small soft dirt specks on the ground.",
          plot_random("dirt.png", (ri(2, 10) + ri(2, 10)).astype(float), "dirt snippets per image (both layers)",
-                     "Dirt snippets per image (configured)", unit="images (of 20000)", discrete=True), notes=cfgd)
+                     "Dirt snippets per image (configured)", unit="images (of 20000)", discrete=True), notes=zc)
     card("grass_clippings", "Grass clippings (v1 photos)", "GRASS_IMAGES_TO_SAMPLE, GRASS_CLIPPINGS_PER_IMAGE",
-         "randomized", "-", "4 source photos x 5-16 crops per layer, 40-80 px", "Uniform integer per photo.",
+         "randomized", "-", "4 source photos x 5-16 crops per layer (x z^-2), 40-80 px x z", "Uniform integer per photo.",
          "Crops of v1 grass photos scattered as clutter.",
          plot_random("grass_clippings.png", sum(ri(5, 16) for _ in range(8)).astype(float),
                      "grass clippings per image (both layers)", "Grass clippings per image (configured)",
-                     unit="images (of 20000)", discrete=True), notes=cfgd)
+                     unit="images (of 20000)", discrete=True), notes=zc)
     return cards
+
+
+def _draw_boxes(rgb, labels, W, H, pad=3, thick=2):
+    import cv2
+    for l in labels:
+        _, xc, yc, w, h = l
+        x0, y0 = int(round((xc - w / 2) * W)) - pad, int(round((yc - h / 2) * H)) - pad
+        cv2.rectangle(rgb, (x0, y0), (x0 + int(round(w * W)) + 2 * pad, y0 + int(round(h * H)) + 2 * pad),
+                      (255, 60, 40), thick)
+    return rgb
+
+
+def crop_demo():
+    """Render vs saved crop for one plan row: the crop as saved, and the same scene without the crop (mines pinned
+    at their placed positions) with the window outlined."""
+    import cv2
+    from features.camera import jpeg_roundtrip
+    from scene import render_scene
+    design = G.load_design(os.path.dirname(PLAN))
+    r = next(x for x in design if x["n_mines"] == 3 and x["scale_bin"] == 1)
+    cfg = G.make_config(G.row_overrides(r))
+    rgb, labels, meta = render_scene(G.BASE_SEED, G.compact_overrides(r), index=r["index"], cfg=cfg)
+    rgb = _draw_boxes(jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"]), labels, 640, 640)
+    cv2.imwrite(os.path.join(IMG, "crop_crop.jpg"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
+    pos = [(m["rect_full"][0] + m["rect_full"][2] / 2, m["rect_full"][1] + m["rect_full"][3] / 2) for m in meta["mines"]]
+    cfg2 = G.make_config({**G.row_overrides(r), "OUTPUT_CROP": None, "MINE_POSITIONS": pos})
+    full, _, _ = render_scene(G.BASE_SEED, {}, index=r["index"], cfg=cfg2)
+    c = meta["crop"]
+    full = full.copy()
+    cv2.rectangle(full, (c["x0"], c["y0"]), (c["x0"] + 640, c["y0"] + 640), (235, 104, 52), 6)
+    small = cv2.resize(full, (640, 360), interpolation=cv2.INTER_AREA)
+    small = np.concatenate([np.full((140, 640, 3), 245, np.uint8), small, np.full((140, 640, 3), 245, np.uint8)], 0)
+    cv2.imwrite(os.path.join(IMG, "crop_full.jpg"), cv2.cvtColor(small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
+    print("rendered crop demo", r["index"], flush=True)
 
 
 def sample_gallery(design, do_render):
@@ -625,7 +728,7 @@ def sample_gallery(design, do_render):
     picks, seen = [], set()
     for r in design:
         key = (r["scale_bin"], r["light"] == 0)
-        if r["n_mines"] >= 3 and key not in seen:
+        if r["n_mines"] >= 2 and key not in seen:
             seen.add(key)
             picks.append(r)
         if len(picks) == 6:
@@ -636,21 +739,17 @@ def sample_gallery(design, do_render):
         if do_render:
             rgb, labels, meta = render_scene(G.BASE_SEED, G.compact_overrides(r), index=r["index"],
                                              cfg=G.make_config(G.row_overrides(r)))
-            rgb = jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"])
-            for l in labels:
-                _, xc, yc, w, h = l
-                x0, y0 = int((xc - w / 2) * 1920) - 4, int((yc - h / 2) * 1080) - 4
-                cv2.rectangle(rgb, (x0, y0), (x0 + int(w * 1920) + 8, y0 + int(h * 1080) + 8), (255, 60, 40), 2)
-            cv2.imwrite(os.path.join(IMG, name), cv2.cvtColor(cv2.resize(rgb, (960, 540), interpolation=cv2.INTER_AREA),
-                                                              cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 90])
+            rgb = _draw_boxes(jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"]), labels, 640, 640)
+            cv2.imwrite(os.path.join(IMG, name), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
             print("rendered sample", r["index"], flush=True)
-        opts.append({"label": f"plan row {r['index']} ({r['split']})",
+        lo, hi = G.bucket_range(G.SCALE_EDGES, r["scale_bin"])
+        opts.append({"label": f"plan row {r['index']} ({r['split']}, scale {lo:.4g}-{hi:.4g})",
                      "params": f"n_mines={r['n_mines']} scale_bin={r['scale_bin']} burial_bin={r['burial_bin']} "
                                f"elev_bin={r['elev_bin']} light={r['light']} family={G.FAMILY_NAMES[r['family']]} "
                                f"psf_bin={r['psf_bin']} bg={r['bg_file']}",
                      "image": REL + name,
-                     "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = "
-                                "YOLO boxes). Not part of a generated dataset."})
+                     "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at "
+                                "full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."})
     return opts
 
 
@@ -710,7 +809,8 @@ def main():
                      "figure": {"image": split_png, "label": "val share per bucket", "caption": PLANNED}})
     features.append({"id": "samples", "title": "Planned rows rendered (examples)", "flag": "render_scene(2026, k)",
                      "summary": "Six plan rows with different scale buckets and light conditions, rendered in memory "
-                                "with their overrides to show what the plan produces. No dataset images were written.",
+                                "with their overrides (640x640 native crops, zoom coupling on) to show what the plan "
+                                "produces. No dataset images were written.",
                      "options": gallery})
     for c in cards:
         f = {"id": c["cid"], "title": c["title"], "flag": c["flag"], "summary": c["what"],
@@ -730,37 +830,41 @@ def main():
     overview = [[c["title"], c["kind"], c["buckets"] if c["buckets"] != "-" else "randomized", c["range"], c["flag"]]
                 for c in cards]
     b = meta["balance"]
+    nm_tot, nb_tot = meta["n_mines_planned"], meta["n_buried_planned"]
     decisions = [
-        ["Dataset size", "3000 images (2700 train / 300 val), 10800 planned mines, 600 empty images",
-         "Confirm 3000, or scale up (the plan is a pure function of N; quotas re-derive)"],
-        ["Stratified factors", "mines per image (9), mine scale (5 log bins), burial fraction (4), sun elevation (6), "
-                               "light: overcast + 4 shadow bins (5), background family (2, + per-file quotas), "
-                               "lens blur (3)", "Confirm the list; anything else stays randomized"],
-        ["Randomized factors", "sun azimuth, all per-mine pose / face-down / colour / burial yes-no / dust / position, "
-                               "camera jitter, debris counts", "Confirm (per-mine factors cannot be bucketed without "
-                                                               "a generator change)"],
-        ["Mine-scale distribution", "log-uniform (equal count per log bin) instead of the generator's linear uniform",
-         "Confirm the change (more small mines) or switch to 5 linear bins"],
-        ["Empty images", "20 % (600) - the generator's real P(0) = 0.10 + 0.9 / 9; the controlPanel comment says 10 %",
-         "Keep 20 % or set the quota to 10 %"],
-        ["Burial", "35 % of mines buried (random), target fraction in 4 equal-count buckets, cap 0.5",
-         "Confirm buckets [0.05, 0.2, 0.3, 0.4, 0.5]"],
-        ["Image format / resolution", "native 1920x1080 JPEG, NOT resized. JPEG quality: generator samples 70-95 per "
-                                      "image (default here); brief said q95 (--jpeg-quality 95)",
-         "Pick sampled 70-95 (recommended: it is an augmentation) or fixed q95"],
-        ["v1 comparison", "v1 rendered 1920x1080 too, then exportToYOLO.py STRETCHED every image to 640x640 "
-                          "(aspect 16:9 -> 1:1, re-saved at OpenCV's default q95)", "Keep native; resizing can be "
-                                                                                  "left to the trainer (imgsz)"],
+        ["Image format / resolution (NEW)", "640x640 JPEG as a NATIVE crop of the 1920x1080 render (no resize, no "
+         "resampling); the window position is uniform and every mine is placed fully inside it (8 px margin); labels "
+         "normalised to the crop", "confirmed (ADR 0016)"],
+        ["Mine-scale distribution (NEW)", "4 LINEAR bins over 0.25-0.40 (750 images each, uniform inside the bucket), "
+         "mine length ~107-171 px; was 5 log bins over 0.10-0.40", "confirmed (ADR 0016)"],
+        ["Zoom coupling (NEW)", "rocks, grass clippings, leaf clumps, dirt and the mine's pixel-sized soil / contact "
+         "details x z = scale / 0.2, debris counts x z^-2, background magnified by z (capped at 1.5 px per source px); "
+         "blades follow px/mm; sensor effects stay in pixels (SCENE_ZOOM_COUPLING, default off in the generator)",
+         "confirmed (ADR 0016)"],
+        ["Mines per image (NEW)", "0-4: 600 empty (20 %) and 600 each for 1..4; was 0-8", "confirmed (ADR 0016)"],
+        ["Dataset size", f"3000 images (2700 train / 300 val), {nm_tot} planned mines ({nb_tot} buried), 600 empty",
+         "confirmed"],
+        ["Stratified factors", "mines per image (5), mine scale (4 linear bins), burial fraction (4), sun elevation "
+                               "(6), light: overcast + 4 shadow bins (5), background family (2, + per-file quotas), "
+                               "lens blur (3)", "confirmed (unchanged except mines / scale)"],
+        ["Randomized factors", "sun azimuth, all per-mine pose / face-down / colour / burial yes-no / dust / soft "
+                               "grains / position, camera jitter, debris counts, crop position", "confirmed"],
+        ["Burial", "35 % of mines buried (random), target fraction in 4 equal-count buckets [0.05, 0.2, 0.3, 0.4, "
+                   "0.5], cap 0.5", "confirmed (unchanged)"],
+        ["JPEG quality", "generator-sampled 70-95 per image (an augmentation), saved at 640x640", "confirmed"],
         ["Output location", "output_dataset/v2_3000 (gitignored): images/{train,val}, labels/{train,val}, meta/, "
-                            "manifest.csv, data.yaml, plan/, README.md", "Confirm"],
-        ["Generation time", "~1.1-1.5 s per image per worker (measured 0.8-2.0 s single-process on plan rows) -> "
-                            "about 15-25 min with 4 low-priority workers", "Confirm 4 workers"],
+                            "manifest.csv, data.yaml, plan/, README.md; the earlier 1920x1080 render was deleted",
+         "confirmed"],
+        ["Generation time", "~0.7-2 s per image single-process (the full scene is still rendered at 1920x1080, "
+                            "fewer debris objects) -> roughly 15-25 min with 4 low-priority workers",
+         "the lead starts the render after the review of docs/zoomed_look.png"],
     ]
     page = {"id": "params", "tab": "Dataset v2: parameters",
-            "title": "Dataset v2 (3000 images): every sampled parameter",
-            "intro": "PLAN AWAITING CONFIRMATION: every graph on this page is the planned distribution from the "
-                     "3000-row sampling plan (scripts/generate_dataset.py --plan-only); the dataset has not been "
-                     "generated yet. Stratified factors are evenly sampled: equal-count buckets per image, value "
+            "title": "Dataset v2 (3000 zoomed 640x640 images): every sampled parameter",
+            "intro": "DATASET NOT YET GENERATED. Plan confirmed with the zoomed 640x640 revision (ADR 0016: native "
+                     "640x640 crop, mine scale 0.25-0.40 in 4 linear bins, scene zoom coupling, 0-4 mines). Every "
+                     "graph on this page is the planned distribution from the 3000-row sampling plan "
+                     "(scripts/generate_dataset.py --plan-only). Stratified factors are evenly sampled: equal-count buckets per image, value "
                      "uniform inside the bucket, buckets crossed with each other by a balanced design. Everything "
                      "else is randomized with the generator's tuned distributions. Before / after pairs use the same "
                      "seed and change only the named parameter.",
@@ -774,9 +878,13 @@ def main():
                          "chi-square": "Sum over table cells of (count - expected)^2 / expected; 0 = perfectly "
                                        "even crossing.",
                          "PSF": "Point-spread function: how the lens smears a point (here a Gaussian blur).",
-                         "YOLO label": "One line per box: class x_centre y_centre width height, normalised to 0-1."},
+                         "YOLO label": "One line per box: class x_centre y_centre width height, normalised to 0-1.",
+                         "native crop": "Cutting a window out of the rendered image pixel for pixel (no resize or "
+                                        "interpolation), so nothing gets blurred or stretched.",
+                         "zoom coupling": "Scaling everything physical (rocks, debris, ground texture, soil details) "
+                                          "with the mine size, as if the camera moved closer."},
             "tables": [
-                {"title": "Decisions to confirm before generating", "columns": ["decision", "plan", "confirm"],
+                {"title": "Decisions", "columns": ["decision", "plan", "status"],
                  "rows": decisions},
                 {"title": "Overview: parameters", "columns": ["parameter", "type", "buckets", "range", "override / config"],
                  "rows": overview,

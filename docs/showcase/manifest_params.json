@@ -3,74 +3,81 @@
   {
    "id": "params",
    "tab": "Dataset v2: parameters",
-   "title": "Dataset v2 (3000 images): every sampled parameter",
-   "intro": "PLAN AWAITING CONFIRMATION: every graph on this page is the planned distribution from the 3000-row sampling plan (scripts/generate_dataset.py --plan-only); the dataset has not been generated yet. Stratified factors are evenly sampled: equal-count buckets per image, value uniform inside the bucket, buckets crossed with each other by a balanced design. Everything else is randomized with the generator's tuned distributions. Before / after pairs use the same seed and change only the named parameter.",
+   "title": "Dataset v2 (3000 zoomed 640x640 images): every sampled parameter",
+   "intro": "DATASET NOT YET GENERATED. Plan confirmed with the zoomed 640x640 revision (ADR 0016: native 640x640 crop, mine scale 0.25-0.40 in 4 linear bins, scene zoom coupling, 0-4 mines). Every graph on this page is the planned distribution from the 3000-row sampling plan (scripts/generate_dataset.py --plan-only). Stratified factors are evenly sampled: equal-count buckets per image, value uniform inside the bucket, buckets crossed with each other by a balanced design. Everything else is randomized with the generator's tuned distributions. Before / after pairs use the same seed and change only the named parameter.",
    "glossary": {
     "stratified": "Evenly sampled: the range is cut into buckets and every bucket gets exactly the same number of images (or a fixed quota); the value is random inside it.",
     "randomized": "Each image / mine draws the value independently (i.i.d.) from the configured distribution.",
     "balanced design": "Bucket columns are shuffled, then rows are swapped inside a column to make every pair of factors as evenly crossed as possible (pairwise chi-square minimised); marginal counts never change.",
     "chi-square": "Sum over table cells of (count - expected)^2 / expected; 0 = perfectly even crossing.",
     "PSF": "Point-spread function: how the lens smears a point (here a Gaussian blur).",
-    "YOLO label": "One line per box: class x_centre y_centre width height, normalised to 0-1."
+    "YOLO label": "One line per box: class x_centre y_centre width height, normalised to 0-1.",
+    "native crop": "Cutting a window out of the rendered image pixel for pixel (no resize or interpolation), so nothing gets blurred or stretched.",
+    "zoom coupling": "Scaling everything physical (rocks, debris, ground texture, soil details) with the mine size, as if the camera moved closer."
    },
    "tables": [
     {
-     "title": "Decisions to confirm before generating",
+     "title": "Decisions",
      "columns": [
       "decision",
       "plan",
-      "confirm"
+      "status"
      ],
      "rows": [
       [
+       "Image format / resolution (NEW)",
+       "640x640 JPEG as a NATIVE crop of the 1920x1080 render (no resize, no resampling); the window position is uniform and every mine is placed fully inside it (8 px margin); labels normalised to the crop",
+       "confirmed (ADR 0016)"
+      ],
+      [
+       "Mine-scale distribution (NEW)",
+       "4 LINEAR bins over 0.25-0.40 (750 images each, uniform inside the bucket), mine length ~107-171 px; was 5 log bins over 0.10-0.40",
+       "confirmed (ADR 0016)"
+      ],
+      [
+       "Zoom coupling (NEW)",
+       "rocks, grass clippings, leaf clumps, dirt and the mine's pixel-sized soil / contact details x z = scale / 0.2, debris counts x z^-2, background magnified by z (capped at 1.5 px per source px); blades follow px/mm; sensor effects stay in pixels (SCENE_ZOOM_COUPLING, default off in the generator)",
+       "confirmed (ADR 0016)"
+      ],
+      [
+       "Mines per image (NEW)",
+       "0-4: 600 empty (20 %) and 600 each for 1..4; was 0-8",
+       "confirmed (ADR 0016)"
+      ],
+      [
        "Dataset size",
-       "3000 images (2700 train / 300 val), 10800 planned mines, 600 empty images",
-       "Confirm 3000, or scale up (the plan is a pure function of N; quotas re-derive)"
+       "3000 images (2700 train / 300 val), 6000 planned mines (2059 buried), 600 empty",
+       "confirmed"
       ],
       [
        "Stratified factors",
-       "mines per image (9), mine scale (5 log bins), burial fraction (4), sun elevation (6), light: overcast + 4 shadow bins (5), background family (2, + per-file quotas), lens blur (3)",
-       "Confirm the list; anything else stays randomized"
+       "mines per image (5), mine scale (4 linear bins), burial fraction (4), sun elevation (6), light: overcast + 4 shadow bins (5), background family (2, + per-file quotas), lens blur (3)",
+       "confirmed (unchanged except mines / scale)"
       ],
       [
        "Randomized factors",
-       "sun azimuth, all per-mine pose / face-down / colour / burial yes-no / dust / position, camera jitter, debris counts",
-       "Confirm (per-mine factors cannot be bucketed without a generator change)"
-      ],
-      [
-       "Mine-scale distribution",
-       "log-uniform (equal count per log bin) instead of the generator's linear uniform",
-       "Confirm the change (more small mines) or switch to 5 linear bins"
-      ],
-      [
-       "Empty images",
-       "20 % (600) - the generator's real P(0) = 0.10 + 0.9 / 9; the controlPanel comment says 10 %",
-       "Keep 20 % or set the quota to 10 %"
+       "sun azimuth, all per-mine pose / face-down / colour / burial yes-no / dust / soft grains / position, camera jitter, debris counts, crop position",
+       "confirmed"
       ],
       [
        "Burial",
-       "35 % of mines buried (random), target fraction in 4 equal-count buckets, cap 0.5",
-       "Confirm buckets [0.05, 0.2, 0.3, 0.4, 0.5]"
+       "35 % of mines buried (random), target fraction in 4 equal-count buckets [0.05, 0.2, 0.3, 0.4, 0.5], cap 0.5",
+       "confirmed (unchanged)"
       ],
       [
-       "Image format / resolution",
-       "native 1920x1080 JPEG, NOT resized. JPEG quality: generator samples 70-95 per image (default here); brief said q95 (--jpeg-quality 95)",
-       "Pick sampled 70-95 (recommended: it is an augmentation) or fixed q95"
-      ],
-      [
-       "v1 comparison",
-       "v1 rendered 1920x1080 too, then exportToYOLO.py STRETCHED every image to 640x640 (aspect 16:9 -> 1:1, re-saved at OpenCV's default q95)",
-       "Keep native; resizing can be left to the trainer (imgsz)"
+       "JPEG quality",
+       "generator-sampled 70-95 per image (an augmentation), saved at 640x640",
+       "confirmed"
       ],
       [
        "Output location",
-       "output_dataset/v2_3000 (gitignored): images/{train,val}, labels/{train,val}, meta/, manifest.csv, data.yaml, plan/, README.md",
-       "Confirm"
+       "output_dataset/v2_3000 (gitignored): images/{train,val}, labels/{train,val}, meta/, manifest.csv, data.yaml, plan/, README.md; the earlier 1920x1080 render was deleted",
+       "confirmed"
       ],
       [
        "Generation time",
-       "~1.1-1.5 s per image per worker (measured 0.8-2.0 s single-process on plan rows) -> about 15-25 min with 4 low-priority workers",
-       "Confirm 4 workers"
+       "~0.7-2 s per image single-process (the full scene is still rendered at 1920x1080, fewer debris objects) -> roughly 15-25 min with 4 low-priority workers",
+       "the lead starts the render after the review of docs/zoomed_look.png"
       ]
      ]
     },
@@ -87,15 +94,15 @@
       [
        "Mines per image",
        "stratified",
-       "9 (0..8)",
-       "0-8 mines",
+       "5 (0..4)",
+       "0-4 mines",
        "N_MINES"
       ],
       [
        "Mine scale (altitude)",
        "stratified",
-       "5 log-spaced",
-       "0.10-0.40 (mine length ~43-171 px at 1080p)",
+       "4 linear",
+       "0.25-0.40 (mine length ~107-171 px in the 640x640 crop)",
        "MINE_SCALE_MIN / MINE_SCALE_MAX (per-image bucket)"
       ],
       [
@@ -228,8 +235,8 @@
        "Background zoom",
        "randomized",
        "randomized",
-       "1.0-2.0",
-       "BG_ZOOM"
+       "BG_ZOOM 1.0-2.0, then x mine scale / 0.2, capped at 1.5 output px per source px",
+       "BG_ZOOM x zoom coupling (SCENE_ZOOM_BG, SCENE_ZOOM_BG_MAX_MAG)"
       ],
       [
        "Background colour jitter",
@@ -241,9 +248,23 @@
       [
        "Ground scale (px per mm)",
        "stratified (via scale)",
-       "5 (same as mine scale)",
-       "0.36-1.42 px/mm",
+       "4 (same as mine scale)",
+       "0.89-1.42 px/mm",
        "derived from the scale bucket"
+      ],
+      [
+       "Scene zoom coupling (camera closer)",
+       "stratified (via scale)",
+       "4 (same as mine scale)",
+       "z = 1.25-2.0",
+       "SCENE_ZOOM_COUPLING, SCENE_ZOOM_REF_SCALE 0.2, SCENE_ZOOM_COUNT_EXP 2"
+      ],
+      [
+       "Native 640x640 crop",
+       "randomized",
+       "randomized",
+       "window anywhere in the 1920x1080 render",
+       "OUTPUT_CROP (640, 640), CROP_MINE_MARGIN 8"
       ],
       [
        "Mine yaw (in-plane rotation)",
@@ -305,7 +326,7 @@
        "Soil grains and contact band",
        "randomized (per mine)",
        "randomized",
-       "grains 0-5 % of mine pixels; band 1.5-4 px, darken 0.1-0.3",
+       "grains 0-5 % of mine pixels; band (1.5-4 px) x zoom, darken 0.1-0.3",
        "GRAIN_DENSITY, CONTACT_BAND_PX, CONTACT_BAND_DARKEN"
       ],
       [
@@ -326,14 +347,14 @@
        "Mine position",
        "randomized (per mine)",
        "randomized",
-       "anywhere with the box fully inside the frame",
-       "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN"
+       "anywhere with the box fully inside the 640x640 crop (8 px margin)",
+       "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN, CROP_MINE_MARGIN"
       ],
       [
        "Grass blades, tufts, wisps",
        "randomized",
        "randomized",
-       "under 20-80, over 15-60 per image",
+       "under 20-80, over 15-60 per 1920x1080 render, x z^-2",
        "BLADES_UNDER, BLADES_OVER, BLADE_KIND_PROBS"
       ],
       [
@@ -347,32 +368,32 @@
        "Leaf-litter clumps",
        "randomized",
        "randomized",
-       "under 2-8, over 0-2 per image; 25-60 px",
+       "under 2-8, over 0-2 per render, x z^-2; 25-60 px x z",
        "LEAF_CLUMPS_UNDER, LEAF_CLUMPS_OVER, LEAF_CLUMP_SIZE"
       ],
       [
        "Rocks",
        "randomized",
        "randomized",
-       "5-20 per layer (two layers), 40-100 px",
+       "5-20 per layer (two layers) x z^-2, 40-100 px x z",
        "ROCKS_TO_SPAWN_MIN / MAX, ROCK_OUTPUT_SIZE_MIN / MAX"
       ],
       [
        "Dirt snippets and specks",
        "randomized",
        "randomized",
-       "2-10 snippets and 50-200 soft specks per layer",
+       "2-10 snippets (15-60 px) and 50-200 soft specks (4-12 px) per layer; counts x z^-2, sizes x z",
        "DIRT_SNIPPETS_PER_LAYER, DIRT_RECTS_PER_LAYER"
       ],
       [
        "Grass clippings (v1 photos)",
        "randomized",
        "randomized",
-       "4 source photos x 5-16 crops per layer, 40-80 px",
+       "4 source photos x 5-16 crops per layer (x z^-2), 40-80 px x z",
        "GRASS_IMAGES_TO_SAMPLE, GRASS_CLIPPINGS_PER_IMAGE"
       ]
      ],
-     "note": "Balance: pairwise chi-square over all 21 factor pairs 298.01 (shuffled) -> 0.3 (balanced). Planned mines 10800, buried 3763."
+     "note": "Balance: pairwise chi-square over all 21 factor pairs 197.13 (shuffled) -> 0.21 (balanced). Planned mines 6000, buried 2059."
     },
     {
      "title": "Planned bucket counts (all images / val)",
@@ -384,13 +405,13 @@
      "rows": [
       [
        "n_mines",
-       "600 300 300 300 300 300 300 300 300",
-       "60 30 30 30 30 30 30 30 30"
+       "600 600 600 600 600",
+       "60 60 60 60 60"
       ],
       [
        "scale_bin",
-       "600 600 600 600 600",
-       "60 60 60 60 60"
+       "750 750 750 750",
+       "75 75 75 75"
       ],
       [
        "burial_bin",
@@ -410,7 +431,7 @@
       [
        "family",
        "1950 1050",
-       "194 106"
+       "195 105"
       ],
       [
        "psf_bin",
@@ -438,7 +459,7 @@
       ],
       [
        "balance",
-       "split-vs-factor chi-square 44.23 -> 0.32 after the swap search"
+       "split-vs-factor chi-square 27.17 -> 0.22 after the swap search"
       ]
      ],
      "figure": {
@@ -451,43 +472,43 @@
      "id": "samples",
      "title": "Planned rows rendered (examples)",
      "flag": "render_scene(2026, k)",
-     "summary": "Six plan rows with different scale buckets and light conditions, rendered in memory with their overrides to show what the plan produces. No dataset images were written.",
+     "summary": "Six plan rows with different scale buckets and light conditions, rendered in memory with their overrides (640x640 native crops, zoom coupling on) to show what the plan produces. No dataset images were written.",
      "options": [
       {
-       "label": "plan row 0 (train)",
-       "params": "n_mines=4 scale_bin=1 burial_bin=0 elev_bin=5 light=4 family=grass psf_bin=0 bg=bg_gen_31_grass_patchy_over.jpg",
+       "label": "plan row 0 (train, scale 0.25-0.2875)",
+       "params": "n_mines=2 scale_bin=0 burial_bin=0 elev_bin=0 light=4 family=grass psf_bin=0 bg=bg_gen_31_grass_patchy_over.jpg",
        "image": "images/params/sample_row_00000.jpg",
-       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+       "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."
       },
       {
-       "label": "plan row 1 (train)",
-       "params": "n_mines=5 scale_bin=4 burial_bin=2 elev_bin=1 light=1 family=grass psf_bin=1 bg=bg_gen_38_moss_clover_mowed.jpg",
+       "label": "plan row 1 (train, scale 0.3625-0.4)",
+       "params": "n_mines=3 scale_bin=3 burial_bin=2 elev_bin=1 light=1 family=grass psf_bin=1 bg=bg_gen_38_moss_clover_mowed.jpg",
        "image": "images/params/sample_row_00001.jpg",
-       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+       "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."
       },
       {
-       "label": "plan row 3 (train)",
-       "params": "n_mines=4 scale_bin=0 burial_bin=3 elev_bin=4 light=2 family=grass psf_bin=0 bg=bg_gen_13_grass_olive_normal.jpg",
-       "image": "images/params/sample_row_00003.jpg",
-       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+       "label": "plan row 4 (train, scale 0.2875-0.325)",
+       "params": "n_mines=4 scale_bin=1 burial_bin=3 elev_bin=5 light=3 family=grass psf_bin=1 bg=bg_gen_23_grass_dry_normal.jpg",
+       "image": "images/params/sample_row_00004.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."
       },
       {
-       "label": "plan row 9 (val)",
-       "params": "n_mines=5 scale_bin=3 burial_bin=1 elev_bin=3 light=4 family=grass psf_bin=1 bg=bg_gen_28_grass_patchy_normal.jpg",
-       "image": "images/params/sample_row_00009.jpg",
-       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+       "label": "plan row 10 (train, scale 0.325-0.3625)",
+       "params": "n_mines=3 scale_bin=2 burial_bin=0 elev_bin=2 light=3 family=non_grass psf_bin=1 bg=bg_Ground013.jpg",
+       "image": "images/params/sample_row_00010.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."
       },
       {
-       "label": "plan row 29 (train)",
-       "params": "n_mines=6 scale_bin=2 burial_bin=2 elev_bin=0 light=4 family=grass psf_bin=2 bg=bg_gen_21_grass_dry_normal.jpg",
-       "image": "images/params/sample_row_00029.jpg",
-       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+       "label": "plan row 31 (train, scale 0.25-0.2875)",
+       "params": "n_mines=2 scale_bin=0 burial_bin=3 elev_bin=3 light=0 family=non_grass psf_bin=1 bg=bg_Ground004.jpg",
+       "image": "images/params/sample_row_00031.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."
       },
       {
-       "label": "plan row 33 (train)",
-       "params": "n_mines=5 scale_bin=3 burial_bin=0 elev_bin=0 light=0 family=grass psf_bin=2 bg=grass1.png",
-       "image": "images/params/sample_row_00033.jpg",
-       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+       "label": "plan row 47 (train, scale 0.325-0.3625)",
+       "params": "n_mines=4 scale_bin=2 burial_bin=2 elev_bin=0 light=0 family=grass psf_bin=2 bg=bg_gen_27_grass_patchy_over.jpg",
+       "image": "images/params/sample_row_00047.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would: the native 640x640 crop at full size (red = YOLO boxes, drawn 3 px outside). Not part of a generated dataset."
       }
      ]
     },
@@ -495,7 +516,7 @@
      "id": "n_mines",
      "title": "Mines per image",
      "flag": "N_MINES",
-     "summary": "How many PFM-1 mines are placed in the image (positions by rejection sampling, 50 attempts).",
+     "summary": "How many PFM-1 mines are placed in the 640x640 crop (rejection sampling inside the crop, 50 attempts).",
      "facts": [
       [
        "type",
@@ -503,15 +524,15 @@
       ],
       [
        "buckets",
-       "9 (0..8)"
+       "5 (0..4)"
       ],
       [
        "range",
-       "0-8 mines"
+       "0-4 mines"
       ],
       [
        "distribution",
-       "Exact quota: 600 images with 0 mines, 300 with each of 1..8. This is the generator's own distribution (ZERO_MINE_PROB 0.10 plus a uniform draw of 0..8, i.e. P(0) = 0.2, P(k) = 0.1) made exact."
+       "Exact quota: 600 images (20 %) with 0 mines and 600 with each of 1..4 (user decision for the zoomed 640x640 dataset; was 0-8 with 600 / 300 x 8)."
       ],
       [
        "override / config",
@@ -523,13 +544,13 @@
       "label": "Mines per image",
       "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
      },
-     "notes": "Planned mines in total: 10800. Placement can fail for 8 large mines (50 attempts each); the rendered manifest will record placed vs planned."
+     "notes": "Planned mines in total: 6000. 4 mines of up to 171 px fit easily in the 624x624 placement area; the rendered manifest will record placed vs planned."
     },
     {
      "id": "mine_scale",
      "title": "Mine scale (altitude)",
      "flag": "MINE_SCALE_MIN / MINE_SCALE_MAX (per-image bucket)",
-     "summary": "Mine size in the frame (proxy for flight altitude). The ground blade scale (px per mm) is drawn from the same bucket, so grass and mines agree in scale within an image.",
+     "summary": "Mine size in the frame (proxy for flight altitude). The ground blade scale (px per mm) and the zoom coupling factor (scale / 0.2) come from the same bucket, so grass, rocks, debris and mines agree in scale.",
      "facts": [
       [
        "type",
@@ -537,15 +558,15 @@
       ],
       [
        "buckets",
-       "5 log-spaced"
+       "4 linear"
       ],
       [
        "range",
-       "0.10-0.40 (mine length ~43-171 px at 1080p)"
+       "0.25-0.40 (mine length ~107-171 px in the 640x640 crop)"
       ],
       [
        "distribution",
-       "Each image gets one log-spaced bucket (600 images per bucket); every mine in it draws its scale uniformly inside that bucket. Equal counts per log bucket = roughly log-uniform overall (DELIBERATE CHANGE from the generator's linear uniform 0.1-0.4: more small, hard mines; median 0.20 instead of 0.25)."
+       "Each image gets one of 4 equal-width buckets (750 images per bucket); every mine in it draws its scale uniformly inside that bucket, i.e. uniform 0.25-0.40 overall (user decision: was 5 log bins over 0.1-0.4, where mines were often barely visible)."
       ],
       [
        "override / config",
@@ -559,12 +580,12 @@
      },
      "before_after": [
       {
-       "label": "Scale 0.10 vs 0.40",
+       "label": "Scale 0.25 vs 0.40",
        "before": "images/params/scale_before.png",
        "after": "images/params/scale_after.png",
-       "before_label": "scale 0.10",
-       "after_label": "scale 0.40",
-       "caption": "Smallest vs largest end of the range. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "before_label": "scale 0.25 (zoom 1.25)",
+       "after_label": "scale 0.40 (zoom 2.0)",
+       "caption": "Smallest vs largest end of the range, both zoom-coupled. native-resolution 640x640 px crop around the mine."
       }
      ],
      "notes": "Per-image buckets mean all mines in one image share a scale range (like one flight altitude). Mine counts per bucket are exact because the n_mines x scale table is balanced."
@@ -608,7 +629,7 @@
        "after": "images/params/burial_none_after.png",
        "before_label": "not buried",
        "after_label": "45% buried",
-       "caption": "Same mine, fraction 0.45 (top bucket). native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Same mine, fraction 0.45 (top bucket). native-resolution 640x640 px crop around the mine."
       },
       {
        "label": "15% vs 45% buried",
@@ -616,7 +637,7 @@
        "after": "images/params/burial_low_after.png",
        "before_label": "15% buried",
        "after_label": "45% buried",
-       "caption": "Lowest vs highest bucket. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Lowest vs highest bucket. native-resolution 640x640 px crop around the mine."
       }
      ],
      "notes": "Buckets are [0.05, 0.2), [0.2, 0.3), [0.3, 0.4), [0.4, 0.5]: the first is wider, so the lightest burials get slightly less density per 0.01 than in the old uniform 0.05-0.5. The achieved hidden fraction is measured after rendering (it differs a little from the target). Images per bucket are exact (750); buried MINES per bucket vary a little (graph) because burial yes / no stays random per mine."
@@ -660,7 +681,7 @@
        "after": "images/params/sun_el_after.png",
        "before_label": "15 deg",
        "after_label": "70 deg",
-       "caption": "Long low-sun shadow vs short noon shadow. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Long low-sun shadow vs short noon shadow. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -692,7 +713,7 @@
       ],
       [
        "strength histogram",
-       "direct-sun mean 0.450, overcast mean 0.091"
+       "direct-sun mean 0.450, overcast mean 0.090"
       ]
      ],
      "figure": {
@@ -707,7 +728,7 @@
        "after": "images/params/overcast_after.png",
        "before_label": "overcast",
        "after_label": "direct, strength 0.65",
-       "caption": "Diffuse sky vs hard sun. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Diffuse sky vs hard sun. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -791,7 +812,7 @@
        "after": "images/params/psf_after.png",
        "before_label": "sigma 0",
        "after_label": "sigma 1.5",
-       "caption": "Sharp vs most blurred. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+       "caption": "Sharp vs most blurred. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom."
       }
      ]
     },
@@ -834,7 +855,7 @@
        "after": "images/params/sun_az_after.png",
        "before_label": "0 deg",
        "after_label": "180 deg",
-       "caption": "Shadow flips side. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Shadow flips side. native-resolution 640x640 px crop around the mine."
       }
      ],
      "notes": "Randomized: azimuth is a nuisance factor and background flips / 90-degree rotations already spread it; 3000 uniform draws fill every 15-degree bin (see graph)."
@@ -878,7 +899,7 @@
        "after": "images/params/tint_after.png",
        "before_label": "tint 0",
        "after_label": "tint 0.15",
-       "caption": "Strong shadow so the tint is visible. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Strong shadow so the tint is visible. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -921,7 +942,7 @@
        "after": "images/params/motion_after.png",
        "before_label": "none",
        "after_label": "4 px",
-       "caption": "Longest smear. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+       "caption": "Longest smear. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom."
       }
      ]
     },
@@ -964,7 +985,7 @@
        "after": "images/params/exposure_after.png",
        "before_label": "0.75",
        "after_label": "1.25",
-       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1007,7 +1028,7 @@
        "after": "images/params/gamma_after.png",
        "before_label": "0.85",
        "after_label": "1.15",
-       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1050,7 +1071,7 @@
        "after": "images/params/saturation_after.png",
        "before_label": "0.75",
        "after_label": "1.25",
-       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1093,7 +1114,7 @@
        "after": "images/params/contrast_after.png",
        "before_label": "0.95",
        "after_label": "1.2",
-       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1136,7 +1157,7 @@
        "after": "images/params/vignette_after.png",
        "before_label": "0.0",
        "after_label": "0.5",
-       "caption": "Range ends. whole 1920x1080 frame shown at 1/3 size; seed 11, one mine at the centre."
+       "caption": "Range ends. whole 1920x1080 render (before the 640x640 crop) shown at 1/3 size."
       }
      ]
     },
@@ -1144,7 +1165,7 @@
      "id": "aberration",
      "title": "Chromatic aberration",
      "flag": "ABERRATION",
-     "summary": "Chromatic aberration: R / B shift in uv units (0.002 = 3.8 px).",
+     "summary": "Chromatic aberration: R / B shift in units of the 1920 px render width (0.002 = 3.8 px; the crop keeps the pixel shift).",
      "facts": [
       [
        "type",
@@ -1179,7 +1200,7 @@
        "after": "images/params/aberration_after.png",
        "before_label": "0.0",
        "after_label": "0.002",
-       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom."
       }
      ]
     },
@@ -1222,7 +1243,7 @@
        "after": "images/params/wb_after.png",
        "before_label": "R, B = 0.92",
        "after_label": "R, B = 1.08",
-       "caption": "Both gains at the range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Both gains at the range ends. native-resolution 640x640 px crop around the mine."
       }
      ],
      "notes": "The before / after sets both gains together; in the dataset they are independent."
@@ -1266,7 +1287,7 @@
        "after": "images/params/noise_after.png",
        "before_label": "sigma 0",
        "after_label": "sigma 0.025, chroma 0.5",
-       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom."
       }
      ]
     },
@@ -1309,7 +1330,7 @@
        "after": "images/params/jpeg_after.png",
        "before_label": "q70",
        "after_label": "q95",
-       "caption": "Same render, saved at 70 vs 95. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+       "caption": "Same render, saved at 70 vs 95. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom."
       }
      ],
      "notes": "DECISION: the brief asked for q95 files. The generator instead samples 70-95 per image; the driver keeps that by default (--jpeg-quality sampled) and can force q95 with --jpeg-quality 95."
@@ -1350,7 +1371,7 @@
     {
      "id": "bg_zoom",
      "title": "Background zoom",
-     "flag": "BG_ZOOM",
+     "flag": "BG_ZOOM x zoom coupling (SCENE_ZOOM_BG, SCENE_ZOOM_BG_MAX_MAG)",
      "summary": "Zoom-crop into the ground photo on top of scale-to-cover (texture scale).",
      "facts": [
       [
@@ -1363,15 +1384,15 @@
       ],
       [
        "range",
-       "1.0-2.0"
+       "BG_ZOOM 1.0-2.0, then x mine scale / 0.2, capped at 1.5 output px per source px"
       ],
       [
        "distribution",
-       "Uniform per image, random offset."
+       "Uniform BG_ZOOM per image, random offset; zoom coupling multiplies it by z (camera closer), but the magnification (output px per photo px) is capped at max(1.5, uncoupled value) so the texture does not get blurrier than the generator already allowed; upscaling uses bicubic interpolation."
       ],
       [
        "override / config",
-       "BG_ZOOM"
+       "BG_ZOOM x zoom coupling (SCENE_ZOOM_BG, SCENE_ZOOM_BG_MAX_MAG)"
       ]
      ],
      "figure": {
@@ -1386,7 +1407,7 @@
        "after": "images/params/bgzoom_after.png",
        "before_label": "1.0",
        "after_label": "2.0",
-       "caption": "Ground texture scale. whole 1920x1080 frame shown at 1/3 size; seed 11, one mine at the centre."
+       "caption": "Ground texture scale. whole 1920x1080 render (before the 640x640 crop) shown at 1/3 size."
       }
      ]
     },
@@ -1429,7 +1450,7 @@
        "after": "images/params/bgbright_after.png",
        "before_label": "0.8",
        "after_label": "1.2",
-       "caption": "Ground only; the mine is harmonised to the ground's brightness. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Ground only; the mine is harmonised to the ground's brightness. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1445,11 +1466,11 @@
       ],
       [
        "buckets",
-       "5 (same as mine scale)"
+       "4 (same as mine scale)"
       ],
       [
        "range",
-       "0.36-1.42 px/mm"
+       "0.89-1.42 px/mm"
       ],
       [
        "distribution",
@@ -1466,6 +1487,101 @@
       "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
      },
      "notes": "In the default generator this value is drawn independently of the mines' scale, so blades could be drawn at a different 'altitude' than the mines of the same image; the per-image scale bucket keeps the two within one bucket."
+    },
+    {
+     "id": "zoom",
+     "title": "Scene zoom coupling (camera closer)",
+     "flag": "SCENE_ZOOM_COUPLING, SCENE_ZOOM_REF_SCALE 0.2, SCENE_ZOOM_COUNT_EXP 2",
+     "summary": "Like moving the camera closer: rocks, grass clippings, leaf clumps, dirt snippets and specks are drawn z times larger and z^2 times rarer (same density per ground area); the mine's contact band, contact AO, berm lip, exposed-part AO, soil-grain size and soft-grain blur grow by z; the background texture is magnified by z (capped, see 'Background zoom'). Grass blades are sized in mm and already follow px/mm. Sensor effects (PSF, motion blur, noise, aberration shift, vignette, JPEG) stay in pixels.",
+     "facts": [
+      [
+       "type",
+       "stratified (via scale)"
+      ],
+      [
+       "buckets",
+       "4 (same as mine scale)"
+      ],
+      [
+       "range",
+       "z = 1.25-2.0"
+      ],
+      [
+       "distribution",
+       "z = the image's mine scale / 0.2 (0.2 = the old plan's median scale), so it follows the scale bucket."
+      ],
+      [
+       "override / config",
+       "SCENE_ZOOM_COUPLING, SCENE_ZOOM_REF_SCALE 0.2, SCENE_ZOOM_COUNT_EXP 2"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/zoom.png",
+      "label": "Scene zoom coupling (camera closer)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
+     },
+     "before_after": [
+      {
+       "label": "Old look vs zoomed look",
+       "before": "images/params/zoom_old_new_before.png",
+       "after": "images/params/zoom_old_new_after.png",
+       "before_label": "old: scale 0.20, no coupling",
+       "after_label": "new: scale 0.30, zoom 1.5",
+       "caption": "The old median look vs the middle of the new range (debris counts / sizes differ by design). native-resolution 640x640 px crop around the mine."
+      },
+      {
+       "label": "Scale 0.40 without vs with coupling",
+       "before": "images/params/zoom_coupling_before.png",
+       "after": "images/params/zoom_coupling_after.png",
+       "before_label": "scale 0.40, coupling off",
+       "after_label": "scale 0.40, coupling on (z 2.0)",
+       "caption": "Same mine size: without coupling rocks, clippings and the ground texture keep the old pixel size, so the mine looks out of scale. native-resolution 640x640 px crop around the mine."
+      }
+     ],
+     "notes": "Default OFF in controlPanel (existing seeds and the earlier outputs are bit-identical with it off); the dataset driver turns it on. Debris count rounding and the crop window use new random streams R(11) / R(12) / R(13), so no existing stream changes."
+    },
+    {
+     "id": "crop",
+     "title": "Native 640x640 crop",
+     "flag": "OUTPUT_CROP (640, 640), CROP_MINE_MARGIN 8",
+     "summary": "The saved image: a 640x640 window cut out of the 1920x1080 render without any resize or resampling. Labels are converted to the crop's normalised YOLO coordinates (a box crossing the edge would be clipped and kept only if visible pixels remain inside, the usual label policy; with the margin none do). The camera model (blur with a context pad, noise, colour, vignette) is applied to the crop as the camera's frame.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "window anywhere in the 1920x1080 render"
+      ],
+      [
+       "distribution",
+       "Uniform window position per image (own stream R(11)), drawn before the mines; every mine is then placed fully inside the window (8 px margin)."
+      ],
+      [
+       "override / config",
+       "OUTPUT_CROP (640, 640), CROP_MINE_MARGIN 8"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/crop.png",
+      "label": "Native 640x640 crop",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Render vs saved crop",
+       "before": "images/params/crop_full.jpg",
+       "after": "images/params/crop_crop.jpg",
+       "before_label": "1920x1080 render (1/3 size, letterboxed), orange = crop window",
+       "after_label": "saved 640x640 image (native pixels), red = YOLO boxes",
+       "caption": "Plan row rendered with OUTPUT_CROP; the full frame on the left is the same scene re-rendered without the crop (mines pinned at the same positions)."
+      }
+     ]
     },
     {
      "id": "yaw",
@@ -1487,7 +1603,7 @@
       ],
       [
        "distribution",
-       "Uniform per mine. Drawn per mine inside the renderer, so it cannot be bucketed by per-image overrides without a generator change; with 10800 mines every 30-degree bin is within a few % of equal."
+       "Uniform per mine. Drawn per mine inside the renderer, so it cannot be bucketed by per-image overrides without a generator change; with 6000 mines every 30-degree bin is within a few % of equal."
       ],
       [
        "override / config",
@@ -1506,7 +1622,7 @@
        "after": "images/params/yaw_after.png",
        "before_label": "30 deg",
        "after_label": "120 deg",
-       "caption": "Same mine rotated. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Same mine rotated. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1549,7 +1665,7 @@
        "after": "images/params/tilt_after.png",
        "before_label": "pitch 3, roll 2",
        "after_label": "pitch 25",
-       "caption": "Tail of the distribution. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Tail of the distribution. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1592,10 +1708,10 @@
        "after": "images/params/flip_after.png",
        "before_label": "face up",
        "after_label": "face down",
-       "caption": "Same pose otherwise. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Same pose otherwise. native-resolution 640x640 px crop around the mine."
       }
      ],
-     "notes": "Kept random per mine (realistic mixed orientations in one image); 10800 Bernoulli draws give 29.9% face down."
+     "notes": "Kept random per mine (realistic mixed orientations in one image); 6000 Bernoulli draws give 29.3% face down."
     },
     {
      "id": "colour_family",
@@ -1636,7 +1752,7 @@
        "after": "images/params/colour_after.png",
        "before_label": "olive",
        "after_label": "tan",
-       "caption": "Two fixed albedos from the palette. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Two fixed albedos from the palette. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1712,7 +1828,7 @@
        "after": "images/params/bleach_after.png",
        "before_label": "none",
        "after_label": "0.6",
-       "caption": "Strongest fading. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Strongest fading. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1755,7 +1871,7 @@
        "after": "images/params/dtint_after.png",
        "before_label": "none",
        "after_label": "0.3",
-       "caption": "Strongest tint. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Strongest tint. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1779,7 +1895,7 @@
       ],
       [
        "distribution",
-       "Triangular(0.25, 0.30, 0.50), mean 0.35 (the user's ~35 %); planned mean 0.350."
+       "Triangular(0.25, 0.30, 0.50), mean 0.35 (the user's ~35 %); planned mean 0.349."
       ],
       [
        "override / config",
@@ -1798,7 +1914,7 @@
        "after": "images/params/dust_after.png",
        "before_label": "0.25",
        "after_label": "0.50",
-       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1818,11 +1934,11 @@
       ],
       [
        "range",
-       "grains 0-5 % of mine pixels; band 1.5-4 px, darken 0.1-0.3"
+       "grains 0-5 % of mine pixels; band (1.5-4 px) x zoom, darken 0.1-0.3"
       ],
       [
        "distribution",
-       "Uniform per mine."
+       "Uniform per mine; band width, grain size and soft-grain blur are multiplied by the zoom factor."
       ],
       [
        "override / config",
@@ -1841,7 +1957,7 @@
        "after": "images/params/grain_after.png",
        "before_label": "0",
        "after_label": "0.05",
-       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom."
       }
      ]
     },
@@ -1884,7 +2000,7 @@
        "after": "images/params/btilt_after.png",
        "before_label": "tilt 0",
        "after_label": "tilt 25",
-       "caption": "Fraction 0.35. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Fraction 0.35. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
@@ -1927,14 +2043,14 @@
        "after": "images/params/spec_after.png",
        "before_label": "0",
        "after_label": "0.12",
-       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ]
     },
     {
      "id": "position",
      "title": "Mine position",
-     "flag": "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN",
+     "flag": "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN, CROP_MINE_MARGIN",
      "summary": "Where the mine lands in the image.",
      "facts": [
       [
@@ -1947,15 +2063,15 @@
       ],
       [
        "range",
-       "anywhere with the box fully inside the frame"
+       "anywhere with the box fully inside the 640x640 crop (8 px margin)"
       ],
       [
        "distribution",
-       "Uniform over the frame, rejection sampling against already-placed boxes (50 attempts, 10 px margin)."
+       "Uniform inside the crop window, rejection sampling against already-placed boxes (50 attempts, 10 px x zoom overlap margin)."
       ],
       [
        "override / config",
-       "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN"
+       "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN, CROP_MINE_MARGIN"
       ]
      ],
      "figure": {
@@ -1981,11 +2097,11 @@
       ],
       [
        "range",
-       "under 20-80, over 15-60 per image"
+       "under 20-80, over 15-60 per 1920x1080 render, x z^-2"
       ],
       [
        "distribution",
-       "Uniform integer counts per image; kind blade 0.6 / tuft 0.25 / wisp 0.15."
+       "Uniform integer counts per image; kind blade 0.6 / tuft 0.25 / wisp 0.15. Sizes in mm (follow px/mm)."
       ],
       [
        "override / config",
@@ -2004,10 +2120,10 @@
        "after": "images/params/blades_after.png",
        "before_label": "0 over",
        "after_label": "60 over",
-       "caption": "Over-layer count only. native-resolution 540x540 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Over-layer count only. native-resolution 640x640 px crop around the mine."
       }
      ],
-     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+     "notes": "Configured distribution per 1920x1080 render BEFORE zoom coupling (drawn inside the renderer, not replicated in the plan; 20000 draws). With zoom z = scale / 0.2 (1.25-2.0) the count is multiplied by z^-2 (stochastic rounding) and sizes by z; about 20 % of the render lands in the 640x640 crop."
     },
     {
      "id": "blades_on_mine",
@@ -2048,7 +2164,7 @@
        "after": "images/params/bom_after.png",
        "before_label": "0",
        "after_label": "4",
-       "caption": "Partial occlusion. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+       "caption": "Partial occlusion. native-resolution 640x640 px crop around the mine."
       }
      ],
      "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
@@ -2069,7 +2185,7 @@
       ],
       [
        "range",
-       "under 2-8, over 0-2 per image; 25-60 px"
+       "under 2-8, over 0-2 per render, x z^-2; 25-60 px x z"
       ],
       [
        "distribution",
@@ -2091,11 +2207,11 @@
        "before": "images/params/leaf_before.png",
        "after": "images/params/leaf_after.png",
        "before_label": "0",
-       "after_label": "10",
-       "caption": "Range ends. native-resolution 540x540 px crop around the mine; seed 11, one mine at the centre."
+       "after_label": "10 (x z^-2)",
+       "caption": "Range ends. native-resolution 640x640 px crop around the mine."
       }
      ],
-     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+     "notes": "Configured distribution per 1920x1080 render BEFORE zoom coupling (drawn inside the renderer, not replicated in the plan; 20000 draws). With zoom z = scale / 0.2 (1.25-2.0) the count is multiplied by z^-2 (stochastic rounding) and sizes by z; about 20 % of the render lands in the 640x640 crop."
     },
     {
      "id": "rocks",
@@ -2113,7 +2229,7 @@
       ],
       [
        "range",
-       "5-20 per layer (two layers), 40-100 px"
+       "5-20 per layer (two layers) x z^-2, 40-100 px x z"
       ],
       [
        "distribution",
@@ -2136,10 +2252,10 @@
        "after": "images/params/rocks_after.png",
        "before_label": "5 per layer",
        "after_label": "20 per layer",
-       "caption": "Range ends. whole 1920x1080 frame shown at 1/3 size; seed 11, one mine at the centre."
+       "caption": "Range ends (before x z^-2). native-resolution 640x640 px crop around the mine."
       }
      ],
-     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws). Rocks, grass clippings and dirt are drawn in BOTH debris layers (v1 behaviour), so some land on top of mines."
+     "notes": "Configured distribution per 1920x1080 render BEFORE zoom coupling (drawn inside the renderer, not replicated in the plan; 20000 draws). With zoom z = scale / 0.2 (1.25-2.0) the count is multiplied by z^-2 (stochastic rounding) and sizes by z; about 20 % of the render lands in the 640x640 crop. Rocks, grass clippings and dirt are drawn in BOTH debris layers (v1 behaviour), so some land on top of mines."
     },
     {
      "id": "dirt",
@@ -2157,7 +2273,7 @@
       ],
       [
        "range",
-       "2-10 snippets and 50-200 soft specks per layer"
+       "2-10 snippets (15-60 px) and 50-200 soft specks (4-12 px) per layer; counts x z^-2, sizes x z"
       ],
       [
        "distribution",
@@ -2173,7 +2289,7 @@
       "label": "Dirt snippets and specks",
       "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
      },
-     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+     "notes": "Configured distribution per 1920x1080 render BEFORE zoom coupling (drawn inside the renderer, not replicated in the plan; 20000 draws). With zoom z = scale / 0.2 (1.25-2.0) the count is multiplied by z^-2 (stochastic rounding) and sizes by z; about 20 % of the render lands in the 640x640 crop."
     },
     {
      "id": "grass_clippings",
@@ -2191,7 +2307,7 @@
       ],
       [
        "range",
-       "4 source photos x 5-16 crops per layer, 40-80 px"
+       "4 source photos x 5-16 crops per layer (x z^-2), 40-80 px x z"
       ],
       [
        "distribution",
@@ -2207,7 +2323,7 @@
       "label": "Grass clippings (v1 photos)",
       "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
      },
-     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+     "notes": "Configured distribution per 1920x1080 render BEFORE zoom coupling (drawn inside the renderer, not replicated in the plan; 20000 draws). With zoom z = scale / 0.2 (1.25-2.0) the count is multiplied by z^-2 (stochastic rounding) and sizes by z; about 20 % of the render lands in the 640x640 crop."
     }
    ]
   }

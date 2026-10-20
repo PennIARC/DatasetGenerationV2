@@ -75,7 +75,7 @@ def _soil_blend(rgb_pm, alpha, alpha_full, local_bg, length_px, scene_luma, p, c
     rgb = rgb * (1 - p["band_darken"] * band)[..., None]
     dust = np.clip(dust + p["band_dust"] * band, 0, 1)
     if p["grain_density"] > 0 and inside.any():
-        g = fx.fbm(h, w, 1.5, rng, octaves=2)
+        g = fx.fbm(h, w, getattr(cfg, "SOIL_GRAIN_PX", 1.5), rng, octaves=2)
         thr = np.quantile(g[alpha_full > 0.5] if (alpha_full > 0.5).any() else g[inside > 0], 1 - p["grain_density"])
         ga = np.clip((g - thr) / 0.03, 0, 1) * p["grain_opacity"]
         gcol = lb * (0.55 + 0.6 * fx.fbm(h, w, 2.0, rng, octaves=1))[..., None]

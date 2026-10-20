@@ -7,9 +7,12 @@ per-image choice is passed to DatasetGenerator/scene.render_scene as controlPane
     python3 scripts/generate_dataset.py --render --workers 4        # full dataset (NOT run yet: awaiting confirmation)
     python3 scripts/generate_dataset.py --render --limit 8 --out /tmp/x   # small trial render elsewhere
 
-Design (docs/history/0013-dataset-v2-plan.md):
-  * STRATIFIED image-level factors get exact equal-count (or exact-quota) buckets: mines per image, mine scale
-    (log bins), burial fraction (target, of buried mines), sun elevation, light (overcast / 4 shadow-strength bins),
+Design (docs/history/0013-dataset-v2-plan.md, zoomed 640x640 revision: 0016-zoomed-640-dataset.md):
+  * Output: 640x640 NATIVE crop of the 1920x1080 scene (OUTPUT_CROP; no resize), all mines inside the crop, YOLO labels
+    normalised to the crop; SCENE_ZOOM_COUPLING on (debris / soil sizes x mine scale / 0.2, counts x (0.2 / scale)^2,
+    background magnified, capped at 1.5 output px per source px).
+  * STRATIFIED image-level factors get exact equal-count (or exact-quota) buckets: mines per image (0-4), mine scale
+    (4 linear bins 0.25-0.40), burial fraction (target, of buried mines), sun elevation, light (overcast / 4 shadow-strength bins),
     background family (+ file quotas proportional to the tuned weights), lens blur. Each image draws its value
     uniformly INSIDE its bucket with the generator's own RNG (override = bucket range).
   * Joint coverage: every factor column starts as a shuffled balanced list; a swap search (swaps inside one column
@@ -40,7 +43,7 @@ GEN = os.path.join(REPO, "DatasetGenerator")
 sys.path.insert(0, GEN)
 
 from config import make_config  # noqa: E402
-from features import background, camera, colour, mesh, soil, sun as sunmod  # noqa: E402
+from features import background, camera, colour, mesh, soil, sun as sunmod, zoom as zoommod  # noqa: E402
 
 # ------------------------------------------------------------------------------------------------ design constants
 N_IMAGES = 3000
@@ -50,10 +53,11 @@ PLAN_SEED = 20261020        # RNG of the design itself (bucket assignment, swap 
 VAL_COUNT = 300
 OUT_DEFAULT = os.path.join(REPO, "output_dataset", "v2_3000")
 
-# mines per image: keeps the generator's own pmf exactly (ZERO_MINE_PROB 0.10 + U{0..8} -> P(0) = 0.2, P(k) = 0.1)
-N_MINES_LEVELS = list(range(9))
-N_MINES_QUOTA = [600] + [300] * 8
-SCALE_EDGES = [float(x) for x in np.geomspace(0.1, 0.4, 6)]      # 5 log bins of MINE_SCALE (deliberate change)
+# mines per image 0-4 (user decision, ADR 0016): 600 empty (20 %), 600 each for 1..4
+N_MINES_LEVELS = list(range(5))
+N_MINES_QUOTA = [600] * 5
+SCALE_EDGES = [float(x) for x in np.linspace(0.25, 0.40, 5)]     # 4 LINEAR bins of MINE_SCALE (user decision, ADR 0016)
+OUTPUT_CROP = (640, 640)                                           # native crop of the 1920x1080 render (no resize)
 BURIAL_EDGES = [0.05, 0.2, 0.3, 0.4, 0.5]                          # 4 bins of the target burial fraction
 ELEV_EDGES = [float(x) for x in np.linspace(15.0, 70.0, 7)]        # 6 bins of sun elevation
 SHADOW_EDGES = [float(x) for x in np.linspace(0.25, 0.65, 5)]      # 4 bins of direct-sun shadow strength
@@ -65,7 +69,7 @@ FAMILY_QUOTA = {"grass": 1950, "non_grass": 1050}                  # exactly 65 
 _direct = N_IMAGES - OVERCAST_COUNT
 FACTORS = {
     "n_mines": (N_MINES_LEVELS, N_MINES_QUOTA),
-    "scale_bin": (list(range(5)), [600] * 5),
+    "scale_bin": (list(range(4)), [750] * 4),
     "burial_bin": (list(range(4)), [750] * 4),
     "elev_bin": (list(range(6)), [500] * 6),
     "light": (list(range(5)), [OVERCAST_COUNT] + [_direct // 4 + (1 if i < _direct % 4 else 0) for i in range(4)]),
@@ -209,7 +213,9 @@ def row_overrides(r):
           "OVERCAST_PROB": 1.0 if r["light"] == 0 else 0.0,
           "BG_FAMILY_WEIGHTS": {fam: 1.0},
           "BG_WEIGHT_OVERRIDES": {**base, **force},
-          "PSF_SIGMA": bucket_range(PSF_EDGES, r["psf_bin"])}
+          "PSF_SIGMA": bucket_range(PSF_EDGES, r["psf_bin"]),
+          "SCENE_ZOOM_COUPLING": True,
+          "OUTPUT_CROP": OUTPUT_CROP}
     if r["light"] > 0:
         ov["SHADOW_STRENGTH"] = bucket_range(SHADOW_EDGES, r["light"] - 1)
     return ov
@@ -232,13 +238,20 @@ def plan_values(r, index=None):
     R = lambda *k: np.random.default_rng([seed, int(index), *k])  # noqa: E731
     s = sunmod.sample_sun(R(0), cfg)
     bgp = background.sample_background_params(R(1), cfg)
-    px_mm = float(cfg.MINE_PX_PER_UNIT * R(9).uniform(cfg.MINE_SCALE_MIN, cfg.MINE_SCALE_MAX) / cfg.MINE_LENGTH_MM)
+    image_scale = float(R(9).uniform(cfg.MINE_SCALE_MIN, cfg.MINE_SCALE_MAX))
+    px_mm = float(cfg.MINE_PX_PER_UNIT * image_scale / cfg.MINE_LENGTH_MM)
     cam = camera.sample_camera_params(R(7), cfg)
+    z = zoommod.zoom_factor(image_scale, cfg)
+    x0, y0, cw, ch = zoommod.crop_window(R(11), cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT, *cfg.OUTPUT_CROP)
+    bg_zoom, bzi = zoommod.zoom_background(bgp, z, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT, _src_hw(bgp["file"]), cfg)
     img = {"sun_azimuth": s["azimuth"], "sun_elevation": s["elevation"], "overcast": s["overcast"],
            "shadow_strength": s["shadow_strength"], "shadow_tint": s["shadow_tint"],
            "bg_file_sampled": os.path.basename(bgp["file"]), "bg_flip_h": bgp["flip_h"], "bg_flip_v": bgp["flip_v"],
            "bg_rot90": bgp["rot90"], "bg_zoom": bgp["zoom"], "bg_hue": bgp["hue"], "bg_sat": bgp["sat"],
-           "bg_bright": bgp["bright"], "ground_px_per_mm": px_mm}
+           "bg_bright": bgp["bright"], "ground_px_per_mm": px_mm, "image_scale": image_scale, "zoom": z,
+           "count_factor": zoommod.count_factor(z, cfg), "bg_zoom_coupled": bg_zoom,
+           "bg_magnification": bzi["magnification"], "bg_mag_capped": bzi["capped"],
+           "crop_x0": x0, "crop_y0": y0}
     for k in ("psf_sigma", "motion_px", "motion_angle", "exposure", "gamma", "wb_r", "wb_b", "saturation", "contrast",
               "noise_sigma", "noise_chroma", "aberration", "vignette", "jpeg_quality"):
         img[k] = cam[k]
@@ -261,6 +274,18 @@ def plan_values(r, index=None):
                       "band_px": sp["band_px"], "band_darken": sp["band_darken"],
                       "grain_density": sp["grain_density"]})
     return img, mines
+
+
+_SRC_HW = {}
+
+
+def _src_hw(path):
+    """(h, w) of a background file from its header (PIL, no decode)."""
+    if path not in _SRC_HW:
+        from PIL import Image
+        with Image.open(path) as im:
+            _SRC_HW[path] = (im.size[1], im.size[0])
+    return _SRC_HW[path]
 
 
 def write_csv(path, rows):
@@ -330,10 +355,16 @@ def write_readme(out, meta, rendered):
 Status: {status}.
 
 Made by `scripts/generate_dataset.py` (plan: `--plan-only`; images: `--render --workers 4`) from the v2 generator in
-`DatasetGenerator/` (HEAD burial / realism round 4). Design rationale: `docs/history/0013-dataset-v2-plan.md`;
+`DatasetGenerator/` (HEAD burial / realism round 4 + soft grains + zoom coupling). Design rationale:
+`docs/history/0013-dataset-v2-plan.md`, zoomed 640x640 revision `docs/history/0016-zoomed-640-dataset.md`;
 per-parameter page: `docs/showcase/showcase.html`, tab "Dataset v2: parameters".
 
-- Images: native 1920x1080 RGB JPEG (no resize; v1's `finalDataset` was stretched to 640x640 by exportToYOLO.py).
+- Images: 640x640 RGB JPEG, a NATIVE crop of the 1920x1080 render (no resize / resampling; v1's `finalDataset` was
+  stretched to 640x640 by exportToYOLO.py). Every mine is placed fully inside the crop (8 px margin); the crop
+  position is uniform. Labels are normalised to the crop. JPEG quality sampled 70-95 per image.
+- Zoom coupling (SCENE_ZOOM_COUPLING): per image z = mine scale / 0.2; rocks, grass clippings, leaf clumps, dirt and
+  the mine's soil / contact / AO sizes x z, debris counts x z^-2, background texture magnified by z (capped at 1.5
+  output px per source px); grass blades follow the ground px/mm; sensor effects (PSF, noise, aberration px) unchanged.
 - Seeds: image k = `render_scene(seed={meta['base_seed']}, index=k)`; retries use index {meta['spare_index0']} + 10 k + attempt.
 - Split: train {meta['split']['train']} / val {meta['split']['val']} (val indices in plan/plan.json), balanced on every stratified factor.
 - Layout after rendering: images/{{train,val}}/v2_NNNNN.jpg, labels/{{train,val}}/v2_NNNNN.txt (YOLO: class xc yc w h,
@@ -345,8 +376,8 @@ per-parameter page: `docs/showcase/showcase.html`, tab "Dataset v2: parameters".
 
 | factor | buckets | counts |
 |---|---|---|
-| mines per image (N_MINES) | 0..8 | {list(c['n_mines'].values())} |
-| mine scale (MINE_SCALE_MIN/MAX), log bins {[round(e, 3) for e in meta['edges']['scale']]} | 5 | {list(c['scale_bin'].values())} |
+| mines per image (N_MINES) | 0..4 | {list(c['n_mines'].values())} |
+| mine scale (MINE_SCALE_MIN/MAX), linear bins {[round(e, 4) for e in meta['edges']['scale']]} | 4 | {list(c['scale_bin'].values())} |
 | burial target fraction of buried mines (BURIAL_FRACTION) {meta['edges']['burial_fraction']} | 4 | {list(c['burial_bin'].values())} |
 | sun elevation (SUN_ELEVATION) {[round(e, 2) for e in meta['edges']['sun_elevation']]} | 6 | {list(c['elev_bin'].values())} |
 | light: overcast / shadow strength bins {meta['edges']['shadow_strength']} | 1 + 4 | {list(c['light'].values())} |
@@ -430,6 +461,9 @@ def build_manifest(out, design):
                      "bg_file": r["bg_file"], "sun_azimuth": s["azimuth"], "sun_elevation": s["elevation"],
                      "overcast": s["overcast"], "shadow_strength": s["shadow_strength"],
                      "psf_sigma": post["psf_sigma"], "motion_px": post["motion_px"], "exposure": post.get("exposure"),
+                     "zoom": m.get("zoom", {}).get("factor"), "crop_x0": m.get("crop", {}).get("x0"),
+                     "crop_y0": m.get("crop", {}).get("y0"),
+                     "bg_magnification": m.get("zoom", {}).get("background", {}).get("magnification"),
                      "jpeg_quality": m["plan"]["saved_jpeg_quality"], "n_placed": len(ms),
                      "n_labelled": sum(1 for x in ms if x.get("labelled")),
                      "n_buried": sum(1 for x in ms if x.get("burial", {}).get("buried")),
@@ -476,7 +510,10 @@ def render(out, design, workers, limit, jpeg_q):
 def verify_plan(design, k):
     """Render k rows in memory (no files) and compare the replicated plan values with the render's sidecar."""
     from scene import render_scene
-    picks = [r for r in design if r["n_mines"] >= 2][:k]
+    picks = []
+    for b in range(len(SCALE_EDGES) - 1):          # spread over the scale bins
+        picks += [r for r in design if r["n_mines"] >= 2 and r["scale_bin"] == b][: -(-k // (len(SCALE_EDGES) - 1))]
+    picks = picks[:k]
     for r in picks:
         t = time.time()
         img, mines = plan_values(r)
@@ -486,12 +523,21 @@ def verify_plan(design, k):
         s = meta["sun"]
         ok = [abs(s["elevation"] - img["sun_elevation"]) < 1e-9, abs(s["azimuth"] - img["sun_azimuth"]) < 1e-9,
               os.path.basename(meta["background"]["file"]) == r["bg_file"],
-              abs(meta["post"]["psf_sigma"] - img["psf_sigma"]) < 1e-9]
+              abs(meta["post"]["psf_sigma"] - img["psf_sigma"]) < 1e-9,
+              abs(meta["zoom"]["factor"] - img["zoom"]) < 1e-9,
+              abs(meta["background"]["zoom"] - img["bg_zoom_coupled"]) < 1e-9,
+              meta["crop"]["x0"] == img["crop_x0"] and meta["crop"]["y0"] == img["crop_y0"]]
+        # labels: inside [0, 1] of the crop, one per labelled mine, matching the full-frame pixel box
+        cx, cy = meta["crop"]["x0"], meta["crop"]["y0"]
+        for l, m in zip(labels, [m for m in meta["mines"] if m["labelled"]]):
+            x0, y0, bw, bh = m["box_px_full"]
+            ok += [all(0 <= v <= 1 for v in (l[1] - l[3] / 2, l[2] - l[4] / 2, l[1] + l[3] / 2, l[2] + l[4] / 2)),
+                   abs(l[1] * OUTPUT_CROP[0] - (x0 - cx + bw // 2)) < 1e-6 and abs(l[3] * OUTPUT_CROP[0] - bw) < 1e-6]
         for m, pm in zip(meta["mines"], mines):
             ok += [abs(m["scale"] - pm["scale"]) < 1e-9, abs(m["yaw"] - pm["yaw"]) < 1e-9,
                    m["face_down"] == pm["face_down"], m["burial"]["buried"] == pm["buried"]]
-        print(f"row {r['index']}: {r['n_mines']} planned, {len(meta['mines'])} placed, {len(labels)} labels, "
-              f"checks {sum(ok)}/{len(ok)} match, {dt:.2f} s")
+        print(f"row {r['index']}: scale bin {r['scale_bin']} (zoom {img['zoom']:.2f}), {r['n_mines']} planned, "
+              f"{len(meta['mines'])} placed, {len(labels)} labels, checks {sum(ok)}/{len(ok)} match, {dt:.2f} s")
 
 
 def main():

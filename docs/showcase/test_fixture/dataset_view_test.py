@@ -50,12 +50,14 @@ wait(function(){ return qa(".dgrid .gcard img").length === 24 && qa(".dgrid .gca
     ok("no horizontal page scroll", document.documentElement.scrollWidth <= window.innerWidth, document.documentElement.scrollWidth + " <= " + window.innerWidth);
     ok("info count", /^30 \/ 3000 images/.test(q(".big").textContent), q(".big").textContent);
     ok("status badge", /generating/.test(q(".badge").textContent), q(".badge").textContent);
-    ok("stat tiles", qa(".stat").length >= 9 && /1920 × 1080/.test(q(".stats").textContent) && /27 \/ 3/.test(q(".stats").textContent), qa(".stat").length);
+    ok("stat tiles", qa(".stat").length >= 9 && /__W__ × __H__/.test(q(".stats").textContent) && /27 \/ 3/.test(q(".stats").textContent), qa(".stat").length);
     ok("storage shown", /MB/.test(q(".stats").textContent));
     var cards = qa(".dgrid .gcard");
     ok("24 cards", cards.length === 24, cards.length);
     var imgs = qa(".dgrid .gcard img");
-    ok("thumbs are 960 px server thumbnails", imgs.every(function(i){ return /^\/thumb\//.test(i.getAttribute("src")) && i.naturalWidth === 960; }), imgs.map(function(i){ return i.naturalWidth; }).slice(0, 4).join(","));
+    ok("thumbs are server thumbnails (960 px, or the native image when smaller)", imgs.every(function(i){ return /^\/thumb\//.test(i.getAttribute("src")) && i.naturalWidth === Math.min(960, __W__); }), imgs.map(function(i){ return i.naturalWidth; }).slice(0, 4).join(","));
+    var th = qa(".dgrid .gcard .thumb").map(function(t){ var r = t.getBoundingClientRect(); return r.width / r.height; });
+    ok("card frame follows the image aspect (__W__:__H__)", th.every(function(r){ return Math.abs(r - __W__ / __H__) < 0.03; }), th.slice(0, 3).map(function(r){ return r.toFixed(3); }).join(","));
     var boxes = qa(".dgrid .bbox");
     ok("boxes drawn", boxes.length > 24, boxes.length);
     ok("boxes visible by default", getComputedStyle(boxes[0]).display === "block");
@@ -69,7 +71,7 @@ wait(function(){ return qa(".dgrid .gcard img").length === 24 && qa(".dgrid .gca
     btn(/^Parameters:/).click();
     var range = q('input[aria-label="cards per row"]'); range.value = "6"; range.dispatchEvent(new Event("input"));
     ok("cards per row", q(".dgrid").style.getPropertyValue("--cols") === "6" && getComputedStyle(q(".dgrid")).gridTemplateColumns.split(" ").length === 6);
-    var aspect = imgs[0].parentNode.getBoundingClientRect(); ok("16:9 card image", Math.abs(aspect.width / aspect.height - 16 / 9) < 0.05, (aspect.width / aspect.height).toFixed(3));
+    var aspect = imgs[0].parentNode.getBoundingClientRect(); ok("card image __W__:__H__", Math.abs(aspect.width / aspect.height - __W__ / __H__) < 0.05, (aspect.width / aspect.height).toFixed(3));
     var seed1 = /seed (\d+)/.exec(q(".counts").textContent)[1];
     q(".dgrid .thumb").click();
     ok("lightbox open with boxes", q("#lb").classList.contains("open") && q("#lbStage .lbwrap.showbox") && qa("#lbStage .bbox").length > 0 && /^\/dataset\/images\//.test(q("#lbStage img").getAttribute("src")));
@@ -130,14 +132,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("work")
     ap.add_argument("--port", type=int, default=8799)
+    ap.add_argument("--size", default="1920x1080", help="fake image size WxH (e.g. 640x640 for the zoomed dataset)")
     a = ap.parse_args()
+    W, H = (int(v) for v in a.size.lower().split("x"))
     if not Path(CHROME).exists():
         sys.exit("Chrome not found; skipping")
     work = Path(a.work).resolve()
     for d in ("fake_ds", "empty_ds", "thumbs"):
         shutil.rmtree(work / d, ignore_errors=True)
     (work / "empty_ds").mkdir(parents=True)
-    subprocess.run([sys.executable, str(HERE / "make_fake_dataset.py"), str(work / "fake_ds"), "--n", "30", "--partial"], check=True)
+    subprocess.run([sys.executable, str(HERE / "make_fake_dataset.py"), str(work / "fake_ds"), "--n", "30", "--partial",
+                    "--size", a.size], check=True)
     (work / "empty_ds" / "plan").mkdir()
     (work / "empty_ds" / "plan" / "plan.json").write_text(json.dumps({"n_images": 3000}))
     pages = {}
@@ -145,7 +150,7 @@ def main():
         p = SC / ("_ds_test_%s.html" % mode)
         subprocess.run([sys.executable, str(SC / "build_showcase.py"), "--manifests", *MANIFESTS, "--out", str(p)],
                        check=True, capture_output=True)
-        p.write_text(p.read_text().replace("</body>", TEST.replace("__MODE__", mode) + "</body>"))
+        p.write_text(p.read_text().replace("</body>", TEST.replace("__MODE__", mode).replace("__W__", str(W)).replace("__H__", str(H)) + "</body>"))
         pages[mode] = p
     srv = [subprocess.Popen([sys.executable, str(REPO / "scripts" / "serve_dataset_view.py"), "--port", str(a.port + i),
                              "--dataset-dir", str(work / d), "--cache-dir", str(work / "thumbs")],

@@ -11,6 +11,7 @@ import numpy as np
 
 import fx
 from features import assets, blades, burial_fx, colour, edges, mesh, shadows, soil
+from features.zoom import stochastic_count
 
 
 CONTACT_KIND_SCALE = {"leaf": 0.5}   # leaf clumps: weaker contact shadow than rocks / clods
@@ -26,15 +27,28 @@ class EnvironmentDebris:
     """One debris layer (v1 draws two: undergrowth before the mines, overgrowth after). rng drives generation
     (counts, files, sizes, positions); draw_rng drives draw-time choices that depend on flags."""
 
-    def __init__(self, cfg, rng, scene, draw_rng, density_factor=1.0, layer="under"):
+    def __init__(self, cfg, rng, scene, draw_rng, density_factor=1.0, layer="under", count_rng=None):
         self.cfg, self.rng, self.scene, self.draw_rng, self.layer = cfg, rng, scene, draw_rng, layer
         self.elements = []
+        # SCENE_ZOOM_COUPLING (features/zoom.py): sizes x z, counts x scene["count_factor"] with stochastic rounding
+        # from count_rng (own stream); without it (z = 1, count_rng None) every draw and value is as before
+        self.z = float(scene.get("zoom", 1.0))
+        self.count_rng = count_rng
+        self.count_f = float(scene.get("count_factor", 1.0))
         self._generate_dirt(density_factor)
         self._generate_dirt_snippets(density_factor)
         self._generate_rocks(density_factor)
         self._generate_grass_overlays(density_factor)
         self._generate_leaf_clumps(density_factor)
         self._generate_blades(density_factor)
+
+    def _count(self, n, density_factor):
+        if self.count_rng is None:
+            return int(n * density_factor)
+        return stochastic_count(n, density_factor * self.count_f, self.count_rng.random())
+
+    def _size(self, px):
+        return px if self.z == 1.0 else max(1, int(round(px * self.z)))
 
     def _generate_leaf_clumps(self, density_factor):
         """LEAF_CLUMPS_NEW: RGBA leaf-litter clumps from assets_new/grassDebris, own count / size / stream; colour
@@ -43,10 +57,11 @@ class EnvironmentDebris:
         rng = np.random.default_rng(self.rng.integers(2 ** 31))
         if not (cfg.LEAF_CLUMPS_NEW and cfg.NEW_ASSETS) or not assets.sources(cfg, "LEAF"):
             return
-        n = int(_ri(rng, *(cfg.LEAF_CLUMPS_UNDER if self.layer == "under" else cfg.LEAF_CLUMPS_OVER)) * density_factor)
+        n = self._count(_ri(rng, *(cfg.LEAF_CLUMPS_UNDER if self.layer == "under" else cfg.LEAF_CLUMPS_OVER)),
+                        density_factor)
         for _ in range(n):
             cut = assets.load_cutout(assets.pick_file(rng, cfg, "LEAF"))
-            tw = _ri(rng, *cfg.LEAF_CLUMP_SIZE)
+            tw = self._size(_ri(rng, *cfg.LEAF_CLUMP_SIZE))
             u = rng.random(8)
             if cut is None:
                 continue
@@ -69,7 +84,7 @@ class EnvironmentDebris:
         if not (cfg.GRASS_BLADES and cfg.NEW_ASSETS):
             return
         rng_n = cfg.BLADES_UNDER if self.layer == "under" else cfg.BLADES_OVER
-        n = int(_ri(rng, *rng_n) * density_factor)
+        n = self._count(_ri(rng, *rng_n), density_factor)
         els = blades.make_blade_elements(cfg, rng, self.scene["px_per_mm"], n, self.scene["blade_budget"])
         for el in els:
             h, w = el["alpha"].shape
@@ -98,8 +113,8 @@ class EnvironmentDebris:
 
     def _generate_dirt(self, density_factor):
         cfg, rng = self.cfg, self.rng
-        for _ in range(int(_ri(rng, *cfg.DIRT_RECTS_PER_LAYER) * density_factor)):
-            size = _ri(rng, *cfg.DIRT_RECT_SIZE)
+        for _ in range(self._count(_ri(rng, *cfg.DIRT_RECTS_PER_LAYER), density_factor)):
+            size = self._size(_ri(rng, *cfg.DIRT_RECT_SIZE))
             x, y = _ri(rng, 0, cfg.SCREEN_WIDTH), _ri(rng, 0, cfg.SCREEN_HEIGHT)
             col = np.clip(np.array(cfg.DIRT_COLOR_BASE) + rng.integers(-cfg.DIRT_VARIANCE, cfg.DIRT_VARIANCE + 1, 3),
                           0, 255) / 255.0
@@ -111,10 +126,10 @@ class EnvironmentDebris:
         rng = np.random.default_rng(self.rng.integers(2 ** 31))   # own stream: absent assets change nothing else
         if not assets.sources(cfg, "DIRT"):
             return
-        for _ in range(int(_ri(rng, *cfg.DIRT_SNIPPETS_PER_LAYER) * density_factor)):
+        for _ in range(self._count(_ri(rng, *cfg.DIRT_SNIPPETS_PER_LAYER), density_factor)):
             path = assets.pick_file(rng, cfg, "DIRT")
             cut = assets.load_cutout(path, erode=cfg.SOFT_EDGES)
-            tw = _ri(rng, *cfg.DIRT_SNIPPET_SIZE)
+            tw = self._size(_ri(rng, *cfg.DIRT_SNIPPET_SIZE))
             if cut is None:
                 continue
             rgb, alpha, _ = cut
@@ -139,10 +154,11 @@ class EnvironmentDebris:
         cfg, rng = self.cfg, self.rng
         if not assets.sources(cfg, "ROCK"):
             return
-        for _ in range(int(_ri(rng, cfg.ROCKS_TO_SPAWN_MIN, cfg.ROCKS_TO_SPAWN_MAX) * density_factor)):
+        for _ in range(self._count(_ri(rng, cfg.ROCKS_TO_SPAWN_MIN, cfg.ROCKS_TO_SPAWN_MAX), density_factor)):
             cut_path = assets.pick_file(rng, cfg, "ROCK")
             cut = assets.load_cutout(cut_path, erode=cfg.SOFT_EDGES)
-            tw = _ri(rng, cfg.ROCK_OUTPUT_SIZE_MIN, cfg.ROCK_OUTPUT_SIZE_MAX)
+            tw0 = _ri(rng, cfg.ROCK_OUTPUT_SIZE_MIN, cfg.ROCK_OUTPUT_SIZE_MAX)
+            tw = self._size(tw0)
             if cut is None:
                 continue
             rgb, alpha, _ = cut
@@ -156,7 +172,7 @@ class EnvironmentDebris:
             x, y = _ri(rng, -tw // 2, cfg.SCREEN_WIDTH), _ri(rng, -th // 2, cfg.SCREEN_HEIGHT)
             # rock height (for the cast shadow): fraction of the width, smaller for small rocks and gravel
             hf = rng.uniform(*cfg.ROCK_HEIGHT_FRAC)
-            size_t = (tw - cfg.ROCK_OUTPUT_SIZE_MIN) / max(1, cfg.ROCK_OUTPUT_SIZE_MAX - cfg.ROCK_OUTPUT_SIZE_MIN)
+            size_t = (tw0 - cfg.ROCK_OUTPUT_SIZE_MIN) / max(1, cfg.ROCK_OUTPUT_SIZE_MAX - cfg.ROCK_OUTPUT_SIZE_MIN)
             hf = cfg.ROCK_HEIGHT_FRAC[0] + (hf - cfg.ROCK_HEIGHT_FRAC[0]) * (cfg.ROCK_SMALL_HEIGHT_SCALE +
                                                                          (1 - cfg.ROCK_SMALL_HEIGHT_SCALE) * size_t)
             if gravel:
@@ -175,7 +191,7 @@ class EnvironmentDebris:
                 continue
             rgb, alpha, kind = cut
             mh, mw = alpha.shape
-            for _ in range(int(_ri(rng, 5, cfg.GRASS_CLIPPINGS_PER_IMAGE) * density_factor)):
+            for _ in range(self._count(_ri(rng, 5, cfg.GRASS_CLIPPINGS_PER_IMAGE), density_factor)):
                 cw = _ri(rng, cfg.GRASS_CROP_SIZE_MIN, cfg.GRASS_CROP_SIZE_MAX)
                 ch = _ri(rng, cfg.GRASS_CROP_SIZE_MIN, cfg.GRASS_CROP_SIZE_MAX)
                 if kind == "alpha":  # RGBA snippets (assets_new) are already single clippings: crop at most to size
@@ -186,7 +202,7 @@ class EnvironmentDebris:
                 ca = alpha[cy:cy + ch, cx:cx + cw]
                 if (ca > 0.5).sum() < 10:
                     continue
-                tw = _ri(rng, cfg.GRASS_OUTPUT_SIZE_MIN, cfg.GRASS_OUTPUT_SIZE_MAX)
+                tw = self._size(_ri(rng, cfg.GRASS_OUTPUT_SIZE_MIN, cfg.GRASS_OUTPUT_SIZE_MAX))
                 th = max(1, int(tw * ch / cw))
                 prgb, pa = edges.resize_rotate(rgb[cy:cy + ch, cx:cx + cw], ca, tw, th, None, cfg.SOFT_EDGES,
                                                cfg.DEBRIS_ALPHA_FEATHER)
@@ -399,13 +415,20 @@ class Mine:
     def rect(self):
         return (self.x + self.bx0, self.y + self.by0, self.bx1 - self.bx0, self.by1 - self.by0)
 
-    def set_position(self, W, H, centre=None):
+    def set_position(self, W, H, centre=None, region=None):
+        """region = (x0, y0, x1, y1): place the unclipped silhouette box inside it (OUTPUT_CROP window minus margin);
+        same number of draws from the same stream as without it."""
         bw, bh = self.bx1 - self.bx0, self.by1 - self.by0
         if centre is not None:
             self.x, self.y = int(centre[0] - bw / 2) - self.bx0, int(centre[1] - bh / 2) - self.by0
             return
-        self.x = _ri(self.rng, 0, max(0, W - bw)) - self.bx0
-        self.y = _ri(self.rng, 0, max(0, H - bh)) - self.by0
+        if region is None:
+            self.x = _ri(self.rng, 0, max(0, W - bw)) - self.bx0
+            self.y = _ri(self.rng, 0, max(0, H - bh)) - self.by0
+            return
+        x0, y0, x1, y1 = region
+        self.x = _ri(self.rng, x0, max(x0, x1 - bw)) - self.bx0
+        self.y = _ri(self.rng, y0, max(y0, y1 - bh)) - self.by0
 
     def collides(self, other, margin):
         ax, ay, aw, ah = self.rect
@@ -577,9 +600,11 @@ class Mine:
         self.meta["shadow"] = {"length_px": float(length), "penumbra_sigma_px": float(sigma), "contact_ao": ao_s,
                                "contact_shadow": contact, "buried_length_px": self.r["info"].get("shadow_length_buried_px")}
 
-    def label(self, W, H, occlusion):
+    def label(self, W, H, occlusion, crop=None):
         """YOLO box. v1: un-occluded mask. LABEL_VISIBLE_MASK: mask after burial soil and overgrowth.
-        pygame-Rect integer centre arithmetic like v1. -> [0, xc, yc, w, h] or None."""
+        pygame-Rect integer centre arithmetic like v1. -> [0, xc, yc, w, h] or None.
+        crop = (cx, cy, cw, ch) (OUTPUT_CROP): only mask pixels inside the window count (same visibility policy:
+        LABEL_MIN_VISIBLE_PX visible pixels inside the window), box clipped to and normalised by the window."""
         cfg = self.cfg
         if cfg.LABEL_VISIBLE_MASK:
             vis = np.zeros_like(self.visible)
@@ -588,6 +613,8 @@ class Mine:
                 d, s = r
                 vis[s] = self.visible[s] * (1.0 - occlusion[d]) if occlusion is not None else self.visible[s]
             m = vis > cfg.LABEL_ALPHA_THRESHOLD
+            if crop is not None:
+                m = m & self._crop_mask(m.shape, crop)
             before = max(int((self.visible > cfg.LABEL_ALPHA_THRESHOLD).sum()), 1)
             self.meta["overgrowth_occluded_fraction"] = float(1 - m.sum() / before)
             full = max(int((self.alpha_full > cfg.LABEL_ALPHA_THRESHOLD).sum()), 1)
@@ -596,9 +623,22 @@ class Mine:
                 return None
         else:
             m = getattr(self, "alpha_label", self.alpha) > cfg.LABEL_ALPHA_THRESHOLD
+            if crop is not None:
+                m = m & self._crop_mask(m.shape, crop)
         ys, xs = np.nonzero(m)
         if len(xs) == 0:
             return None
         x0, y0 = int(xs.min()) + self.x, int(ys.min()) + self.y
         bw, bh = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
+        if crop is not None:
+            cx, cy, cw, ch = crop
+            self.meta["box_px_full"] = [x0, y0, bw, bh]
+            return [0, (x0 - cx + bw // 2) / cw, (y0 - cy + bh // 2) / ch, bw / cw, bh / ch]
         return [0, (x0 + bw // 2) / W, (y0 + bh // 2) / H, bw / W, bh / H]
+
+    def _crop_mask(self, shape, crop):
+        """bool mask (mine canvas) of the pixels inside the crop window."""
+        cx, cy, cw, ch = crop
+        yy = np.arange(shape[0])[:, None] + self.y
+        xx = np.arange(shape[1])[None, :] + self.x
+        return (yy >= cy) & (yy < cy + ch) & (xx >= cx) & (xx < cx + cw)
