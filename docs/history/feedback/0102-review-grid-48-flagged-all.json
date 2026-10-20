@@ -1,0 +1,167 @@
+[
+  {
+    "id": "b001",
+    "seed": 5001,
+    "image": "images/v2/review/b001.jpg",
+    "tags": [
+      "grass",
+      "mid_sun",
+      "blades"
+    ],
+    "meta": {
+      "seed": 5001,
+      "background": "grass_bg_gen_23_grass_dry_normal",
+      "sun_el": 50.2,
+      "burial": 0.41,
+      "face_down": false,
+      "blades_on_mine": 4,
+      "visible_frac": 0.33,
+      "dust": 0.38
+    },
+    "note": "burial is relatively convincing (only non-believable part is mainly just an unsolvable problem with the background image and how a mine would \"weigh into the grass\" more in this specific scenario. fixing this issue would require understanding specifics about the materials in each location of each image which is not worth doing). the issue here is that because of the blades on top of the mine it becomes like 80% buried which may be too difficult for anything to learn. we can leave this as is for now and see if models somehow manage anyways. if they don't we can figure out a solution"
+  },
+  {
+    "id": "b002",
+    "seed": 5002,
+    "image": "images/v2/review/b002.jpg",
+    "tags": [
+      "ground",
+      "low_sun",
+      "face_down"
+    ],
+    "meta": {
+      "seed": 5002,
+      "background": "ground_bg_Ground005",
+      "sun_el": 24.8,
+      "burial": 0.41,
+      "face_down": true,
+      "blades_on_mine": 0,
+      "visible_frac": 0.59,
+      "dust": 0.33
+    },
+    "note": "1) is it intentional for the shape of the shadow of the mine to change? it looks wrong in the burial version (it seems to extend further than it should, and it extends further than in the non-buried image)\n2) the sand that is added on top of the mine doesn't blend into the sand on the ground and instead has a sharp shadow line separating them\n3) the shadow of the sand on top of the mine is too aggressive/sharp/strong"
+  },
+  {
+    "id": "b004",
+    "seed": 5004,
+    "image": "images/v2/review/b004.jpg",
+    "tags": [
+      "grass",
+      "low_sun"
+    ],
+    "meta": {
+      "seed": 5004,
+      "background": "grass_bg_real_00_Grass001_grass_fresh",
+      "sun_el": 27.4,
+      "burial": 0.45,
+      "face_down": false,
+      "blades_on_mine": 0,
+      "visible_frac": 0.55,
+      "dust": 0.28
+    },
+    "note": "you can still see the outline/shadow around the mine"
+  },
+  {
+    "id": "b005",
+    "seed": 5005,
+    "image": "images/v2/review/b005.jpg",
+    "tags": [
+      "ground",
+      "mid_sun",
+      "blades"
+    ],
+    "meta": {
+      "seed": 5005,
+      "background": "ground_bg_Ground005",
+      "sun_el": 35.1,
+      "burial": 0.42,
+      "face_down": false,
+      "blades_on_mine": 2,
+      "visible_frac": 0.53,
+      "dust": 0.32
+    },
+    "note": "very convincing but a straight line, although the line is along the ridge in the middle of the mine which is believable since it's a real height different in the STL file so it's fine"
+  },
+  {
+    "id": "b008",
+    "seed": 5008,
+    "image": "images/v2/review/b008.jpg",
+    "tags": [
+      "grass",
+      "mid_sun"
+    ],
+    "meta": {
+      "seed": 5008,
+      "background": "grass_bg_gen_23_grass_dry_normal",
+      "sun_el": 53.5,
+      "burial": 0.21,
+      "face_down": false,
+      "blades_on_mine": 0,
+      "visible_frac": 0.79,
+      "dust": 0.37
+    },
+    "note": "this isn't related to the burial, but here the mine looks like it's floating on top of the grass (it's not blended into the background). I think the issue is that the shadow is the same size as the mine, so when the sun is at an angle the shadow is offset from the mine and not enough of it is under the mine itself, which makes it look like its floating on the side closer to the sun"
+  },
+  {
+    "id": "b019",
+    "seed": 5019,
+    "image": "images/v2/review/b019.jpg",
+    "tags": [
+      "ground",
+      "mid_sun",
+      "face_down"
+    ],
+    "meta": {
+      "seed": 5019,
+      "background": "ground_Screenshot 2026-02-07 at 4.21.38 PM",
+      "sun_el": 32.7,
+      "burial": 0.4,
+      "face_down": true,
+      "blades_on_mine": 0,
+      "visible_frac": 0.6,
+      "dust": 0.37
+    },
+    "note": "dirt on top of mine doesn't blend into dirt in the background"
+  },
+  {
+    "id": "b020",
+    "seed": 5020,
+    "image": "images/v2/review/b020.jpg",
+    "tags": [
+      "ground",
+      "low_sun",
+      "blades"
+    ],
+    "meta": {
+      "seed": 5020,
+      "background": "ground_bg_Ground005",
+      "sun_el": 16.8,
+      "burial": 0.19,
+      "face_down": false,
+      "blades_on_mine": 2,
+      "visible_frac": 0.78,
+      "dust": 0.29
+    },
+    "note": "sand on top of mine doesn't blend into sand in the background"
+  },
+  {
+    "id": "b022",
+    "seed": 5022,
+    "image": "images/v2/review/b022.jpg",
+    "tags": [
+      "grass",
+      "high_sun"
+    ],
+    "meta": {
+      "seed": 5022,
+      "background": "grass_bg_gen_19_grass_dry_normal",
+      "sun_el": 60.1,
+      "burial": 0.32,
+      "face_down": false,
+      "blades_on_mine": 0,
+      "visible_frac": 0.68,
+      "dust": 0.28
+    },
+    "note": "mine looks like it's floating"
+  }
+]

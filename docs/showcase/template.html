@@ -449,6 +449,7 @@ function renderGrid(page){
   var nodes = [], visible = [];
   function setFlag(id, v){ touch(id).f = v ? 1 : 0; prune(id); save(); sync(); }
   function setNote(id, t){ touch(id).n = t; prune(id); save(); }
+  function annotatedItems(){ return items.filter(function(it){ return isFl(it.id) || noteOf(it.id); }); }
   function flaggedItems(){ return items.filter(function(it){ return isFl(it.id); }); }
   function sync(){
     nodes.forEach(function(n){ var f = isFl(n.id); n.root.classList.toggle("flagged", f); n.cb.checked = f; });
@@ -708,8 +709,8 @@ function renderGrid(page){
     return parts.join(" | ");
   }
   function doCopy(){
-    var fl = flaggedItems();
-    if (!fl.length) { say("Nothing flagged yet."); return; }
+    var fl = annotatedItems();
+    if (!fl.length) { say("Nothing flagged or noted yet."); return; }
     var text = fl.map(lineFor).join("\n");
     function fallback(){
       fb.hidden = false; ta.value = text; ta.focus(); ta.select();
@@ -723,10 +724,10 @@ function renderGrid(page){
     } else fallback();
   }
   function doDownload(){
-    var data = flaggedItems().map(function(it){
-      return {id: it.id, seed: kSeed ? it.meta[kSeed] : undefined, image: it.image, tags: it.tags, meta: it.meta, note: noteOf(it.id)};
+    var data = annotatedItems().map(function(it){
+      return {id: it.id, flagged: isFl(it.id), seed: kSeed ? it.meta[kSeed] : undefined, image: it.image, tags: it.tags, meta: it.meta, note: noteOf(it.id)};
     });
-    if (!data.length) { say("Nothing flagged yet."); return; }
+    if (!data.length) { say("Nothing flagged or noted yet."); return; }
     try {
       var url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: "application/json"}));
       var a = el("a", {href: url, download: "flagged.json"});
