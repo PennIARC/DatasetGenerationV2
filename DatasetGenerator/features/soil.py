@@ -97,20 +97,21 @@ def sample_soft_grain_params(rng, cfg):
 
 
 def soft_grains(rgb_pm, alpha, alpha_full, local_bg, length_px, p, cfg):
-    """Blurred, low-contrast soil speckle on the mine: fBm thresholded at the density quantile (inside the UNCLIPPED
-    silhouette, so burial on / off only removes speckle), density raised in the contact zone near the outline,
-    Gaussian-blurred by blur_px, coloured by the blurred local ground x tone. Only changes colour, never alpha (labels
-    unaffected). -> rgb_pm'."""
+    """Blurred, low-contrast, ground-coloured soil speckle on the mine. fBm thresholded at the density quantile (inside
+    the UNCLIPPED silhouette, so burial on / off only removes speckle), denser in the contact zone near the outline.
+    Each speckle takes the colour of a random BACKGROUND pixel from a ring of ground around the mine (lightly
+    blurred, x tone x a +-3% per-speckle jitter); colour and alpha are then Gaussian-blurred by blur_px (normalised
+    convolution for the colour). Only changes colour, never alpha (labels unaffected). -> rgb_pm'."""
     ys, xs = np.nonzero(alpha_full > 0.01)
     if not p.get("apply") or len(xs) == 0:
         return rgb_pm
-    pad = 8
+    L = length_px
+    pad = int(max(8, cfg.SOFT_GRAIN_RING_FRAC[1] * L + 2))
     y0, y1 = max(0, ys.min() - pad), min(alpha.shape[0], ys.max() + 1 + pad)
     x0, x1 = max(0, xs.min() - pad), min(alpha.shape[1], xs.max() + 1 + pad)
     r = (slice(y0, y1), slice(x0, x1))
     a, af = alpha[r], alpha_full[r]
     h, w = a.shape
-    L = length_px
     rng = np.random.default_rng(p["noise_seed"])
     g = fx.fbm(h, w, max(1.5, p["size_frac"] * L), rng, octaves=2)
     inside = af > 0.5
@@ -120,10 +121,30 @@ def soft_grains(rgb_pm, alpha, alpha_full, local_bg, length_px, p, cfg):
     edge = np.clip(1 - d / max(1.0, cfg.SOFT_GRAIN_EDGE_FRAC * L), 0, 1)
     g = g + 0.15 * p["edge_boost"] * edge                      # more speckle in the contact zone
     thr = np.quantile(g[inside], 1 - min(0.6, p["density"] * (1 + 0.5 * p["edge_boost"] * edge[inside].mean())))
-    sa = fx.gblur(np.clip((g - thr) / 0.05, 0, 1), p["blur_px"])
+    m = (g > thr) & inside
+    # colours sampled from the background around the mine (ring of ground outside the unclipped silhouette)
+    outside = (af < 0.05).astype(np.uint8)
+    d_out = cv2.distanceTransform(outside, cv2.DIST_L2, 3)
+    lo, hi = cfg.SOFT_GRAIN_RING_FRAC
+    ring = (outside > 0) & (d_out >= max(2.0, lo * L)) & (d_out <= max(4.0, hi * L))
+    gb = fx.gblur(local_bg[r], 1.0)
+    ry, rx = np.nonzero(ring)
+    if len(rx) == 0:
+        ry, rx = np.nonzero(outside)
+    if len(rx) == 0:
+        return rgb_pm
+    n_cc, lab = cv2.connectedComponents(m.astype(np.uint8), connectivity=8)
+    k = max(n_cc, 1)
+    pick = rng.integers(0, len(rx), k)
+    cols = gb[ry[pick], rx[pick]] * (p["tone"] * (1 + 0.03 * rng.standard_normal(k)))[:, None]
+    mf = m.astype(np.float32)
+    sig = p["blur_px"]
+    den = fx.gblur(mf, sig)
+    col = fx.gblur(cols[lab] * mf[..., None], sig) / np.maximum(den, 1e-4)[..., None]
+    col = np.where(den[..., None] > 1e-3, col, gb[ry, rx].mean(0))
+    sa = fx.gblur(mf, sig)
     sa = np.clip(sa / max(float(np.quantile(sa[inside], 0.995)), 0.2), 0, 1)   # blur keeps softness, not the peak
     sa = sa * p["strength"] * a
-    col = fx.gblur(local_bg[r], max(1.0, 0.1 * L)) * p["tone"]
     out = rgb_pm.copy()
     out[r] = rgb_pm[r] * (1 - sa[..., None]) + col * (a * sa)[..., None]
     return out.astype(np.float32)

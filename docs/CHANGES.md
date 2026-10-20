@@ -115,19 +115,22 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
 - **Soft grains** (`MINE_SOFT_GRAINS`, default on, needs `SOIL_BLEND`; user: "add a second augmentation similar to
   'Soil grains and contact band' where you add randomized grains except you should blur/smooth these out more";
   ADR `docs/history/0014-soft-grains.md`): a second, blurred speckle layer on the mine (`soil.soft_grains`). Per mine,
-  with probability `SOFT_GRAIN_PROB`=0.75: fBm with feature size U(`SOFT_GRAIN_SIZE_FRAC`=1.2-3.5%) of the mine length
+  with probability `SOFT_GRAIN_PROB`=0.75: fBm with feature size U(`SOFT_GRAIN_SIZE_FRAC`=1.5-4%) of the mine length
   thresholded to cover U(`SOFT_GRAIN_DENSITY`=6-22%) of the mine, denser in the contact zone (within
-  `SOFT_GRAIN_EDGE_FRAC`=8% of the length from the outline, x (1 + U(`SOFT_GRAIN_EDGE_BOOST`=0.5-2))), Gaussian-blurred
-  by U(`SOFT_GRAIN_BLUR_PX`=1.2-3 px) (the existing grains are unblurred with a hard 0.03 ramp), peak opacity
-  U(`SOFT_GRAIN_STRENGTH`=0.2-0.45), colour = blurred local ground x U(`SOFT_GRAIN_TONE`=0.65-1.3) (darker damp soil
-  to lighter dry dust). Computed on the unclipped silhouette's box, so burial only removes speckle; changes colour
+  `SOFT_GRAIN_EDGE_FRAC`=8% of the length from the outline, x (1 + U(`SOFT_GRAIN_EDGE_BOOST`=0.5-2))), each speckle
+  coloured like the BACKGROUND: the colour of a random ground pixel from a ring `SOFT_GRAIN_RING_FRAC`=3-15% of the
+  mine length outside the silhouette (1 px blur), x U(`SOFT_GRAIN_TONE`=0.95-1.05) x a +-3% per-speckle jitter;
+  alpha and colour then Gaussian-blurred by U(`SOFT_GRAIN_BLUR_PX`=2.5-6 px) (the existing grains are unblurred
+  with a hard 0.03 ramp), peak opacity U(`SOFT_GRAIN_STRENGTH`=0.2-0.45). Second user round: "you should blur the
+  soft grains more and make them the same/similar color (maybe sample them) from the background" (was: blur
+  1.2-3 px, colour = blurred local ground x 0.65-1.3). Computed on the unclipped silhouette's box, so burial only removes speckle; changes colour
   only, never alpha (labels unchanged). Own random sub-stream (mine sub-stream 12): with the flag off every image is
   identical to before, and with it on all other draws (and the v2_3000 plan) are unchanged (checked: 1385 planned
   mines re-derived, 0 differ; `generate_dataset.py --verify-plan 3` all match). Sidecar: `mine["soft_grains"]`
   (apply, density, size_frac, blur_px, strength, tone, edge_boost). Figure: `docs/soft_grains.png`
   (`scripts/soft_grains_figure.py`; columns off / existing grains only / + soft grains). Test:
   `tests/test_soft_grains.py` (labels and other sidecar values identical, only the mines change, Laplacian
-  energy per unit change 10-60x lower than the crisp grains, prob 0 = no change).
+  energy per unit change 25-200x lower than the crisp grains, prob 0 = no change).
 - **Limitations**: dust is a 2D overlay (no accumulation in crevices); no wetness / mud.
 
 ## 5. Partial burial (`BURIAL`, needs `MESH_MINES`)

@@ -20,7 +20,7 @@ opacity. They read as sharp dots at 4-6x.
   - speckle size 1.2-3.5% of the mine length (about 2-5 px)
   - blur sigma 1.2-3 px
   - peak opacity 0.2-0.45
-  - tone 0.65-1.3 x the blurred local ground
+  - tone 0.65-1.3 x the blurred local ground (replaced in the follow-up below)
   - contact-zone density boost 0.5-2 (applied within 8% of the length from the outline)
 
   The result is soft, low-contrast, larger blotches, not dots. Varying the parameters per mine adds variation
@@ -39,7 +39,7 @@ opacity. They read as sharp dots at 4-6x.
   captioned.
 - `tests/test_soft_grains.py`:
   - only the mines change; labels and other sidecar values are identical;
-  - the change has 10-60x less pixel-scale (Laplacian) energy per unit than the crisp grains;
+  - the change has 25-200x less pixel-scale (Laplacian) energy per unit than the crisp grains;
   - prob 0 leaves the image unchanged.
 - The plan's `plan_mines.csv` was re-derived for 1385 mines with 0 differences, and `--verify-plan 3` matched on
   all checks.
@@ -47,11 +47,24 @@ opacity. They read as sharp dots at 4-6x.
   them, `plan_values` can replicate them with `soil.sample_soft_grain_params(sub(12), cfg)`.
 - The other docs sheets (`burial_realism.png`, `v1_vs_v2.png`, `mine_crops.png`, ...) predate this layer and do not
   show it. Mines whose colour is close to the ground get almost invisible soft grains (the colour comes from the
-  ground). That is intended: it is low contrast.
+  background). That is intended: it is low contrast.
+
+## Follow-up (same day): more blur, background colours
+
+User, verbatim: "you should blur the soft grains more and make them the same/similar color (maybe sample them) from
+the background".
+
+- Blur sigma raised from 1.2-3 px to 2.5-6 px (`SOFT_GRAIN_BLUR_PX`), speckle size 1.5-4% of the mine length.
+- Colour: each speckle (connected blob before blurring) takes the colour of a random background pixel sampled in a
+  ring 3-15% of the mine length outside the unclipped silhouette (`SOFT_GRAIN_RING_FRAC`), x a small tone jitter
+  (`SOFT_GRAIN_TONE` 0.95-1.05, +-3% per speckle). Alpha and colour are both blurred by sigma (normalised convolution
+  for the colour). Before this round the colour was the blurred local ground x 0.65-1.3.
+- Same sub-stream 12 with the same 9 draws; the extra randomness (ring positions, jitter) comes from the layer's own
+  noise seed, so no other stream moves (plan re-derived: 0 of 1385 mines differ; tests pass).
 
 ## Feedback that triggered this
 
-- User request relayed by the lead (quoted above).
+- User requests relayed by the lead (both quoted above).
 
 ## Commits
 

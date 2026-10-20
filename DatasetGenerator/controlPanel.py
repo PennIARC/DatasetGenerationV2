@@ -238,10 +238,13 @@ GRAIN_OPACITY = (0.5, 0.9)
 MINE_SOFT_GRAINS = True
 SOFT_GRAIN_PROB = 0.75              # share of mines that get the layer (per mine)
 SOFT_GRAIN_DENSITY = (0.06, 0.22)   # fraction of the mine's pixels inside speckles (before blurring)
-SOFT_GRAIN_SIZE_FRAC = (0.012, 0.035)   # speckle feature size / mine length (~2-5 px at 150 px; grains: 1.5 px)
-SOFT_GRAIN_BLUR_PX = (1.2, 3.0)     # Gaussian sigma of the speckle alpha (existing grains: unblurred, 0.03 ramp)
+SOFT_GRAIN_SIZE_FRAC = (0.015, 0.04)    # speckle feature size / mine length (~2-6 px at 150 px; grains: 1.5 px)
+SOFT_GRAIN_BLUR_PX = (2.5, 6.0)     # Gaussian sigma of speckle alpha and colour (user: "blur the soft grains more";
+                                    # existing grains: unblurred, 0.03 ramp)
 SOFT_GRAIN_STRENGTH = (0.2, 0.45)   # peak opacity of a speckle (low contrast; grains: 0.5-0.9)
-SOFT_GRAIN_TONE = (0.65, 1.3)       # speckle colour = local ground x this (darker damp soil .. lighter dry dust)
+SOFT_GRAIN_TONE = (0.95, 1.05)      # small brightness jitter of the sampled colour (+ 3% per speckle)
+SOFT_GRAIN_RING_FRAC = (0.03, 0.15) # speckle colours = background pixels sampled in this ring around the mine
+                                    # (x mine length; user: "same/similar color (maybe sample them) from the background")
 SOFT_GRAIN_EDGE_BOOST = (0.5, 2.0)  # density x (1 + this) inside the contact zone (SOFT_GRAIN_EDGE_FRAC x length)
 SOFT_GRAIN_EDGE_FRAC = 0.08
 HARMONIZE_LOCAL = 0.5               # mine *= (local bg luminance / image luminance) ** this
