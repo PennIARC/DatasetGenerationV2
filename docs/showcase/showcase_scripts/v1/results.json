@@ -1,0 +1,374 @@
+{
+ "backgrounds": {
+  "options": [
+   {
+    "label": "all 15 photos",
+    "params": "assets/backgrounds/*.png (7 grassN.png + 8 screenshots)",
+    "image": "images/v1/bg_contact_sheet.jpg",
+    "caption": "Centre-cropped thumbnails of every background photo v1 can pick."
+   },
+   {
+    "label": "zoom 1.0",
+    "params": "zoom=1.0, crop offset fraction (0.4, 0.3)",
+    "image": "images/v1/bg_zoom_1_0.jpg",
+    "caption": "Same photo and same crop anchor; higher zoom shows a smaller, blurrier part of the photo."
+   },
+   {
+    "label": "zoom 1.25",
+    "params": "zoom=1.25, crop offset fraction (0.4, 0.3)",
+    "image": "images/v1/bg_zoom_1_25.jpg",
+    "caption": "Same photo and same crop anchor; higher zoom shows a smaller, blurrier part of the photo."
+   },
+   {
+    "label": "zoom 1.5",
+    "params": "zoom=1.5, crop offset fraction (0.4, 0.3)",
+    "image": "images/v1/bg_zoom_1_5.jpg",
+    "caption": "Same photo and same crop anchor; higher zoom shows a smaller, blurrier part of the photo."
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Random crop offset",
+    "before": "images/v1/bg_crop_a.jpg",
+    "after": "images/v1/bg_crop_b.jpg",
+    "before_label": "offset near top-left",
+    "after_label": "offset near bottom-right",
+    "caption": "Same photo, zoom 1.5: the random offset gives two different-looking training images."
+   }
+  ]
+ },
+ "dirt": {
+  "options": [
+   {
+    "label": "density 0.5",
+    "params": "density_factor=0.5 (52 squares; v1 count = randint(50,200) x density)",
+    "image": "images/v1/dirt_density_0_5.jpg",
+    "caption": ""
+   },
+   {
+    "label": "density 1.0",
+    "params": "density_factor=1.0 (104 squares; v1 count = randint(50,200) x density)",
+    "image": "images/v1/dirt_density_1_0.jpg",
+    "caption": ""
+   },
+   {
+    "label": "density 2.0",
+    "params": "density_factor=2.0 (208 squares; v1 count = randint(50,200) x density)",
+    "image": "images/v1/dirt_density_2_0.jpg",
+    "caption": ""
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Dirt specks (2x crop)",
+    "before": "images/v1/dirt_off.png",
+    "after": "images/v1/dirt_on.png",
+    "before_label": "off",
+    "after_label": "on (density 1.0)",
+    "caption": "Hard-edged brown squares, 4-12 px, with a different shade each."
+   }
+  ]
+ },
+ "rocks": {
+  "options": [
+   {
+    "label": "5 rocks",
+    "params": "ROCKS_TO_SPAWN_MIN=MAX=5, size 40-100 px, random rotation",
+    "image": "images/v1/rocks_5.jpg",
+    "caption": ""
+   },
+   {
+    "label": "12 rocks",
+    "params": "ROCKS_TO_SPAWN_MIN=MAX=12, size 40-100 px, random rotation",
+    "image": "images/v1/rocks_12.jpg",
+    "caption": ""
+   },
+   {
+    "label": "20 rocks",
+    "params": "ROCKS_TO_SPAWN_MIN=MAX=20, size 40-100 px, random rotation",
+    "image": "images/v1/rocks_20.jpg",
+    "caption": ""
+   },
+   {
+    "label": "Otsu alpha mask",
+    "params": "mask = Otsu threshold of blurred grey rock photo (white = kept)",
+    "image": "images/v1/rocks_mask.png",
+    "caption": "The binary mask that becomes the alpha channel."
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Rock debris (crop)",
+    "before": "images/v1/rocks_off.jpg",
+    "after": "images/v1/rocks_on.jpg",
+    "before_label": "off",
+    "after_label": "on (12 rocks)",
+    "caption": "Photographed rocks pasted on the grass at random positions and rotations; there is no shadow under them."
+   },
+   {
+    "label": "Cutout edge (5x zoom)",
+    "before": "images/v1/rock_edge_raw.png",
+    "after": "images/v1/rock_edge_cut.png",
+    "before_label": "raw photo pasted",
+    "after_label": "Otsu cutout",
+    "caption": "Look at the rim: the cut is a hard 1-bit edge with no feathering, and shadowed parts of the rock can be cut away."
+   }
+  ]
+ },
+ "grass": {
+  "options": [
+   {
+    "label": "cap 5",
+    "params": "GRASS_CLIPPINGS_PER_IMAGE=5 (17 clippings from 4 source photos)",
+    "image": "images/v1/grass_5.jpg",
+    "caption": "Value 4 from the brief is impossible in v1: randint(5, 4) raises ValueError, so 5 is the smallest usable setting."
+   },
+   {
+    "label": "cap 16",
+    "params": "GRASS_CLIPPINGS_PER_IMAGE=16 (36 clippings from 4 source photos)",
+    "image": "images/v1/grass_16.jpg",
+    "caption": ""
+   },
+   {
+    "label": "cap 32",
+    "params": "GRASS_CLIPPINGS_PER_IMAGE=32 (61 clippings from 4 source photos)",
+    "image": "images/v1/grass_32.jpg",
+    "caption": ""
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Grass clippings (crop)",
+    "before": "images/v1/grass_off.jpg",
+    "after": "images/v1/grass_on.jpg",
+    "before_label": "off",
+    "after_label": "on (cap 16)",
+    "caption": "Cut-out crops of blade photos scattered on the lawn; patches that are mostly background are skipped."
+   }
+  ]
+ },
+ "sprites": {
+  "options": [
+   {
+    "label": "all 50 sprites",
+    "params": "assets/mines/mine_0000..0049.png on mid-grey",
+    "image": "images/v1/sprite_sheet.png",
+    "caption": "Pre-rendered 3D mine renders: pitch/roll in +-20 deg, yaw 0-360, brightness shifts."
+   },
+   {
+    "label": "scale x rotation grid",
+    "params": "mine_0007.png; scale in [0.1, 0.25, 0.4]; in-plane rotation in [37, 151, 262] deg (rows = scale, cols = rotation)",
+    "image": "images/v1/sprite_scale_rotation.png",
+    "caption": "One sprite placed at the three scales and three in-plane rotations."
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Sprite vs placed mine",
+    "before": "images/v1/sprite_flat.png",
+    "after": "images/v1/sprite_placed.png",
+    "before_label": "sprite on grey (scale 0.4)",
+    "after_label": "as placed: rotated 110 deg + dirt, on grass",
+    "caption": "Same sprite; placement adds the second rotation and surface specks. Note the sprite carries its own baked-in lighting."
+   }
+  ]
+ },
+ "count": {
+  "options": [
+   {
+    "label": "0 mines",
+    "params": "n_mines=0 (v1: randint(0,8), 10% chance forced to 0), YOLO boxes in green",
+    "image": "images/v1/mines_0.jpg",
+    "caption": ""
+   },
+   {
+    "label": "1 mines",
+    "params": "n_mines=1 (v1: randint(0,8), 10% chance forced to 0), YOLO boxes in green",
+    "image": "images/v1/mines_1.jpg",
+    "caption": ""
+   },
+   {
+    "label": "4 mines",
+    "params": "n_mines=4 (v1: randint(0,8), 10% chance forced to 0), YOLO boxes in green",
+    "image": "images/v1/mines_4.jpg",
+    "caption": ""
+   },
+   {
+    "label": "8 mines",
+    "params": "n_mines=8 (v1: randint(0,8), 10% chance forced to 0), YOLO boxes in green",
+    "image": "images/v1/mines_8.jpg",
+    "caption": ""
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Overlap rejection",
+    "before": "images/v1/place_naive.jpg",
+    "after": "images/v1/place_reject.jpg",
+    "before_label": "no check (random positions)",
+    "after_label": "v1 check: rect vs rect inflated by 10 px, up to 50 tries",
+    "caption": "8 mines at scale 0.4 (seed 2). Without the check some boxes overlap; with it each mine is re-rolled until its rectangle is clear. Failures after 50 tries are silently dropped."
+   }
+  ]
+ },
+ "minedirt": {
+  "options": [
+   {
+    "label": "example 1",
+    "params": "mine_0012.png, scale 0.4, 5-20 circles r=1-3, colour (80,60,40)+-30, 4x nearest zoom",
+    "image": "images/v1/minedirt_ex1.png",
+    "caption": ""
+   },
+   {
+    "label": "example 2",
+    "params": "mine_0020.png, scale 0.4, 5-20 circles r=1-3, colour (80,60,40)+-30, 4x nearest zoom",
+    "image": "images/v1/minedirt_ex2.png",
+    "caption": ""
+   },
+   {
+    "label": "example 3",
+    "params": "mine_0033.png, scale 0.4, 5-20 circles r=1-3, colour (80,60,40)+-30, 4x nearest zoom",
+    "image": "images/v1/minedirt_ex3.png",
+    "caption": ""
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Surface dirt (4x zoom)",
+    "before": "images/v1/minedirt_off.png",
+    "after": "images/v1/minedirt_on.png",
+    "before_label": "off",
+    "after_label": "on",
+    "caption": "Round, hard-edged dots in one brownish colour family; the pixels near a dot's edge can spill past the silhouette."
+   }
+  ]
+ },
+ "overgrowth": {
+  "options": [
+   {
+    "label": "label box vs visible area",
+    "params": "green = v1 YOLO box (from unoccluded sprite mask); red = bounding box of the pixels actually still visible",
+    "image": "images/v1/over_box_vs_visible.png",
+    "caption": "Visible fraction of the silhouette ~64%."
+   },
+   {
+    "label": "heavy overgrowth",
+    "params": "second layer with dirt density 2, 20 rocks, grass cap 32 (not the v1 default; exaggerated)",
+    "image": "images/v1/over_heavy.png",
+    "caption": "The same mine under a denser second layer."
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Occlusion layer",
+    "before": "images/v1/over_off.png",
+    "after": "images/v1/over_on.png",
+    "before_label": "mine, no overgrowth",
+    "after_label": "second debris layer drawn after the mine",
+    "caption": "About 36% of this mine's silhouette is covered (seed 4)."
+   }
+  ]
+ },
+ "shader": {
+  "options": [
+   {
+    "label": "grain 0.05",
+    "params": "noise_strength=0.05 (alone), 4x nearest crop of 200x200",
+    "image": "images/v1/shader_grain_005.png",
+    "caption": "The grain is added to all three channels, then red and blue are overwritten by the aberration step, so only green keeps it."
+   },
+   {
+    "label": "grain 0.12",
+    "params": "noise_strength=0.12 (alone), 4x nearest crop of 200x200",
+    "image": "images/v1/shader_grain_012.png",
+    "caption": ""
+   },
+   {
+    "label": "vignette 0.4",
+    "params": "vignette strength 0.4 (alone), full frame",
+    "image": "images/v1/shader_vignette.jpg",
+    "caption": ""
+   },
+   {
+    "label": "all four together",
+    "params": "noise 0.08 (v1 draws U(0.05,0.12)), aberration 0.002, vignette 0.4, contrast 1.1",
+    "image": "images/v1/shader_all.jpg",
+    "caption": ""
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Grain 0.12 (4x crop)",
+    "before": "images/v1/shader_grain_off.png",
+    "after": "images/v1/shader_grain_on.png",
+    "before_label": "off",
+    "after_label": "noise 0.12",
+    "caption": ""
+   },
+   {
+    "label": "Chromatic aberration (8x crop at a mine edge)",
+    "before": "images/v1/shader_ca_off.png",
+    "after": "images/v1/shader_ca_on.png",
+    "before_label": "off",
+    "after_label": "aberration 0.002 (about 3.8 px)",
+    "caption": "Red is sampled 3.8 px to the right and blue 3.8 px to the left, giving coloured fringes on vertical edges."
+   },
+   {
+    "label": "Vignette",
+    "before": "images/v1/shader_vig_off.jpg",
+    "after": "images/v1/shader_vig_on.jpg",
+    "before_label": "off",
+    "after_label": "0.4",
+    "caption": "Corners are multiplied by about 0.72; the centre is untouched."
+   },
+   {
+    "label": "Contrast 1.1",
+    "before": "images/v1/shader_ct_off.jpg",
+    "after": "images/v1/shader_ct_on.jpg",
+    "before_label": "off",
+    "after_label": "1.1",
+    "caption": "A mild push around mid-grey: darks get darker, lights lighter."
+   },
+   {
+    "label": "All effects",
+    "before": "images/v1/shader_pre.jpg",
+    "after": "images/v1/shader_all2.jpg",
+    "before_label": "pre-shader frame",
+    "after_label": "after full v1 pass",
+    "caption": ""
+   }
+  ]
+ },
+ "export": {
+  "options": [
+   {
+    "label": "side by side",
+    "params": "cv2.resize(img,(640,640), INTER_LINEAR); label numbers copied unchanged",
+    "image": "images/v1/export_side_by_side.jpg",
+    "caption": "Left: 1920x1080 with boxes. Right: the 640x640 export (shown at 560 px) with the same normalised boxes redrawn."
+   },
+   {
+    "label": "1920x1080 source",
+    "params": "full-resolution labels drawn",
+    "image": "images/v1/export_1920.jpg",
+    "caption": ""
+   },
+   {
+    "label": "640x640 stretched",
+    "params": "640x640, boxes redrawn from the unchanged label file",
+    "image": "images/v1/export_640.png",
+    "caption": ""
+   }
+  ],
+  "before_after": [
+   {
+    "label": "Same mine before/after export",
+    "before": "images/v1/export_mine_before.png",
+    "after": "images/v1/export_mine_after.png",
+    "before_label": "1920x1080 (2x view)",
+    "after_label": "640x640 (6x nearest view of the same region)",
+    "caption": "x shrinks by 0.333 (1/3) and y by 0.593, so round things become tall and narrow."
+   }
+  ]
+ }
+}

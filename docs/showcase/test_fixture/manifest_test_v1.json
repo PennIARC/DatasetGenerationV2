@@ -1,0 +1,148 @@
+{
+ "pages": [
+  {
+   "id": "v1",
+   "tab": "v1: original generator",
+   "title": "Original generator",
+   "intro": "Test intro for v1. It has two sentences.",
+   "glossary": {
+    "Alpha": "A test term.",
+    "Beta": "Another test term."
+   },
+   "features": [
+    {
+     "id": "backgrounds",
+     "title": "Background photos",
+     "summary": "Plain summary of Background photos.",
+     "how": "Does a thing in a function.",
+     "code": "DatasetGenerator/main.py: backgrounds",
+     "options": [
+      {
+       "label": "backgrounds 0",
+       "params": "k=0, random crop",
+       "image": "test_fixture/images/backgrounds_0.jpg",
+       "caption": "caption 0"
+      },
+      {
+       "label": "backgrounds 1",
+       "params": "k=1, random crop",
+       "image": "test_fixture/images/backgrounds_1.jpg",
+       "caption": ""
+      },
+      {
+       "label": "backgrounds 2",
+       "params": "k=2, random crop",
+       "image": "test_fixture/images/backgrounds_2.jpg",
+       "caption": "caption 2"
+      },
+      {
+       "label": "backgrounds 3",
+       "params": "k=3, random crop",
+       "image": "test_fixture/images/backgrounds_3.jpg",
+       "caption": ""
+      }
+     ],
+     "before_after": [
+      {
+       "label": "Backgrounds",
+       "before": "test_fixture/images/backgrounds_off.jpg",
+       "after": "test_fixture/images/backgrounds_on.jpg",
+       "before_label": "off",
+       "after_label": "on",
+       "caption": "Look at the centre band."
+      }
+     ],
+     "notes": "Placeholder limitation for Background photos."
+    },
+    {
+     "id": "sprites",
+     "title": "Sprite placement",
+     "summary": "Plain summary of Sprite placement.",
+     "how": "Does a thing in a function.",
+     "code": "DatasetGenerator/main.py: sprites",
+     "options": [
+      {
+       "label": "sprites 0",
+       "params": "k=0, random crop",
+       "image": "test_fixture/images/sprites_0.jpg",
+       "caption": "caption 0"
+      },
+      {
+       "label": "sprites 1",
+       "params": "k=1, random crop",
+       "image": "test_fixture/images/does_not_exist.jpg",
+       "caption": ""
+      },
+      {
+       "label": "sprites 2",
+       "params": "k=2, random crop",
+       "image": "test_fixture/images/sprites_2.jpg",
+       "caption": "caption 2"
+      },
+      {
+       "label": "sprites 3",
+       "params": "k=3, random crop",
+       "image": "test_fixture/images/sprites_3.jpg",
+       "caption": ""
+      }
+     ],
+     "before_after": [
+      {
+       "label": "Sprites",
+       "before": "test_fixture/images/sprites_off.jpg",
+       "after": "test_fixture/images/also_missing.jpg",
+       "before_label": "off",
+       "after_label": "on",
+       "caption": "Look at the centre band."
+      }
+     ],
+     "notes": "Placeholder limitation for Sprite placement."
+    },
+    {
+     "id": "noise",
+     "title": "Dirt specks",
+     "summary": "Plain summary of Dirt specks.",
+     "how": "Does a thing in a function.",
+     "code": "DatasetGenerator/main.py: noise",
+     "options": [
+      {
+       "label": "noise 0",
+       "params": "k=0, random crop",
+       "image": "test_fixture/images/noise_0.jpg",
+       "caption": "caption 0"
+      },
+      {
+       "label": "noise 1",
+       "params": "k=1, random crop",
+       "image": "test_fixture/images/noise_1.jpg",
+       "caption": ""
+      },
+      {
+       "label": "noise 2",
+       "params": "k=2, random crop",
+       "image": "test_fixture/images/noise_2.jpg",
+       "caption": "caption 2"
+      },
+      {
+       "label": "noise 3",
+       "params": "k=3, random crop",
+       "image": "test_fixture/images/noise_3.jpg",
+       "caption": ""
+      }
+     ],
+     "before_after": [
+      {
+       "label": "Noise",
+       "before": "test_fixture/images/noise_off.jpg",
+       "after": "test_fixture/images/noise_on.jpg",
+       "before_label": "off",
+       "after_label": "on",
+       "caption": "Look at the centre band."
+      }
+     ],
+     "notes": "Placeholder limitation for Dirt specks."
+    }
+   ]
+  }
+ ]
+}

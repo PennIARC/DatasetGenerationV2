@@ -1,0 +1,121 @@
+{
+ "pages": [
+  {
+   "id": "v2",
+   "tab": "v2: new realism features",
+   "title": "New realism features",
+   "intro": "Test intro for v2.",
+   "glossary": {
+    "Shadow": "A dark area."
+   },
+   "features": [
+    {
+     "id": "shadows",
+     "title": "Shadows",
+     "summary": "Plain summary of Shadows.",
+     "how": "Does a thing in a function.",
+     "code": "DatasetGenerator/main.py: shadows",
+     "options": [
+      {
+       "label": "shadows 0",
+       "params": "k=0, random crop",
+       "image": "test_fixture/images/shadows_0.jpg",
+       "caption": "caption 0"
+      },
+      {
+       "label": "shadows 1",
+       "params": "k=1, random crop",
+       "image": "test_fixture/images/shadows_1.jpg",
+       "caption": ""
+      },
+      {
+       "label": "shadows 2",
+       "params": "k=2, random crop",
+       "image": "test_fixture/images/shadows_2.jpg",
+       "caption": "caption 2"
+      },
+      {
+       "label": "shadows 3",
+       "params": "k=3, random crop",
+       "image": "test_fixture/images/shadows_3.jpg",
+       "caption": ""
+      }
+     ],
+     "before_after": [
+      {
+       "label": "Shadows",
+       "before": "test_fixture/images/shadows_off.jpg",
+       "after": "test_fixture/images/shadows_on.jpg",
+       "before_label": "off",
+       "after_label": "on",
+       "caption": "Look at the centre band."
+      }
+     ],
+     "notes": "Placeholder limitation for Shadows.",
+     "flag": "enable_shadows"
+    },
+    {
+     "id": "blur",
+     "title": "Motion blur",
+     "summary": "Plain summary of Motion blur.",
+     "how": "Does a thing in a function.",
+     "code": "DatasetGenerator/main.py: blur",
+     "options": [
+      {
+       "label": "blur 0",
+       "params": "k=0, random crop",
+       "image": "test_fixture/images/blur_0.jpg",
+       "caption": "caption 0"
+      },
+      {
+       "label": "blur 1",
+       "params": "k=1, random crop",
+       "image": "test_fixture/images/blur_1.jpg",
+       "caption": ""
+      },
+      {
+       "label": "blur 2",
+       "params": "k=2, random crop",
+       "image": "test_fixture/images/blur_2.jpg",
+       "caption": "caption 2"
+      },
+      {
+       "label": "blur 3",
+       "params": "k=3, random crop",
+       "image": "test_fixture/images/blur_3.jpg",
+       "caption": ""
+      }
+     ],
+     "before_after": [
+      {
+       "label": "Blur",
+       "before": "test_fixture/images/blur_off.jpg",
+       "after": "test_fixture/images/blur_on.jpg",
+       "before_label": "off",
+       "after_label": "on",
+       "caption": "Look at the centre band."
+      }
+     ],
+     "notes": "Placeholder limitation for Motion blur.",
+     "flag": "enable_blur"
+    },
+    {
+     "id": "sparse",
+     "title": "Sparse feature",
+     "summary": "Plain summary of Sparse feature.",
+     "code": "DatasetGenerator/main.py: sparse",
+     "before_after": [
+      {
+       "label": "Sparse",
+       "before": "test_fixture/images/sparse_off.jpg",
+       "after": "test_fixture/images/sparse_on.jpg",
+       "before_label": "off",
+       "after_label": "on",
+       "caption": "Look at the centre band."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
