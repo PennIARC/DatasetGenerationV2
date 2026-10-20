@@ -60,4 +60,13 @@ def process_dataset():
 
 
 if __name__ == "__main__":
+    # optional: python3 exportToYOLO.py [SRC_DIR [DST_DIR]]  (defaults: OUTPUT_PATH -> finalDataset, as in v1)
+    import sys
+    if len(sys.argv) > 1:
+        INPUT_IMG_DIR = os.path.join(sys.argv[1], cp.IMAGES_DIR)
+        INPUT_LBL_DIR = os.path.join(sys.argv[1], cp.LABELS_DIR)
+    if len(sys.argv) > 2:
+        OUTPUT_BASE = sys.argv[2]
+        OUTPUT_IMG_DIR = os.path.join(OUTPUT_BASE, "images")
+        OUTPUT_LBL_DIR = os.path.join(OUTPUT_BASE, "labels")
     process_dataset()
