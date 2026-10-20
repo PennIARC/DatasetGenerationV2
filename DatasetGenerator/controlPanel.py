@@ -237,6 +237,7 @@ LOCAL_BG_SIGMA_FRAC = 0.25          # blur of the local background (fraction of 
 # --- BURIAL (BURIAL; needs MESH_MINES) ---
 BURIAL_PROB = 0.35
 BURIAL_FRACTION = (0.05, 0.5)       # fraction of the mine's top-down visible area that ends up under soil
+BURIAL_CLIP_SHARE = 0.85            # the 3D clip hides this share of BURIAL_FRACTION; soil line / ridge / clods the rest
 BURIAL_MAX_FRACTION = 0.5           # hard cap (user decision: every mine stays reasonably visible, always boxed)
 BURIAL_TILT = (0.0, 25.0)           # ground-plane tilt
 SOIL_EDGE_NOISE = (0.01, 0.035)     # soil-line roughness, mesh units (mine length = 1)
@@ -244,18 +245,20 @@ BERM_WIDTH_PX = (2.0, 6.0)          # soil lip / berm along the buried edge
 BERM_OPACITY = (0.4, 0.85)
 BERM_DARKEN = (0.75, 0.95)          # disturbed soil is a little darker / damper than the surface
 BURIAL_MIN_FRAGMENT_FRAC = 0.06     # after clipping: visible islands smaller than this x full area are dropped ...
-BURIAL_OPEN_PX = 1                  # ... and structures thinner than ~2 px removed (morphological opening radius)
+BURIAL_OPEN_PX = 1                  # ... and structures thinner than ~2 r px removed (morphological opening, radius
+BURIAL_OPEN_FRAC = 0.025            #     r = max(BURIAL_OPEN_PX, BURIAL_OPEN_FRAC x mine length); ~4 px at 150 px)
 # Soil-displacement cues (user feedback: a cut-away mine looks edited). Strength scales with
 # s = clip(burial fraction / 0.4, 0.25, 1.25): subtle for small burials, clear at 40-50%.
 BURIAL_BERM = True                  # raised, clumpy ridge along the soil line, sun-shaded, casting a short shadow
 BERM_RIDGE_WIDTH_FRAC = (0.03, 0.08)    # ridge width / mine length
 BERM_RIDGE_HEIGHT_FRAC = (0.02, 0.05)   # ridge height / mine length (cast-shadow length)
-BERM_RIDGE_OPACITY = (0.6, 0.9)
+BERM_RIDGE_OPACITY = (0.5, 0.8)
+BERM_RIDGE_SHADE = 0.35             # sun shading contrast of the ridge (lit side x (1 + this), far side x (1 - this))
 BURIAL_DISTURBED_SOIL = True        # darker, rougher turned-soil patch around the buried part (on the ground)
-DISTURBED_RADIUS_FRAC = (0.12, 0.3) # patch extent beyond the buried region / mine length (noise-modulated edge)
+DISTURBED_RADIUS_FRAC = (0.08, 0.2) # patch extent beyond the buried region / mine length (noise-modulated edge)
 DISTURBED_DARKEN = (0.72, 0.88)
 DISTURBED_DESAT = (0.1, 0.3)
-DISTURBED_OPACITY = (0.6, 0.9)
+DISTURBED_OPACITY = (0.35, 0.65)
 BURIAL_CLODS = True                 # displaced soil clods (assets_new/dirt clods) along the soil line, with shadows
 BURIAL_CLOD_COUNT = (3.0, 9.0)      # at s = 1
 BURIAL_CLOD_SIZE_FRAC = (0.03, 0.09)    # clod width / mine length

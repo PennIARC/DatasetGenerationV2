@@ -343,7 +343,7 @@ class Mine:
         if burial is not None:
             # the clip plane can leave slivers on thin wings / rims and tiny islands: remove them (they count as buried)
             full_px = float((self.alpha_full > 0.5).sum())
-            keep = burial_fx.clean_mask(self.alpha > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full_px, cfg.BURIAL_OPEN_PX)
+            keep = burial_fx.clean_mask(self.alpha > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full_px, self._open_r(ppu))
             g = cv2.dilate(keep, burial_fx.K3).astype(np.float32)
             self.alpha = self.alpha * g
             self.rgb_pm = self.rgb_pm * g[..., None]
@@ -353,6 +353,11 @@ class Mine:
                          colour=cinfo, burial={"buried": burial is not None, **(burial or {}), **r["info"]})
         if not cfg.SOIL_BLEND:
             self._v1_dots()
+
+    def _open_r(self, length_px):
+        """Opening radius for the burial clean-up: strips thinner than ~2 r px (r = BURIAL_OPEN_FRAC x mine length,
+        at least BURIAL_OPEN_PX) left by the clip plane on thin wings / rims are removed."""
+        return int(max(self.cfg.BURIAL_OPEN_PX, round(self.cfg.BURIAL_OPEN_FRAC * length_px)))
 
     def _load_sprite(self, scale):
         cfg, rng = self.cfg, self.rng
@@ -450,15 +455,21 @@ class Mine:
             s_rgb = s_rgb * (s_a > 0)[..., None]
         # what the soil line leaves visible must not contain slivers / islands either: cover them with soil
         vis = alpha * (1.0 - s_a)
-        keep = burial_fx.clean_mask(vis > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, cfg.BURIAL_OPEN_PX)
+        stages = {"clip": float(1 - (alpha > 0.5).sum() / max(full, 1)),
+                  "soil_line": float(1 - (vis > 0.5).sum() / max(full, 1))}
+        keep = burial_fx.clean_mask(vis > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, self._open_r(L))
         drop = ((alpha > 0.02) & (cv2.dilate(keep, burial_fx.K3) == 0)).astype(np.float32)
         if drop.any():
             soil_col = fx.gblur(local, 1.0) * p["berm_darken"]
             s_rgb = s_rgb * (1 - drop)[..., None] + soil_col * drop[..., None]
             s_a = np.maximum(s_a, drop)
         vis = alpha * (1.0 - s_a)
+        stages["fragments"] = float(1 - (vis > 0.5).sum() / max(full, 1))
         core = np.maximum(np.clip(self.alpha_full - alpha, 0, 1), s_a)
-        line, dist = burial_fx.soil_line(vis, core)
+        # the ridge / occlusion gradient follow the CLIP line (visible mine against the part cut away by the soil
+        # plane, incl. dropped fragments); the noisy soil cover over low rims only roughens the edge
+        clip_core = np.maximum(np.clip(self.alpha_full - alpha, 0, 1), drop)
+        line, dist = burial_fx.soil_line(vis, clip_core)
         if cfg.BURIAL_DIRTY_EXPOSED:
             rgb_pm = burial_fx.dirty_exposed(rgb_pm, alpha, dist, local, L, bp, sB, rngb, cfg)
         fx.over(img, rgb_pm, alpha, self.x, self.y)
@@ -479,9 +490,25 @@ class Mine:
                 cover = np.maximum(cover, tmp)
         vis_final = vis * (1.0 - cover)
         achieved = float(1 - (vis_final > 0.5).sum() / max(full, 1))
-        if achieved > cfg.BURIAL_MAX_FRACTION:   # ridge / clods hid too much: they stay, but only semi-transparent
-            vis_final = vis * (1.0 - np.minimum(cover, 0.45))
+        if achieved > cfg.BURIAL_MAX_FRACTION:
+            # ridge / clods would hide too much: they are drawn as they are, but for the visible mask (label) they
+            # count with the largest weight f that keeps the cap (bisection), i.e. as partly see-through cover
+            lo, hi = 0.0, 1.0
+            for _ in range(8):
+                f = (lo + hi) / 2
+                if 1 - (vis * (1 - f * cover) > 0.5).sum() / max(full, 1) > cfg.BURIAL_MAX_FRACTION:
+                    hi = f
+                else:
+                    lo = f
+            vis_final = vis * (1.0 - lo * cover)
             achieved = float(1 - (vis_final > 0.5).sum() / max(full, 1))
+        # ridge / clods can split off tiny bits of the visible mask: the label mask drops them like any fragment
+        keep = burial_fx.clean_mask(vis_final > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, cfg.BURIAL_OPEN_PX)
+        vis_final = vis_final * cv2.dilate(keep, burial_fx.K3).astype(np.float32)
+        achieved = float(1 - (vis_final > 0.5).sum() / max(full, 1))
+        stages["final"] = achieved
+        self.meta["burial"]["hidden_by_stage"] = stages
+        self.meta["burial"]["cap_exceeded"] = bool(achieved > cfg.BURIAL_MAX_FRACTION + 0.01)
         self.visible = vis_final
         self.meta["burial"].update({k: v for k, v in p.items() if k != "noise_seed"})
         self.meta["burial"].update(achieved=achieved, realism={k: v for k, v in bp.items() if k != "seed"}, scale=sB)

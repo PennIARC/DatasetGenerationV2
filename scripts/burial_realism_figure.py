@@ -22,7 +22,8 @@ BASE = dict(n_mines=1, mine_positions=[(960, 540)], mine_scale=0.35, psf_sigma=0
             overcast_prob=0.0, blades_over_on_mine=0.0)
 BUR = dict(burial_prob=1.0, burial_fraction=0.4, burial_tilt=15)
 OLD = dict(burial_berm=False, burial_disturbed_soil=False, burial_clods=False, burial_dirty_exposed=False,
-           blade_soil_lift=False, blade_emerge=False, burial_min_fragment_frac=0.0, burial_open_px=0)
+           blade_soil_lift=False, blade_emerge=False, burial_min_fragment_frac=0.0, burial_open_px=0,
+           burial_open_frac=0.0, burial_clip_share=1.0)
 CASES = [("gravel", 1, dict(mine_pose=(3, -2, 30))),
          ("dark grass", 12, dict(mine_pose=(3, -2, 30))),
          ("light dry grass", 8, dict(mine_pose=(4, 3, 120))),

@@ -125,14 +125,17 @@ def berm_ridge(line_dist, core, vis, local, L, sun, p, s, rng, cfg):
     n = fx.fbm(h, w, max(2.0, 0.06 * L), rng)
     clumps = fx.fbm(h, w, max(1.5, 0.025 * L), rng, octaves=2)
     prof = np.clip(1 - line_dist / (width * (0.5 + n)), 0, 1)      # irregular width
+    # the ridge sits on the soil side and only laps onto the exposed mine by ~25% of its width
+    inside = cv2.distanceTransform((vis > 0.5).astype(np.uint8), cv2.DIST_L2, 3)
+    prof *= np.clip(1 - inside / max(1.0, 0.25 * width), 0, 1)
     height = fx.gblur(prof ** 0.7 * (0.7 + 0.6 * clumps), max(0.8, 0.15 * width))
     a = np.clip(height * 1.6, 0, 1) * p["ridge_opacity"] * min(1.0, s)
     # shading from the height field: lit where the surface faces the sun
     gy, gx = np.gradient(height)
     sd = _sun_dir_img(sun["azimuth"])
     shade = -(gx * sd[0] + gy * sd[1]) * (width * 1.5)            # >0 on the sunlit slope
-    k = 0.5 * sun["shadow_strength"] / 0.45
-    shade = np.clip(1 + k * np.clip(shade, -1, 1), 0.55, 1.4)
+    k = cfg.BERM_RIDGE_SHADE * sun["shadow_strength"] / 0.45
+    shade = np.clip(1 + k * np.clip(shade, -1, 1), 0.6, 1.3)
     base = soil_colour(fx.gblur(local, max(1.0, 0.05 * L)), cfg) * 0.95 * (0.8 + 0.4 * clumps)[..., None]
     rgb = base * shade[..., None]
     # cast shadow of the ridge (height ~ ridge_height_frac x L) away from the sun

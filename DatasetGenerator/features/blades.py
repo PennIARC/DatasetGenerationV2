@@ -91,6 +91,12 @@ def make_blade_elements(cfg, rng, px_per_mm, count, fresh_budget):
                 continue
             rgb, a, _ = cut
             f = L / max(a.shape)
+            # pool PNGs have their own length / width ratio: never let a scaled blade get wider than the blade-width
+            # range allows (mean width ~ area / long side); tufts / wisps are capped at 3x that
+            wr = cfg.BLADE_WIDTH_MM[1] * px_per_mm * (1.0 if kind == "blade" else 3.0)
+            mean_w = float((a > 0.5).sum()) / max(a.shape)
+            if mean_w * f > wr:
+                f = wr / max(mean_w, 1e-3)
             tw, th = max(1, int(round(a.shape[1] * f))), max(1, int(round(a.shape[0] * f)))
             prgb, pa = edges.resize_rotate(rgb, a, tw, th, angle, cfg.SOFT_EDGES, 0.0)
             src = "pool"

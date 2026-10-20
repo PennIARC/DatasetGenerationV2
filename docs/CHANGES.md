@@ -129,6 +129,43 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
   `docs/burial_fix.png` (`scripts/burial_fix_figure.py`). The irregular soil line on the gravel example (buried part
   in the middle, ragged edge) is unchanged. If the rough soil line would push the hidden area past the 50% cap even
   after shrinking it 4 times, soil is kept off the visible mine (200-image check: max achieved 0.50, 255 buried mines).
+- **Slivers / fragments (second round of user feedback)**: a thin wing rim grazed by the clip plane could leave a
+  1-4 px diagonal line and a detached wing-tip island. Now, after the clip, after the soil line and for the final
+  label mask, the visible mask is cleaned (`features/burial_fx.clean_mask`): morphological opening with radius
+  r = max(`BURIAL_OPEN_PX`=1, `BURIAL_OPEN_FRAC`=0.025 x mine length) removes strips thinner than ~2r px, and visible
+  islands smaller than `BURIAL_MIN_FRAGMENT_FRAC`=0.06 of the full area are dropped (the largest part always stays);
+  what is removed counts as buried and is covered by soil. Regression test (in `tests/test_burial.py`, 9 seeds /
+  poses incl. face down): no visible component below the minimum area, every component keeps >= 70% under a 3x3
+  opening (no line-like parts), < 6% of the visible pixels are 1-2 px structures.
+- **Soil-displacement cues** (`features/burial_fx.py`; strength scales with s = clip(burial fraction / 0.4, 0.25,
+  1.25), subtle for small burials, clear at 40-50%). Before / after: `docs/burial_realism.png` (gravel, dark grass,
+  light dry grass, bare soil, face down, low / high sun; columns burial off, old 40%, new 40%, new 40% with blades).
+  Turned soil takes a brown soil tone (`BURIAL_SOIL_RGB`, mixed in by `BURIAL_SOIL_MIX`=0.3-0.75, more on green
+  ground, brightness from the local ground) so digging into a lawn exposes earth, not grass.
+  - `BURIAL_BERM`: a raised, clumpy ridge along the clip line (width `BERM_RIDGE_WIDTH_FRAC`=3-8% of the mine
+    length, irregular, fBm clumps), sitting on the soil side and lapping onto the mine by ~25% of its width,
+    shaded by the sun from its height field (`BERM_RIDGE_SHADE`=0.35: lit slope lighter, far slope darker) and
+    casting a short shadow (height `BERM_RIDGE_HEIGHT_FRAC`=2-5% of the length) onto the mine and the ground.
+  - `BURIAL_DISTURBED_SOIL`: a darker, rougher, slightly browner turned-soil patch on the ground around the buried
+    part (`DISTURBED_RADIUS_FRAC`=0.08-0.2 of the length, noise-modulated edge, opacity 0.35-0.65, darken 0.72-0.88,
+    desaturate 0.1-0.3), drawn under the mine and its shadow.
+  - `BURIAL_CLODS`: `BURIAL_CLOD_COUNT`=3-9 (x s) clods from `assets_new/dirt` (clod snippets, audit-filtered),
+    3-9% of the mine length, coloured towards the turned soil (`BURIAL_CLOD_COLOUR_ADAPT`=0.85), scattered along
+    and over the soil line (some on the mine) with small sun-consistent shadows.
+  - `BURIAL_DIRTY_EXPOSED`: the exposed part gets an occlusion gradient at the soil line (`EXPOSED_AO_PX`=2-6 px,
+    strength 0.25-0.45), is darker (5-15%) and less saturated (10-25%), and carries grains, thin streaks and a dusty
+    film (`EXPOSED_GRAIN_DENSITY`, `EXPOSED_STREAKS`, `EXPOSED_FILM`) whose density rises towards the buried side.
+  - Hidden fraction: the clip plane now hides `BURIAL_CLIP_SHARE`=0.85 of `BURIAL_FRACTION`; the rough soil line,
+    ridge and clods hide the rest. If ridge / clods would push the hidden area past the 50% cap, they are still
+    drawn but count for the label mask with the largest weight that keeps the cap (bisection). Sidecar:
+    `burial.hidden_by_stage` (clip, soil_line, fragments, final), `burial.realism` (all sampled cue parameters),
+    `burial.scale`, `burial.cap_exceeded`. 50-image sample: 63 buried mines, max hidden 0.50, cap never exceeded.
+- **Blades over buried mines** (`BLADE_SOIL_LIFT`, `BLADE_EMERGE`): every over-layer blade / tuft / wisp that
+  crosses a buried mine's soil-line zone is warped (cv2.remap with a smooth weight around the clip line): its pixels
+  are lifted by up to ~4% of the mine length (1.5-6 px) towards the sun side (away from the shadow direction), a soft
+  shadow is left where it would have lain, and the lifted segment is brightened slightly. Parts lying on the
+  soil-covered region are partly covered by soil (`BLADE_EMERGE_COVER`=0.6, noise-modulated), so they look rooted /
+  emerging. Pool blades are also capped in width (`BLADE_WIDTH_MM` max; tufts / wisps 3x) so no flat, wide strips.
 - **Limitations**: the soil plane is a plane (no local relief); no soil spilled onto the wings away from the line;
   where the tilted plane runs close to a low wing rim, the noisy soil line can cover a thin strip of that rim.
 
@@ -247,6 +284,11 @@ saved_look = jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"])
   centres, `MINE_COLOUR` (r, g, b in [0, 1]), `overcast_prob: 0`, `sun_azimuth`, `sun_elevation`, `burial_prob`,
   `burial_fraction`, `psf_sigma`, `exposure`, ...
 - Assets / debris toggles: `grass_blades`, `blades_under` / `blades_over` (count ranges, e.g. (0, 0)),
+  `burial_berm`, `burial_disturbed_soil`, `burial_clods`, `burial_dirty_exposed`, `blade_soil_lift`, `blade_emerge`,
+  `burial_min_fragment_frac`, `burial_open_frac`, `burial_open_px`, `burial_clip_share`, `berm_ridge_width_frac`,
+  `berm_ridge_shade`, `disturbed_radius_frac`, `disturbed_opacity`, `burial_clod_count`, `exposed_ao_strength`,
+  `exposed_film`, `burial_soil_rgb` (old-style burial for comparisons: set the four BURIAL_* cue flags and the two
+  blade flags False, `burial_min_fragment_frac=0`, `burial_open_px=0`, `burial_open_frac=0`, `burial_clip_share=1`),
   `blades_over_on_mine` (probability per mine, 1.0 = every mine), `blades_on_mine_count`, `dust_strength` (scalar
   fixes it; or a (low, mode, high) triangle),
   `blade_size_mm`, `blade_width_mm`, `blade_colour_adapt`, `blade_fresh_prob`, `blade_max_fresh_per_image`,
@@ -274,6 +316,7 @@ saved_look = jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"])
 | v1 (original, pygame + moderngl) | 0.49 |
 | v2, all features (before new assets / blades) | 0.64 (1.3x v1) |
 | v2, all features incl. blades, new assets, rock seating, leaf clumps, blades on mines, audit filter | 0.93 (1.9x v1) |
+| v2, + burial soil-displacement cues | 1.01 (2.1x v1) |
 | v2 engine, `--v1` | 0.33 |
 `--workers N` parallelises (50 images with 4 workers: 0.32 s / image wall clock). The extra time is mostly the
 on-the-fly blades (capped at 3 per image), ~100 more debris elements with shadows, and the soft dirt grains.

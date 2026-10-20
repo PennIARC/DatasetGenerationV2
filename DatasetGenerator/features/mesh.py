@@ -193,7 +193,8 @@ def render_mine(cp, pose, ppu, sun_az, sun_el, albedo, shadow_strength, burial=N
     # soil plane n . p = c (default: flat ground through the lowest point)
     n_pl, c_pl = np.array([0.0, 0.0, 1.0]), z0
     front_all = nrm[:, 2] > 0
-    burial_frac = burial["fraction"] if burial else 0.0
+    # the clip plane hides BURIAL_CLIP_SHARE of the target; the rough soil line, ridge and clods add the rest
+    burial_frac = burial["fraction"] * cp.BURIAL_CLIP_SHARE if burial else 0.0
     if burial_frac > 0:
         tilt, phi = np.deg2rad(burial["tilt"]), np.deg2rad(burial["direction"])
         n_pl = np.array([np.sin(tilt) * np.cos(phi), np.sin(tilt) * np.sin(phi), np.cos(tilt)])
