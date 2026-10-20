@@ -89,9 +89,15 @@ def sample_burial(rng, cp):
     """-> dict(fraction, tilt, direction) or None (not buried). BURIAL_FRACTION is capped at BURIAL_MAX_FRACTION.
     Always 4 draws."""
     u, f, t, d = rng.random(), rng.uniform(*cp.BURIAL_FRACTION), rng.uniform(*cp.BURIAL_TILT), rng.uniform(0, 360)
+    wv, ws = rng.random(), int(rng.integers(2 ** 31))     # soil-line wander amplitude + noise seed (always drawn)
     if not (cp.BURIAL and cp.MESH_MINES) or u >= cp.BURIAL_PROB:
         return None
-    return {"fraction": float(min(f, cp.BURIAL_MAX_FRACTION)), "tilt": float(t), "direction": float(d)}
+    f = float(min(f, cp.BURIAL_MAX_FRACTION))
+    wander = 0.0
+    if cp.BURIAL_IRREGULAR_LINE:   # amplitude grows with the buried fraction (small burial = gentler line)
+        lo, hi = cp.BURIAL_LINE_WANDER
+        wander = float((lo + (hi - lo) * wv) * np.clip(np.sqrt(f / 0.4), 0.5, 1.2))
+    return {"fraction": f, "tilt": float(t), "direction": float(d), "wander": wander, "wander_seed": ws}
 
 
 def sample_specular(rng, cp):
@@ -214,7 +220,9 @@ def render_mine(cp, pose, ppu, sun_az, sun_el, albedo, shadow_strength, burial=N
         info.update(burial_target=float(burial_frac), plane_tilt=float(np.rad2deg(tilt)),
                     plane_dir=float(np.rad2deg(phi)))
         tri_full = tri
-        tri, parent = clip_triangles(tri, parent, n_pl, c_pl)
+        # irregular soil line: clip a little deeper (by the wander amplitude) and let the noisy soil surface of
+        # soil.burial_overlay (nominal plane +- wander) decide what is covered, so the edge is not a straight cut
+        tri, parent = clip_triangles(tri, parent, n_pl, c_pl - burial.get("wander", 0.0))
     else:
         tri_full = tri
 

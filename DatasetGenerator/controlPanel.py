@@ -244,6 +244,10 @@ SOIL_EDGE_NOISE = (0.01, 0.035)     # soil-line roughness, mesh units (mine leng
 BERM_WIDTH_PX = (2.0, 6.0)          # soil lip / berm along the buried edge
 BERM_OPACITY = (0.4, 0.85)
 BERM_DARKEN = (0.75, 0.95)          # disturbed soil is a little darker / damper than the surface
+BURIAL_IRREGULAR_LINE = True        # organic soil line instead of a straight clip edge: the soil surface is the
+BURIAL_LINE_WANDER = (0.015, 0.04)  # nominal plane +- this (mesh units, mine length = 1; x sqrt(fraction / 0.4))
+BURIAL_WANDER_SCALES = (0.35, 0.12, 0.04)   # fBm feature sizes (x mine length): low-frequency wander, bays, lumps
+BURIAL_WANDER_WEIGHTS = (0.6, 0.3, 0.1)
 BURIAL_MIN_FRAGMENT_FRAC = 0.06     # after clipping: visible islands smaller than this x full area are dropped ...
 BURIAL_OPEN_PX = 1                  # ... and structures thinner than ~2 r px removed (morphological opening, radius
 BURIAL_OPEN_FRAC = 0.025            #     r = max(BURIAL_OPEN_PX, BURIAL_OPEN_FRAC x mine length); ~4 px at 150 px)

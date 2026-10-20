@@ -135,8 +135,10 @@ def berm_ridge(line_dist, core, vis, local, L, sun, p, s, rng, cfg):
     sd = _sun_dir_img(sun["azimuth"])
     shade = -(gx * sd[0] + gy * sd[1]) * (width * 1.5)            # >0 on the sunlit slope
     k = cfg.BERM_RIDGE_SHADE * sun["shadow_strength"] / 0.45
-    shade = np.clip(1 + k * np.clip(shade, -1, 1), 0.6, 1.3)
-    base = soil_colour(fx.gblur(local, max(1.0, 0.05 * L)), cfg) * 0.95 * (0.8 + 0.4 * clumps)[..., None]
+    shade = np.clip(1 + k * np.clip(shade, -1, 1), 0.7, 1.15)   # no bright outline on light ground
+    g = fx.gblur(local, max(1.0, 0.04 * L))
+    # turned soil: same tone as the disturbed patch (darker than the undisturbed surface), clumpy texture
+    base = (0.6 * g + 0.4 * soil_colour(g, cfg)) * p["patch_darken"] * (0.85 + 0.3 * clumps)[..., None]
     rgb = base * shade[..., None]
     # cast shadow of the ridge (height ~ ridge_height_frac x L) away from the sun
     hpx = p["ridge_height_frac"] * L * min(1.0, s)

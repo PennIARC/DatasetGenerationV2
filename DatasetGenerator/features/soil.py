@@ -105,7 +105,14 @@ def burial_overlay(alpha, alpha_full, height, local_bg, length_px, p):
     hgt = np.nan_to_num(height, nan=1.0)
     amp = p["edge_noise"]
     n1 = fx.fbm(h, w, max(2.0, 0.08 * L), rng)
-    cover = np.clip((amp * n1 - hgt) / (0.25 * amp + 1e-6), 0, 1) * (alpha > 0)
+    A = float(p.get("wander", 0.0))
+    surf = 0.0
+    if A > 0:   # soil surface = nominal plane + low-frequency wander + mid / high-frequency bays and lumps
+        rw = np.random.default_rng(p.get("wander_seed", 0))
+        wf = sum(wt * (2 * fx.fbm(h, w, max(2.0, sc * L), rw, octaves=2) - 1)
+                 for sc, wt in zip(p.get("wander_scales", (0.35, 0.12, 0.04)), p.get("wander_weights", (0.6, 0.3, 0.1))))
+        surf = A * wf
+    cover = np.clip((surf + amp * n1 - hgt) / (0.25 * amp + 0.1 * A + 1e-6), 0, 1) * (alpha > 0)
     buried = np.clip(alpha_full - alpha, 0, 1)
     core = ((buried > 0.5) | (cover > 0.5)).astype(np.uint8)
     vis = ((alpha > 0.5) & (cover <= 0.5)).astype(np.uint8)
@@ -122,8 +129,13 @@ def burial_overlay(alpha, alpha_full, height, local_bg, length_px, p):
     else:
         berm = np.zeros((h, w), np.float32)
     a = np.maximum(cover, berm).astype(np.float32)
-    soil = fx.gblur(local_bg, 1.0) * p["berm_darken"] * (0.85 + 0.3 * fx.fbm(h, w, 2.0, rng, octaves=3))[..., None]
-    return (soil * a[..., None]).astype(np.float32), a
+    # cover takes the ground's own colour / texture (seamless with the surrounding soil); only the lip is darker
+    tex = (0.9 + 0.2 * fx.fbm(h, w, 2.0, rng, octaves=3))[..., None]
+    base = fx.gblur(local_bg, 0.8)
+    wb = (berm / np.maximum(a, 1e-4))[..., None]
+    soil = base * tex * (1 - wb + wb * p["berm_darken"])
+    a = fx.gblur(a, 0.6)                                    # soft feathered edge, no hard seam
+    return (soil * a[..., None]).astype(np.float32), a.astype(np.float32)
 
 
 # ----------------------------------------------------------------------------------------------- ground dirt

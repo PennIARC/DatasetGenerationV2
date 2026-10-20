@@ -424,9 +424,13 @@ class Mine:
             sB = burial_fx.strength_scale(self.meta["burial"]["fraction"])
             rngb = np.random.default_rng(bp["seed"])
             buried = np.clip(self.alpha_full - self.alpha, 0, 1)
+            ground = local
             if cfg.BURIAL_DISTURBED_SOIL:   # turned soil on the ground, under shadow and mine
                 prgb, pa = burial_fx.disturbed_patch(self.alpha_full, buried, local, L, bp, sB, rngb, cfg)
                 fx.over(img, prgb, pa, self.x, self.y)
+            # ground as it now looks under the mine (incl. turned soil): the soil cover, ridge and clods take their
+            # colour / texture from it, so the covered part of the mine merges with the surrounding ground
+            ground = fx.crop_padded(img, self.x, self.y, h, w)
         if cfg.SHADOWS:
             self._draw_shadow(img)
         rgb_pm, alpha = self.rgb_pm, self.alpha
@@ -439,28 +443,36 @@ class Mine:
             self.visible = alpha.copy()
             return
         p = soil.sample_burial_overlay_params(self.sub(6), cfg)
+        b = self.meta["burial"]
+        p.update(wander=b.get("wander", 0.0), wander_seed=b.get("wander_seed", 0),
+                 wander_scales=cfg.BURIAL_WANDER_SCALES, wander_weights=cfg.BURIAL_WANDER_WEIGHTS)
         if cfg.BURIAL_BERM:
             p["berm_opacity"] *= 0.5            # the shaded ridge below takes over most of the lip
         full = float((self.alpha_full > 0.5).sum())
-        for _ in range(4):  # the rough soil line covers a bit more: shrink it until the cap holds
-            s_rgb, s_a = soil.burial_overlay(alpha, self.alpha_full, self.r["height"], local, L, p)
-            vis = alpha * (1.0 - s_a)
-            achieved = float(1 - (vis > 0.5).sum() / max(full, 1))
+        def soil_and_cleanup(p_):
+            """soil cover + removal of slivers / islands it leaves (covered with ground-coloured soil)."""
+            s_rgb_, s_a_ = soil.burial_overlay(alpha, self.alpha_full, self.r["height"], ground, L, p_)
+            vis_ = alpha * (1.0 - s_a_)
+            keep_ = burial_fx.clean_mask(vis_ > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, self._open_r(L))
+            drop_ = ((alpha > 0.02) & (cv2.dilate(keep_, burial_fx.K3) == 0)).astype(np.float32)
+            return s_rgb_, s_a_, drop_
+
+        for _ in range(5):  # the irregular soil line covers a bit more: shrink it until the cap holds
+            s_rgb, s_a, drop = soil_and_cleanup(p)
+            achieved = float(1 - (alpha * (1 - np.maximum(s_a, drop)) > 0.5).sum() / max(full, 1))
             if achieved <= cfg.BURIAL_MAX_FRACTION:
                 break
             p["edge_noise"] *= 0.5
             p["berm_width_px"] *= 0.6
+            p["wander"] *= 0.6
         else:  # still over the cap: keep soil off the visible mine (only the clip itself hides it)
+            s_rgb, s_a, drop = soil_and_cleanup(p)
             s_a = np.where(alpha > 0.5, 0.0, s_a).astype(np.float32)
             s_rgb = s_rgb * (s_a > 0)[..., None]
-        # what the soil line leaves visible must not contain slivers / islands either: cover them with soil
-        vis = alpha * (1.0 - s_a)
         stages = {"clip": float(1 - (alpha > 0.5).sum() / max(full, 1)),
-                  "soil_line": float(1 - (vis > 0.5).sum() / max(full, 1))}
-        keep = burial_fx.clean_mask(vis > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, self._open_r(L))
-        drop = ((alpha > 0.02) & (cv2.dilate(keep, burial_fx.K3) == 0)).astype(np.float32)
+                  "soil_line": float(1 - (alpha * (1.0 - s_a) > 0.5).sum() / max(full, 1))}
         if drop.any():
-            soil_col = fx.gblur(local, 1.0) * p["berm_darken"]
+            soil_col = fx.gblur(ground, 1.0)
             s_rgb = s_rgb * (1 - drop)[..., None] + soil_col * drop[..., None]
             s_a = np.maximum(s_a, drop)
         vis = alpha * (1.0 - s_a)
@@ -468,44 +480,50 @@ class Mine:
         core = np.maximum(np.clip(self.alpha_full - alpha, 0, 1), s_a)
         # the ridge / occlusion gradient follow the CLIP line (visible mine against the part cut away by the soil
         # plane, incl. dropped fragments); the noisy soil cover over low rims only roughens the edge
+        # plus the soil cover connected to it (the irregular soil edge); isolated cover over low rims is ignored
         clip_core = np.maximum(np.clip(self.alpha_full - alpha, 0, 1), drop)
+        n_cc, lab = cv2.connectedComponents((core > 0.5).astype(np.uint8), connectivity=8)
+        seeds = np.unique(lab[cv2.dilate((clip_core > 0.5).astype(np.uint8), burial_fx.K3) > 0])
+        seeds = seeds[seeds > 0]
+        clip_core = np.maximum(clip_core, np.isin(lab, seeds).astype(np.float32))
         line, dist = burial_fx.soil_line(vis, clip_core)
         if cfg.BURIAL_DIRTY_EXPOSED:
-            rgb_pm = burial_fx.dirty_exposed(rgb_pm, alpha, dist, local, L, bp, sB, rngb, cfg)
+            rgb_pm = burial_fx.dirty_exposed(rgb_pm, alpha, dist, ground, L, bp, sB, rngb, cfg)
         fx.over(img, rgb_pm, alpha, self.x, self.y)
         fx.over(img, s_rgb, s_a, self.x, self.y)
         cover = np.zeros_like(alpha)
         if cfg.BURIAL_BERM and line.any():
-            r_rgb, r_a, r_sh = burial_fx.berm_ridge(dist, core, vis, local, L, sc["sun"], bp, sB, rngb, cfg)
+            r_rgb, r_a, r_sh = burial_fx.berm_ridge(dist, core, vis, ground, L, sc["sun"], bp, sB, rngb, cfg)
             fx.darken(img, fx.shadow_factor(r_sh, sc["sun"]["shadow_strength"], sc["sun"]["shadow_tint"]), self.x, self.y)
             fx.over(img, r_rgb, r_a, self.x, self.y)
             cover = np.maximum(cover, r_a)
         if cfg.BURIAL_CLODS and line.any():
-            for c_rgb, c_a, cx, cy, f, pad in burial_fx.clods(cfg, line, L, sc["sun"], bp, sB, rngb, local):
+            for c_rgb, c_a, cx, cy, f, pad in burial_fx.clods(cfg, line, L, sc["sun"], bp, sB, rngb, ground):
                 if cfg.SHADOWS:
                     fx.darken(img, f, self.x + cx - pad, self.y + cy - pad)
                 fx.over(img, c_rgb, c_a, self.x + cx, self.y + cy)
                 tmp = np.zeros_like(alpha)
                 fx.accumulate_alpha(tmp, c_a, cx, cy)
                 cover = np.maximum(cover, tmp)
-        vis_final = vis * (1.0 - cover)
-        achieved = float(1 - (vis_final > 0.5).sum() / max(full, 1))
+        def final_mask(f):
+            """visible mask with ridge / clods counted at weight f, minus the tiny bits they split off."""
+            vf = vis * (1.0 - f * cover)
+            kp = burial_fx.clean_mask(vf > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, cfg.BURIAL_OPEN_PX)
+            vf = vf * cv2.dilate(kp, burial_fx.K3).astype(np.float32)
+            return vf, float(1 - (vf > 0.5).sum() / max(full, 1))
+
+        vis_final, achieved = final_mask(1.0)
         if achieved > cfg.BURIAL_MAX_FRACTION:
             # ridge / clods would hide too much: they are drawn as they are, but for the visible mask (label) they
             # count with the largest weight f that keeps the cap (bisection), i.e. as partly see-through cover
             lo, hi = 0.0, 1.0
             for _ in range(8):
                 f = (lo + hi) / 2
-                if 1 - (vis * (1 - f * cover) > 0.5).sum() / max(full, 1) > cfg.BURIAL_MAX_FRACTION:
+                if final_mask(f)[1] > cfg.BURIAL_MAX_FRACTION:
                     hi = f
                 else:
                     lo = f
-            vis_final = vis * (1.0 - lo * cover)
-            achieved = float(1 - (vis_final > 0.5).sum() / max(full, 1))
-        # ridge / clods can split off tiny bits of the visible mask: the label mask drops them like any fragment
-        keep = burial_fx.clean_mask(vis_final > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, cfg.BURIAL_OPEN_PX)
-        vis_final = vis_final * cv2.dilate(keep, burial_fx.K3).astype(np.float32)
-        achieved = float(1 - (vis_final > 0.5).sum() / max(full, 1))
+            vis_final, achieved = final_mask(lo)
         stages["final"] = achieved
         self.meta["burial"]["hidden_by_stage"] = stages
         self.meta["burial"]["cap_exceeded"] = bool(achieved > cfg.BURIAL_MAX_FRACTION + 0.01)
