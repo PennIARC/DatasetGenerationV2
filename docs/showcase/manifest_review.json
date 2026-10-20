@@ -1,11 +1,11 @@
 {
 "pages": [
 {
-"id": "burial_review",
-"tab": "Review: buried mines",
+"id": "burial_review_2",
+"tab": "Review 2: buried mines",
 "type": "grid",
 "title": "Review: buried mines (current generator)",
-"intro": "48 single-mine crops (native-resolution 480x270 px window around the box (no upscaling)) with burial 0.1-0.5, random sun elevation 15-70 deg, 35% face down, 50% with blades forced over the mine, default dust (triangular 0.25-0.5) and grass-weighted backgrounds. Flag crops that look wrong (floating soil, odd outlines, unnatural clods) and add a note, then copy the flagged ids.",
+"intro": "24 single-mine crops (native-resolution 480x270 px window around the box (no upscaling)) with burial 0.1-0.5, random sun elevation 15-70 deg, 35% face down, 50% with blades forced over the mine, default dust (triangular 0.25-0.5) and grass-weighted backgrounds. Flag crops that look wrong (floating soil, odd outlines, unnatural clods) and add a note, then copy the flagged ids.",
 "glossary": {
 "burial": "Achieved hidden fraction of the mine's top-down area.",
 "visible_frac": "Visible mine pixels / unburied mine pixels (after soil and blades).",
@@ -25,1339 +25,672 @@
 ],
 "items": [
 {
-"id": "b001",
-"image": "images/v2/review/b001.jpg",
-"thumb": "images/v2/review/b001.jpg",
-"before": "images/v2/review/b001_before.jpg",
+"id": "c001",
+"image": "images/v2/review2/c001.jpg",
+"thumb": "images/v2/review2/c001.jpg",
+"before": "images/v2/review2/c001_before.jpg",
 "box": [
-0.4094,
-0.3241,
-0.1812,
-0.3519
+0.3438,
+0.363,
+0.3125,
+0.2741
 ],
 "meta": {
-"seed": 5001,
-"background": "grass_bg_gen_23_grass_dry_normal",
-"sun_el": 50.2,
-"burial": 0.41,
+"seed": 6001,
+"background": "ground_bg_Ground029",
+"sun_el": 36.2,
+"burial": 0.15,
 "face_down": false,
-"blades_on_mine": 4,
-"visible_frac": 0.33,
-"dust": 0.38
+"blades_on_mine": 1,
+"visible_frac": 0.45,
+"dust": 0.37
 },
-"caption": "target burial 0.29, scale 0.37",
+"caption": "target burial 0.13, scale 0.36",
 "tags": [
-"grass",
+"ground",
 "mid_sun",
 "blades"
 ]
 },
 {
-"id": "b002",
-"image": "images/v2/review/b002.jpg",
-"thumb": "images/v2/review/b002.jpg",
-"before": "images/v2/review/b002_before.jpg",
+"id": "c002",
+"image": "images/v2/review2/c002.jpg",
+"thumb": "images/v2/review2/c002.jpg",
+"before": "images/v2/review2/c002_before.jpg",
 "box": [
-0.3646,
-0.3611,
-0.2708,
-0.2778
+0.4302,
+0.3259,
+0.1396,
+0.3481
 ],
 "meta": {
-"seed": 5002,
-"background": "ground_bg_Ground005",
-"sun_el": 24.8,
-"burial": 0.41,
+"seed": 6002,
+"background": "ground_bg_Ground031",
+"sun_el": 49.2,
+"burial": 0.38,
 "face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.59,
-"dust": 0.33
-},
-"caption": "target burial 0.36, scale 0.39",
-"tags": [
-"ground",
-"low_sun",
-"face_down"
-]
-},
-{
-"id": "b003",
-"image": "images/v2/review/b003.jpg",
-"thumb": "images/v2/review/b003.jpg",
-"before": "images/v2/review/b003_before.jpg",
-"box": [
-0.4292,
-0.3074,
-0.1417,
-0.3852
-],
-"meta": {
-"seed": 5003,
-"background": "grass_bg_Grass004",
-"sun_el": 56.4,
-"burial": 0.41,
-"face_down": false,
 "blades_on_mine": 4,
-"visible_frac": 0.56,
-"dust": 0.32
+"visible_frac": 0.44,
+"dust": 0.37
 },
-"caption": "target burial 0.31, scale 0.30",
-"tags": [
-"grass",
-"high_sun",
-"blades"
-]
-},
-{
-"id": "b004",
-"image": "images/v2/review/b004.jpg",
-"thumb": "images/v2/review/b004.jpg",
-"before": "images/v2/review/b004_before.jpg",
-"box": [
-0.4385,
-0.4,
-0.1229,
-0.2
-],
-"meta": {
-"seed": 5004,
-"background": "grass_bg_real_00_Grass001_grass_fresh",
-"sun_el": 27.4,
-"burial": 0.45,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.55,
-"dust": 0.28
-},
-"caption": "target burial 0.31, scale 0.25",
-"tags": [
-"grass",
-"low_sun"
-]
-},
-{
-"id": "b005",
-"image": "images/v2/review/b005.jpg",
-"thumb": "images/v2/review/b005.jpg",
-"before": "images/v2/review/b005_before.jpg",
-"box": [
-0.4271,
-0.3722,
-0.1458,
-0.2556
-],
-"meta": {
-"seed": 5005,
-"background": "ground_bg_Ground005",
-"sun_el": 35.1,
-"burial": 0.42,
-"face_down": false,
-"blades_on_mine": 2,
-"visible_frac": 0.53,
-"dust": 0.32
-},
-"caption": "target burial 0.18, scale 0.29",
+"caption": "target burial 0.32, scale 0.31",
 "tags": [
 "ground",
 "mid_sun",
+"face_down",
 "blades"
 ]
 },
 {
-"id": "b006",
-"image": "images/v2/review/b006.jpg",
-"thumb": "images/v2/review/b006.jpg",
-"before": "images/v2/review/b006_before.jpg",
+"id": "c003",
+"image": "images/v2/review2/c003.jpg",
+"thumb": "images/v2/review2/c003.jpg",
+"before": "images/v2/review2/c003_before.jpg",
 "box": [
-0.4031,
-0.3296,
-0.1938,
-0.3407
-],
-"meta": {
-"seed": 5006,
-"background": "grass_bg_Grass003",
-"sun_el": 63.1,
-"burial": 0.4,
-"face_down": false,
-"blades_on_mine": 3,
-"visible_frac": 0.58,
-"dust": 0.35
-},
-"caption": "target burial 0.42, scale 0.39",
-"tags": [
-"grass",
-"high_sun",
-"blades"
-]
-},
-{
-"id": "b007",
-"image": "images/v2/review/b007.jpg",
-"thumb": "images/v2/review/b007.jpg",
-"before": "images/v2/review/b007_before.jpg",
-"box": [
-0.3865,
-0.35,
-0.2271,
-0.3
-],
-"meta": {
-"seed": 5007,
-"background": "ground_bg_Gravel001",
-"sun_el": 38.8,
-"burial": 0.2,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.73,
-"dust": 0.28
-},
-"caption": "target burial 0.46, scale 0.30",
-"tags": [
-"ground",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b008",
-"image": "images/v2/review/b008.jpg",
-"thumb": "images/v2/review/b008.jpg",
-"before": "images/v2/review/b008_before.jpg",
-"box": [
-0.3927,
+0.4333,
 0.3778,
-0.2146,
+0.1333,
 0.2444
 ],
 "meta": {
-"seed": 5008,
-"background": "grass_bg_gen_23_grass_dry_normal",
-"sun_el": 53.5,
-"burial": 0.21,
+"seed": 6003,
+"background": "grass_bg_real_23_Moss001_grass_olive",
+"sun_el": 16.6,
+"burial": 0.47,
 "face_down": false,
 "blades_on_mine": 0,
-"visible_frac": 0.79,
-"dust": 0.37
+"visible_frac": 0.5,
+"dust": 0.31
 },
-"caption": "target burial 0.19, scale 0.28",
+"caption": "target burial 0.48, scale 0.28",
 "tags": [
 "grass",
-"mid_sun"
+"low_sun"
 ]
 },
 {
-"id": "b009",
-"image": "images/v2/review/b009.jpg",
-"thumb": "images/v2/review/b009.jpg",
-"before": "images/v2/review/b009_before.jpg",
-"box": [
-0.4198,
-0.3148,
-0.1604,
-0.3704
-],
-"meta": {
-"seed": 5009,
-"background": "grass_bg_gen_39_moss_clover_normal",
-"sun_el": 45.2,
-"burial": 0.34,
-"face_down": false,
-"blades_on_mine": 3,
-"visible_frac": 0.58,
-"dust": 0.26
-},
-"caption": "target burial 0.35, scale 0.32",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b010",
-"image": "images/v2/review/b010.jpg",
-"thumb": "images/v2/review/b010.jpg",
-"before": "images/v2/review/b010_before.jpg",
-"box": [
-0.4042,
-0.3259,
-0.1917,
-0.3481
-],
-"meta": {
-"seed": 5010,
-"background": "grass_bg_Ground003",
-"sun_el": 52.2,
-"burial": 0.32,
-"face_down": false,
-"blades_on_mine": 4,
-"visible_frac": 0.63,
-"dust": 0.43
-},
-"caption": "target burial 0.33, scale 0.37",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b011",
-"image": "images/v2/review/b011.jpg",
-"thumb": "images/v2/review/b011.jpg",
-"before": "images/v2/review/b011_before.jpg",
-"box": [
-0.4021,
-0.2796,
-0.1958,
-0.4407
-],
-"meta": {
-"seed": 5011,
-"background": "grass_bg_gen_08_grass_fresh_mowed",
-"sun_el": 33.0,
-"burial": 0.31,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.66,
-"dust": 0.41
-},
-"caption": "target burial 0.30, scale 0.40",
-"tags": [
-"grass",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b012",
-"image": "images/v2/review/b012.jpg",
-"thumb": "images/v2/review/b012.jpg",
-"before": "images/v2/review/b012_before.jpg",
-"box": [
-0.3823,
-0.4037,
-0.2354,
-0.1926
-],
-"meta": {
-"seed": 5012,
-"background": "grass_bg_gen_23_grass_dry_normal",
-"sun_el": 34.7,
-"burial": 0.43,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.57,
-"dust": 0.42
-},
-"caption": "target burial 0.39, scale 0.31",
-"tags": [
-"grass",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b013",
-"image": "images/v2/review/b013.jpg",
-"thumb": "images/v2/review/b013.jpg",
-"before": "images/v2/review/b013_before.jpg",
-"box": [
-0.4052,
-0.3296,
-0.1896,
-0.3481
-],
-"meta": {
-"seed": 5013,
-"background": "grass_bg_Ground001",
-"sun_el": 67.7,
-"burial": 0.42,
-"face_down": false,
-"blades_on_mine": 3,
-"visible_frac": 0.57,
-"dust": 0.35
-},
-"caption": "target burial 0.46, scale 0.39",
-"tags": [
-"grass",
-"high_sun",
-"blades"
-]
-},
-{
-"id": "b014",
-"image": "images/v2/review/b014.jpg",
-"thumb": "images/v2/review/b014.jpg",
-"before": "images/v2/review/b014_before.jpg",
-"box": [
-0.4333,
-0.3259,
-0.1333,
-0.3481
-],
-"meta": {
-"seed": 5014,
-"background": "grass_bg_Moss001",
-"sun_el": 31.4,
-"burial": 0.29,
-"face_down": false,
-"blades_on_mine": 4,
-"visible_frac": 0.64,
-"dust": 0.3
-},
-"caption": "target burial 0.21, scale 0.26",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b015",
-"image": "images/v2/review/b015.jpg",
-"thumb": "images/v2/review/b015.jpg",
-"before": "images/v2/review/b015_before.jpg",
-"box": [
-0.4083,
-0.3296,
-0.1833,
-0.3407
-],
-"meta": {
-"seed": 5015,
-"background": "grass_bg_Grass002",
-"sun_el": 48.2,
-"burial": 0.41,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.59,
-"dust": 0.36
-},
-"caption": "target burial 0.30, scale 0.38",
-"tags": [
-"grass",
-"mid_sun"
-]
-},
-{
-"id": "b016",
-"image": "images/v2/review/b016.jpg",
-"thumb": "images/v2/review/b016.jpg",
-"before": "images/v2/review/b016_before.jpg",
+"id": "c004",
+"image": "images/v2/review2/c004.jpg",
+"thumb": "images/v2/review2/c004.jpg",
+"before": "images/v2/review2/c004_before.jpg",
 "box": [
 0.3979,
-0.3167,
+0.2722,
 0.2042,
-0.3667
+0.4556
 ],
 "meta": {
-"seed": 5016,
-"background": "ground_bg_Gravel006",
-"sun_el": 25.4,
-"burial": 0.49,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.51,
-"dust": 0.31
-},
-"caption": "target burial 0.48, scale 0.35",
-"tags": [
-"ground",
-"low_sun"
-]
-},
-{
-"id": "b017",
-"image": "images/v2/review/b017.jpg",
-"thumb": "images/v2/review/b017.jpg",
-"before": "images/v2/review/b017_before.jpg",
-"box": [
-0.4021,
-0.3463,
-0.1958,
-0.3074
-],
-"meta": {
-"seed": 5017,
-"background": "grass_bg_gen_36_moss_clover_mowed",
-"sun_el": 65.4,
-"burial": 0.26,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.62,
-"dust": 0.3
-},
-"caption": "target burial 0.19, scale 0.27",
-"tags": [
-"grass",
-"high_sun"
-]
-},
-{
-"id": "b018",
-"image": "images/v2/review/b018.jpg",
-"thumb": "images/v2/review/b018.jpg",
-"before": "images/v2/review/b018_before.jpg",
-"box": [
-0.3812,
-0.3,
-0.2375,
-0.4
-],
-"meta": {
-"seed": 5018,
-"background": "ground_bg_Ground030",
-"sun_el": 37.2,
-"burial": 0.47,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.52,
-"dust": 0.29
-},
-"caption": "target burial 0.41, scale 0.38",
-"tags": [
-"ground",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b019",
-"image": "images/v2/review/b019.jpg",
-"thumb": "images/v2/review/b019.jpg",
-"before": "images/v2/review/b019_before.jpg",
-"box": [
-0.4177,
-0.3333,
-0.1646,
-0.3333
-],
-"meta": {
-"seed": 5019,
-"background": "ground_Screenshot 2026-02-07 at 4.21.38\u202fPM",
-"sun_el": 32.7,
-"burial": 0.4,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.6,
-"dust": 0.37
-},
-"caption": "target burial 0.36, scale 0.27",
-"tags": [
-"ground",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b020",
-"image": "images/v2/review/b020.jpg",
-"thumb": "images/v2/review/b020.jpg",
-"before": "images/v2/review/b020_before.jpg",
-"box": [
-0.3812,
-0.3093,
-0.2375,
-0.3815
-],
-"meta": {
-"seed": 5020,
-"background": "ground_bg_Ground005",
-"sun_el": 16.8,
-"burial": 0.19,
-"face_down": false,
-"blades_on_mine": 2,
-"visible_frac": 0.78,
-"dust": 0.29
-},
-"caption": "target burial 0.13, scale 0.33",
-"tags": [
-"ground",
-"low_sun",
-"blades"
-]
-},
-{
-"id": "b021",
-"image": "images/v2/review/b021.jpg",
-"thumb": "images/v2/review/b021.jpg",
-"before": "images/v2/review/b021_before.jpg",
-"box": [
-0.3865,
-0.3963,
-0.2271,
-0.2074
-],
-"meta": {
-"seed": 5021,
-"background": "grass_grass4",
-"sun_el": 63.5,
-"burial": 0.25,
-"face_down": true,
-"blades_on_mine": 4,
-"visible_frac": 0.67,
-"dust": 0.36
-},
-"caption": "target burial 0.24, scale 0.27",
-"tags": [
-"grass",
-"high_sun",
-"face_down",
-"blades"
-]
-},
-{
-"id": "b022",
-"image": "images/v2/review/b022.jpg",
-"thumb": "images/v2/review/b022.jpg",
-"before": "images/v2/review/b022_before.jpg",
-"box": [
-0.4083,
-0.3481,
-0.1833,
-0.3037
-],
-"meta": {
-"seed": 5022,
-"background": "grass_bg_gen_19_grass_dry_normal",
-"sun_el": 60.1,
-"burial": 0.32,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.68,
-"dust": 0.28
-},
-"caption": "target burial 0.29, scale 0.35",
-"tags": [
-"grass",
-"high_sun"
-]
-},
-{
-"id": "b023",
-"image": "images/v2/review/b023.jpg",
-"thumb": "images/v2/review/b023.jpg",
-"before": "images/v2/review/b023_before.jpg",
-"box": [
-0.3719,
-0.2741,
-0.2562,
-0.4519
-],
-"meta": {
-"seed": 5023,
-"background": "ground_bg_Gravel004",
-"sun_el": 63.9,
-"burial": 0.23,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.77,
-"dust": 0.29
-},
-"caption": "target burial 0.19, scale 0.38",
-"tags": [
-"ground",
-"high_sun"
-]
-},
-{
-"id": "b024",
-"image": "images/v2/review/b024.jpg",
-"thumb": "images/v2/review/b024.jpg",
-"before": "images/v2/review/b024_before.jpg",
-"box": [
-0.424,
-0.3426,
-0.1521,
-0.3148
-],
-"meta": {
-"seed": 5024,
-"background": "grass_bg_real_12_Grass003_grass_patchy",
-"sun_el": 52.9,
-"burial": 0.33,
-"face_down": false,
-"blades_on_mine": 1,
-"visible_frac": 0.64,
-"dust": 0.3
-},
-"caption": "target burial 0.34, scale 0.30",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b025",
-"image": "images/v2/review/b025.jpg",
-"thumb": "images/v2/review/b025.jpg",
-"before": "images/v2/review/b025_before.jpg",
-"box": [
-0.3854,
-0.3741,
-0.2292,
-0.2519
-],
-"meta": {
-"seed": 5025,
-"background": "grass_bg_real_21_Grass004_grass_fresh",
-"sun_el": 26.9,
-"burial": 0.21,
-"face_down": false,
-"blades_on_mine": 4,
-"visible_frac": 0.77,
-"dust": 0.3
-},
-"caption": "target burial 0.15, scale 0.29",
-"tags": [
-"grass",
-"low_sun",
-"blades"
-]
-},
-{
-"id": "b026",
-"image": "images/v2/review/b026.jpg",
-"thumb": "images/v2/review/b026.jpg",
-"before": "images/v2/review/b026_before.jpg",
-"box": [
-0.4021,
-0.3963,
-0.1958,
-0.2074
-],
-"meta": {
-"seed": 5026,
-"background": "grass_bg_gen_29_grass_patchy_over",
-"sun_el": 32.5,
-"burial": 0.32,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.67,
-"dust": 0.38
-},
-"caption": "target burial 0.33, scale 0.27",
-"tags": [
-"grass",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b027",
-"image": "images/v2/review/b027.jpg",
-"thumb": "images/v2/review/b027.jpg",
-"before": "images/v2/review/b027_before.jpg",
-"box": [
-0.4219,
-0.3537,
-0.1562,
-0.2926
-],
-"meta": {
-"seed": 5027,
-"background": "ground_bg_Gravel004",
-"sun_el": 38.3,
-"burial": 0.41,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.59,
-"dust": 0.38
-},
-"caption": "target burial 0.17, scale 0.32",
-"tags": [
-"ground",
-"mid_sun"
-]
-},
-{
-"id": "b028",
-"image": "images/v2/review/b028.jpg",
-"thumb": "images/v2/review/b028.jpg",
-"before": "images/v2/review/b028_before.jpg",
-"box": [
-0.4135,
-0.3963,
-0.1729,
-0.2074
-],
-"meta": {
-"seed": 5028,
-"background": "grass_bg_real_15_Grass004_grass_patchy",
-"sun_el": 58.0,
-"burial": 0.44,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.56,
-"dust": 0.32
-},
-"caption": "target burial 0.25, scale 0.25",
-"tags": [
-"grass",
-"high_sun",
-"face_down"
-]
-},
-{
-"id": "b029",
-"image": "images/v2/review/b029.jpg",
-"thumb": "images/v2/review/b029.jpg",
-"before": "images/v2/review/b029_before.jpg",
-"box": [
-0.3854,
-0.2852,
-0.2292,
-0.4296
-],
-"meta": {
-"seed": 5029,
-"background": "grass_bg_gen_01_grass_fresh_normal",
-"sun_el": 40.6,
-"burial": 0.21,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.79,
-"dust": 0.31
-},
-"caption": "target burial 0.18, scale 0.39",
-"tags": [
-"grass",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b030",
-"image": "images/v2/review/b030.jpg",
-"thumb": "images/v2/review/b030.jpg",
-"before": "images/v2/review/b030_before.jpg",
-"box": [
-0.4396,
-0.3481,
-0.1208,
-0.3037
-],
-"meta": {
-"seed": 5030,
-"background": "ground_bg_Ground008",
-"sun_el": 19.1,
-"burial": 0.49,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.51,
-"dust": 0.37
-},
-"caption": "target burial 0.44, scale 0.29",
-"tags": [
-"ground",
-"low_sun",
-"face_down"
-]
-},
-{
-"id": "b031",
-"image": "images/v2/review/b031.jpg",
-"thumb": "images/v2/review/b031.jpg",
-"before": "images/v2/review/b031_before.jpg",
-"box": [
-0.4125,
-0.3389,
-0.175,
-0.3222
-],
-"meta": {
-"seed": 5031,
-"background": "grass_bg_real_12_Grass003_grass_patchy",
-"sun_el": 54.5,
-"burial": 0.43,
-"face_down": false,
-"blades_on_mine": 2,
-"visible_frac": 0.53,
-"dust": 0.32
-},
-"caption": "target burial 0.44, scale 0.34",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b032",
-"image": "images/v2/review/b032.jpg",
-"thumb": "images/v2/review/b032.jpg",
-"before": "images/v2/review/b032_before.jpg",
-"box": [
-0.4104,
-0.2889,
-0.1792,
-0.4222
-],
-"meta": {
-"seed": 5032,
+"seed": 6004,
 "background": "ground_bg_Ground004",
-"sun_el": 19.4,
-"burial": 0.47,
+"sun_el": 54.4,
+"burial": 0.38,
 "face_down": true,
-"blades_on_mine": 3,
-"visible_frac": 0.45,
-"dust": 0.36
-},
-"caption": "target burial 0.37, scale 0.33",
-"tags": [
-"ground",
-"low_sun",
-"face_down",
-"blades"
-]
-},
-{
-"id": "b033",
-"image": "images/v2/review/b033.jpg",
-"thumb": "images/v2/review/b033.jpg",
-"before": "images/v2/review/b033_before.jpg",
-"box": [
-0.4313,
-0.3574,
-0.1375,
-0.2852
-],
-"meta": {
-"seed": 5033,
-"background": "grass_bg_real_19_Moss002_grass_olive",
-"sun_el": 46.7,
-"burial": 0.32,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.68,
-"dust": 0.42
-},
-"caption": "target burial 0.36, scale 0.28",
-"tags": [
-"grass",
-"mid_sun"
-]
-},
-{
-"id": "b034",
-"image": "images/v2/review/b034.jpg",
-"thumb": "images/v2/review/b034.jpg",
-"before": "images/v2/review/b034_before.jpg",
-"box": [
-0.3688,
-0.3241,
-0.2625,
-0.3519
-],
-"meta": {
-"seed": 5034,
-"background": "grass_bg_gen_24_grass_dry_over",
-"sun_el": 34.6,
-"burial": 0.45,
-"face_down": false,
-"blades_on_mine": 1,
-"visible_frac": 0.46,
-"dust": 0.32
-},
-"caption": "target burial 0.41, scale 0.36",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b035",
-"image": "images/v2/review/b035.jpg",
-"thumb": "images/v2/review/b035.jpg",
-"before": "images/v2/review/b035_before.jpg",
-"box": [
-0.3406,
-0.3537,
-0.3187,
-0.2926
-],
-"meta": {
-"seed": 5035,
-"background": "grass_bg_real_15_Grass004_grass_patchy",
-"sun_el": 57.4,
-"burial": 0.19,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.81,
-"dust": 0.3
-},
-"caption": "target burial 0.13, scale 0.38",
-"tags": [
-"grass",
-"high_sun",
-"face_down"
-]
-},
-{
-"id": "b036",
-"image": "images/v2/review/b036.jpg",
-"thumb": "images/v2/review/b036.jpg",
-"before": "images/v2/review/b036_before.jpg",
-"box": [
-0.4271,
-0.2981,
-0.1458,
-0.4111
-],
-"meta": {
-"seed": 5036,
-"background": "grass_grass5",
-"sun_el": 45.3,
-"burial": 0.28,
-"face_down": false,
-"blades_on_mine": 3,
-"visible_frac": 0.62,
-"dust": 0.37
-},
-"caption": "target burial 0.21, scale 0.29",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b037",
-"image": "images/v2/review/b037.jpg",
-"thumb": "images/v2/review/b037.jpg",
-"before": "images/v2/review/b037_before.jpg",
-"box": [
-0.3823,
-0.3963,
-0.2354,
-0.2074
-],
-"meta": {
-"seed": 5037,
-"background": "ground_bg_Ground008",
-"sun_el": 65.6,
-"burial": 0.39,
-"face_down": true,
-"blades_on_mine": 2,
+"blades_on_mine": 4,
 "visible_frac": 0.55,
-"dust": 0.36
-},
-"caption": "target burial 0.34, scale 0.32",
-"tags": [
-"ground",
-"high_sun",
-"face_down",
-"blades"
-]
-},
-{
-"id": "b038",
-"image": "images/v2/review/b038.jpg",
-"thumb": "images/v2/review/b038.jpg",
-"before": "images/v2/review/b038_before.jpg",
-"box": [
-0.3937,
-0.3093,
-0.2125,
-0.3815
-],
-"meta": {
-"seed": 5038,
-"background": "grass_bg_gen_37_moss_clover_normal",
-"sun_el": 44.3,
-"burial": 0.35,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.65,
-"dust": 0.35
-},
-"caption": "target burial 0.27, scale 0.40",
-"tags": [
-"grass",
-"mid_sun",
-"face_down"
-]
-},
-{
-"id": "b039",
-"image": "images/v2/review/b039.jpg",
-"thumb": "images/v2/review/b039.jpg",
-"before": "images/v2/review/b039_before.jpg",
-"box": [
-0.3594,
-0.3574,
-0.2812,
-0.2852
-],
-"meta": {
-"seed": 5039,
-"background": "grass_bg_gen_11_grass_olive_over",
-"sun_el": 63.8,
-"burial": 0.12,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.86,
-"dust": 0.29
-},
-"caption": "target burial 0.11, scale 0.34",
-"tags": [
-"grass",
-"high_sun",
-"face_down"
-]
-},
-{
-"id": "b040",
-"image": "images/v2/review/b040.jpg",
-"thumb": "images/v2/review/b040.jpg",
-"before": "images/v2/review/b040_before.jpg",
-"box": [
-0.4292,
-0.2648,
-0.1417,
-0.4704
-],
-"meta": {
-"seed": 5040,
-"background": "grass_bg_gen_38_moss_clover_mowed",
-"sun_el": 35.3,
-"burial": 0.31,
-"face_down": false,
-"blades_on_mine": 1,
-"visible_frac": 0.66,
-"dust": 0.36
-},
-"caption": "target burial 0.22, scale 0.32",
-"tags": [
-"grass",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b041",
-"image": "images/v2/review/b041.jpg",
-"thumb": "images/v2/review/b041.jpg",
-"before": "images/v2/review/b041_before.jpg",
-"box": [
-0.4375,
-0.3889,
-0.125,
-0.2222
-],
-"meta": {
-"seed": 5041,
-"background": "grass_bg_gen_28_grass_patchy_normal",
-"sun_el": 67.0,
-"burial": 0.42,
-"face_down": false,
-"blades_on_mine": 4,
-"visible_frac": 0.52,
-"dust": 0.38
-},
-"caption": "target burial 0.50, scale 0.25",
-"tags": [
-"grass",
-"high_sun",
-"blades"
-]
-},
-{
-"id": "b042",
-"image": "images/v2/review/b042.jpg",
-"thumb": "images/v2/review/b042.jpg",
-"before": "images/v2/review/b042_before.jpg",
-"box": [
-0.4198,
-0.337,
-0.1604,
-0.3259
-],
-"meta": {
-"seed": 5042,
-"background": "grass_bg_gen_39_moss_clover_normal",
-"sun_el": 19.2,
-"burial": 0.15,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.77,
-"dust": 0.29
-},
-"caption": "target burial 0.15, scale 0.27",
-"tags": [
-"grass",
-"low_sun",
-"face_down"
-]
-},
-{
-"id": "b043",
-"image": "images/v2/review/b043.jpg",
-"thumb": "images/v2/review/b043.jpg",
-"before": "images/v2/review/b043_before.jpg",
-"box": [
-0.3917,
-0.2741,
-0.2167,
-0.4519
-],
-"meta": {
-"seed": 5043,
-"background": "grass_bg_gen_17_grass_olive_over",
-"sun_el": 65.4,
-"burial": 0.44,
-"face_down": false,
-"blades_on_mine": 3,
-"visible_frac": 0.41,
-"dust": 0.28
-},
-"caption": "target burial 0.35, scale 0.39",
-"tags": [
-"grass",
-"high_sun",
-"blades"
-]
-},
-{
-"id": "b044",
-"image": "images/v2/review/b044.jpg",
-"thumb": "images/v2/review/b044.jpg",
-"before": "images/v2/review/b044_before.jpg",
-"box": [
-0.4125,
-0.3315,
-0.175,
-0.337
-],
-"meta": {
-"seed": 5044,
-"background": "ground_bg_Ground004",
-"sun_el": 45.7,
-"burial": 0.46,
-"face_down": false,
-"blades_on_mine": 1,
-"visible_frac": 0.5,
 "dust": 0.33
-},
-"caption": "target burial 0.49, scale 0.37",
-"tags": [
-"ground",
-"mid_sun",
-"blades"
-]
-},
-{
-"id": "b045",
-"image": "images/v2/review/b045.jpg",
-"thumb": "images/v2/review/b045.jpg",
-"before": "images/v2/review/b045_before.jpg",
-"box": [
-0.3885,
-0.3722,
-0.2229,
-0.2556
-],
-"meta": {
-"seed": 5045,
-"background": "grass_bg_Grass002",
-"sun_el": 26.0,
-"burial": 0.41,
-"face_down": true,
-"blades_on_mine": 0,
-"visible_frac": 0.59,
-"dust": 0.32
-},
-"caption": "target burial 0.31, scale 0.33",
-"tags": [
-"grass",
-"low_sun",
-"face_down"
-]
-},
-{
-"id": "b046",
-"image": "images/v2/review/b046.jpg",
-"thumb": "images/v2/review/b046.jpg",
-"before": "images/v2/review/b046_before.jpg",
-"box": [
-0.4146,
-0.35,
-0.1708,
-0.3
-],
-"meta": {
-"seed": 5046,
-"background": "grass_bg_real_21_Grass004_grass_fresh",
-"sun_el": 66.6,
-"burial": 0.46,
-"face_down": false,
-"blades_on_mine": 1,
-"visible_frac": 0.54,
-"dust": 0.34
-},
-"caption": "target burial 0.50, scale 0.34",
-"tags": [
-"grass",
-"high_sun",
-"blades"
-]
-},
-{
-"id": "b047",
-"image": "images/v2/review/b047.jpg",
-"thumb": "images/v2/review/b047.jpg",
-"before": "images/v2/review/b047_before.jpg",
-"box": [
-0.4302,
-0.3444,
-0.1396,
-0.3111
-],
-"meta": {
-"seed": 5047,
-"background": "ground_bg_Gravel003",
-"sun_el": 21.0,
-"burial": 0.25,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.73,
-"dust": 0.42
-},
-"caption": "target burial 0.23, scale 0.28",
-"tags": [
-"ground",
-"low_sun"
-]
-},
-{
-"id": "b048",
-"image": "images/v2/review/b048.jpg",
-"thumb": "images/v2/review/b048.jpg",
-"before": "images/v2/review/b048_before.jpg",
-"box": [
-0.4052,
-0.3241,
-0.1896,
-0.3519
-],
-"meta": {
-"seed": 5048,
-"background": "ground_bg_Gravel005",
-"sun_el": 53.4,
-"burial": 0.4,
-"face_down": false,
-"blades_on_mine": 0,
-"visible_frac": 0.51,
-"dust": 0.29
 },
 "caption": "target burial 0.46, scale 0.40",
 "tags": [
 "ground",
+"mid_sun",
+"face_down",
+"blades"
+]
+},
+{
+"id": "c005",
+"image": "images/v2/review2/c005.jpg",
+"thumb": "images/v2/review2/c005.jpg",
+"before": "images/v2/review2/c005_before.jpg",
+"box": [
+0.4,
+0.3389,
+0.2,
+0.3222
+],
+"meta": {
+"seed": 6005,
+"background": "ground_bg_Ground015",
+"sun_el": 34.7,
+"burial": 0.18,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.79,
+"dust": 0.42
+},
+"caption": "target burial 0.15, scale 0.28",
+"tags": [
+"ground",
 "mid_sun"
+]
+},
+{
+"id": "c006",
+"image": "images/v2/review2/c006.jpg",
+"thumb": "images/v2/review2/c006.jpg",
+"before": "images/v2/review2/c006_before.jpg",
+"box": [
+0.4323,
+0.3685,
+0.1354,
+0.263
+],
+"meta": {
+"seed": 6006,
+"background": "ground_bg_Ground005",
+"sun_el": 25.1,
+"burial": 0.36,
+"face_down": true,
+"blades_on_mine": 0,
+"visible_frac": 0.64,
+"dust": 0.38
+},
+"caption": "target burial 0.39, scale 0.26",
+"tags": [
+"ground",
+"low_sun",
+"face_down"
+]
+},
+{
+"id": "c007",
+"image": "images/v2/review2/c007.jpg",
+"thumb": "images/v2/review2/c007.jpg",
+"before": "images/v2/review2/c007_before.jpg",
+"box": [
+0.4375,
+0.3093,
+0.125,
+0.3815
+],
+"meta": {
+"seed": 6007,
+"background": "ground_bg_Ground013",
+"sun_el": 50.3,
+"burial": 0.32,
+"face_down": true,
+"blades_on_mine": 4,
+"visible_frac": 0.68,
+"dust": 0.32
+},
+"caption": "target burial 0.35, scale 0.30",
+"tags": [
+"ground",
+"mid_sun",
+"face_down",
+"blades"
+]
+},
+{
+"id": "c008",
+"image": "images/v2/review2/c008.jpg",
+"thumb": "images/v2/review2/c008.jpg",
+"before": "images/v2/review2/c008_before.jpg",
+"box": [
+0.4052,
+0.3426,
+0.1896,
+0.3148
+],
+"meta": {
+"seed": 6008,
+"background": "ground_Screenshot 2026-02-07 at 4.21.38\u202fPM",
+"sun_el": 55.5,
+"burial": 0.36,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.6,
+"dust": 0.32
+},
+"caption": "target burial 0.24, scale 0.35",
+"tags": [
+"ground",
+"high_sun"
+]
+},
+{
+"id": "c009",
+"image": "images/v2/review2/c009.jpg",
+"thumb": "images/v2/review2/c009.jpg",
+"before": "images/v2/review2/c009_before.jpg",
+"box": [
+0.4271,
+0.3611,
+0.1458,
+0.2778
+],
+"meta": {
+"seed": 6009,
+"background": "grass_bg_gen_36_moss_clover_mowed",
+"sun_el": 53.2,
+"burial": 0.41,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.59,
+"dust": 0.29
+},
+"caption": "target burial 0.46, scale 0.29",
+"tags": [
+"grass",
+"mid_sun"
+]
+},
+{
+"id": "c010",
+"image": "images/v2/review2/c010.jpg",
+"thumb": "images/v2/review2/c010.jpg",
+"before": "images/v2/review2/c010_before.jpg",
+"box": [
+0.4313,
+0.3796,
+0.1375,
+0.2407
+],
+"meta": {
+"seed": 6010,
+"background": "grass_bg_Moss002",
+"sun_el": 26.3,
+"burial": 0.33,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.52,
+"dust": 0.34
+},
+"caption": "target burial 0.39, scale 0.27",
+"tags": [
+"grass",
+"low_sun"
+]
+},
+{
+"id": "c011",
+"image": "images/v2/review2/c011.jpg",
+"thumb": "images/v2/review2/c011.jpg",
+"before": "images/v2/review2/c011_before.jpg",
+"box": [
+0.4354,
+0.287,
+0.1292,
+0.4259
+],
+"meta": {
+"seed": 6011,
+"background": "ground_bg_Ground008",
+"sun_el": 63.8,
+"burial": 0.35,
+"face_down": true,
+"blades_on_mine": 0,
+"visible_frac": 0.61,
+"dust": 0.47
+},
+"caption": "target burial 0.36, scale 0.34",
+"tags": [
+"ground",
+"high_sun",
+"face_down"
+]
+},
+{
+"id": "c012",
+"image": "images/v2/review2/c012.jpg",
+"thumb": "images/v2/review2/c012.jpg",
+"before": "images/v2/review2/c012_before.jpg",
+"box": [
+0.4073,
+0.3648,
+0.1854,
+0.2704
+],
+"meta": {
+"seed": 6012,
+"background": "grass_bg_gen_09_grass_olive_mowed",
+"sun_el": 60.0,
+"burial": 0.28,
+"face_down": false,
+"blades_on_mine": 1,
+"visible_frac": 0.72,
+"dust": 0.36
+},
+"caption": "target burial 0.31, scale 0.25",
+"tags": [
+"grass",
+"high_sun",
+"blades"
+]
+},
+{
+"id": "c013",
+"image": "images/v2/review2/c013.jpg",
+"thumb": "images/v2/review2/c013.jpg",
+"before": "images/v2/review2/c013_before.jpg",
+"box": [
+0.4021,
+0.2944,
+0.1958,
+0.4111
+],
+"meta": {
+"seed": 6013,
+"background": "grass_bg_gen_34_grass_patchy_normal",
+"sun_el": 52.1,
+"burial": 0.25,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.72,
+"dust": 0.32
+},
+"caption": "target burial 0.30, scale 0.35",
+"tags": [
+"grass",
+"mid_sun"
+]
+},
+{
+"id": "c014",
+"image": "images/v2/review2/c014.jpg",
+"thumb": "images/v2/review2/c014.jpg",
+"before": "images/v2/review2/c014_before.jpg",
+"box": [
+0.4177,
+0.3407,
+0.1646,
+0.3185
+],
+"meta": {
+"seed": 6014,
+"background": "ground_bg_Ground024",
+"sun_el": 29.2,
+"burial": 0.39,
+"face_down": false,
+"blades_on_mine": 4,
+"visible_frac": 0.56,
+"dust": 0.34
+},
+"caption": "target burial 0.37, scale 0.34",
+"tags": [
+"ground",
+"low_sun",
+"blades"
+]
+},
+{
+"id": "c015",
+"image": "images/v2/review2/c015.jpg",
+"thumb": "images/v2/review2/c015.jpg",
+"before": "images/v2/review2/c015_before.jpg",
+"box": [
+0.3896,
+0.3074,
+0.2208,
+0.3852
+],
+"meta": {
+"seed": 6015,
+"background": "ground_bg_Ground004",
+"sun_el": 67.7,
+"burial": 0.26,
+"face_down": false,
+"blades_on_mine": 4,
+"visible_frac": 0.54,
+"dust": 0.31
+},
+"caption": "target burial 0.16, scale 0.33",
+"tags": [
+"ground",
+"high_sun",
+"blades"
+]
+},
+{
+"id": "c016",
+"image": "images/v2/review2/c016.jpg",
+"thumb": "images/v2/review2/c016.jpg",
+"before": "images/v2/review2/c016_before.jpg",
+"box": [
+0.3854,
+0.3333,
+0.2292,
+0.3333
+],
+"meta": {
+"seed": 6016,
+"background": "grass_bg_real_15_Grass004_grass_patchy",
+"sun_el": 58.9,
+"burial": 0.29,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.71,
+"dust": 0.37
+},
+"caption": "target burial 0.20, scale 0.35",
+"tags": [
+"grass",
+"high_sun"
+]
+},
+{
+"id": "c017",
+"image": "images/v2/review2/c017.jpg",
+"thumb": "images/v2/review2/c017.jpg",
+"before": "images/v2/review2/c017_before.jpg",
+"box": [
+0.4365,
+0.3574,
+0.1271,
+0.2852
+],
+"meta": {
+"seed": 6017,
+"background": "ground_bg_Gravel003",
+"sun_el": 47.2,
+"burial": 0.41,
+"face_down": true,
+"blades_on_mine": 4,
+"visible_frac": 0.52,
+"dust": 0.38
+},
+"caption": "target burial 0.37, scale 0.28",
+"tags": [
+"ground",
+"mid_sun",
+"face_down",
+"blades"
+]
+},
+{
+"id": "c018",
+"image": "images/v2/review2/c018.jpg",
+"thumb": "images/v2/review2/c018.jpg",
+"before": "images/v2/review2/c018_before.jpg",
+"box": [
+0.4229,
+0.3148,
+0.1542,
+0.3704
+],
+"meta": {
+"seed": 6018,
+"background": "ground_bg_Ground008",
+"sun_el": 27.0,
+"burial": 0.3,
+"face_down": true,
+"blades_on_mine": 0,
+"visible_frac": 0.7,
+"dust": 0.39
+},
+"caption": "target burial 0.33, scale 0.28",
+"tags": [
+"ground",
+"low_sun",
+"face_down"
+]
+},
+{
+"id": "c019",
+"image": "images/v2/review2/c019.jpg",
+"thumb": "images/v2/review2/c019.jpg",
+"before": "images/v2/review2/c019_before.jpg",
+"box": [
+0.3781,
+0.3593,
+0.2437,
+0.2815
+],
+"meta": {
+"seed": 6019,
+"background": "grass_bg_Ground001",
+"sun_el": 16.2,
+"burial": 0.28,
+"face_down": false,
+"blades_on_mine": 2,
+"visible_frac": 0.55,
+"dust": 0.43
+},
+"caption": "target burial 0.11, scale 0.33",
+"tags": [
+"grass",
+"low_sun",
+"blades"
+]
+},
+{
+"id": "c020",
+"image": "images/v2/review2/c020.jpg",
+"thumb": "images/v2/review2/c020.jpg",
+"before": "images/v2/review2/c020_before.jpg",
+"box": [
+0.426,
+0.3704,
+0.1479,
+0.2593
+],
+"meta": {
+"seed": 6020,
+"background": "grass_bg_gen_17_grass_olive_over",
+"sun_el": 59.3,
+"burial": 0.39,
+"face_down": false,
+"blades_on_mine": 2,
+"visible_frac": 0.55,
+"dust": 0.35
+},
+"caption": "target burial 0.42, scale 0.30",
+"tags": [
+"grass",
+"high_sun",
+"blades"
+]
+},
+{
+"id": "c021",
+"image": "images/v2/review2/c021.jpg",
+"thumb": "images/v2/review2/c021.jpg",
+"before": "images/v2/review2/c021_before.jpg",
+"box": [
+0.4354,
+0.387,
+0.1333,
+0.2259
+],
+"meta": {
+"seed": 6021,
+"background": "grass_bg_gen_06_grass_fresh_over",
+"sun_el": 25.6,
+"burial": 0.4,
+"face_down": false,
+"blades_on_mine": 0,
+"visible_frac": 0.58,
+"dust": 0.44
+},
+"caption": "target burial 0.48, scale 0.27",
+"tags": [
+"grass",
+"low_sun"
+]
+},
+{
+"id": "c022",
+"image": "images/v2/review2/c022.jpg",
+"thumb": "images/v2/review2/c022.jpg",
+"before": "images/v2/review2/c022_before.jpg",
+"box": [
+0.3542,
+0.3315,
+0.2917,
+0.337
+],
+"meta": {
+"seed": 6022,
+"background": "grass_bg_gen_25_grass_dry_normal",
+"sun_el": 18.8,
+"burial": 0.16,
+"face_down": true,
+"blades_on_mine": 0,
+"visible_frac": 0.84,
+"dust": 0.41
+},
+"caption": "target burial 0.16, scale 0.39",
+"tags": [
+"grass",
+"low_sun",
+"face_down"
+]
+},
+{
+"id": "c023",
+"image": "images/v2/review2/c023.jpg",
+"thumb": "images/v2/review2/c023.jpg",
+"before": "images/v2/review2/c023_before.jpg",
+"box": [
+0.3875,
+0.313,
+0.225,
+0.3741
+],
+"meta": {
+"seed": 6023,
+"background": "grass_bg_gen_29_grass_patchy_over",
+"sun_el": 48.8,
+"burial": 0.15,
+"face_down": false,
+"blades_on_mine": 1,
+"visible_frac": 0.84,
+"dust": 0.32
+},
+"caption": "target burial 0.15, scale 0.36",
+"tags": [
+"grass",
+"mid_sun",
+"blades"
+]
+},
+{
+"id": "c024",
+"image": "images/v2/review2/c024.jpg",
+"thumb": "images/v2/review2/c024.jpg",
+"before": "images/v2/review2/c024_before.jpg",
+"box": [
+0.374,
+0.3741,
+0.2521,
+0.2519
+],
+"meta": {
+"seed": 6024,
+"background": "grass_bg_gen_06_grass_fresh_over",
+"sun_el": 18.4,
+"burial": 0.47,
+"face_down": true,
+"blades_on_mine": 1,
+"visible_frac": 0.46,
+"dust": 0.28
+},
+"caption": "target burial 0.49, scale 0.34",
+"tags": [
+"grass",
+"low_sun",
+"face_down",
+"blades"
 ]
 }
 ]
