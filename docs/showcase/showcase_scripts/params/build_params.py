@@ -324,7 +324,7 @@ def build_cards(imgs, mines, meta, do_render):
     for r in imgs:
         files[r["bg_file"]] = files.get(r["bg_file"], 0) + 1
     card("background", "Background family and file", "BG_FAMILY_WEIGHTS + BG_WEIGHT_OVERRIDES (forced file)",
-         "stratified", "2 families; 99 files by quota", "77 grass + 22 non-grass photos",
+         "stratified", "2 families; 97 files by quota (v1 grass1 + grass2 removed)", "75 grass + 22 non-grass photos",
          "Exact 65 / 35 % family split (1950 grass, 1050 non-grass, the user's 60-70 % grass). Inside a family "
          "every file gets a fixed count proportional to its tuned weight (largest remainder), so the JPEG-blocky "
          "files keep their 0.25 / 0.5 weights and audit 'review' files their 0.4.",

@@ -141,6 +141,9 @@ def balanced_column(levels, quota, rng):
     return col
 
 
+EXCLUDE_BG = {"grass1.png", "grass2.png"}  # removed from the dataset by the user (v1 grass snippets); their share is redistributed over the other files
+
+
 def largest_remainder(total, weights):
     w = np.asarray(weights, float)
     raw = total * w / w.sum()
@@ -168,7 +171,7 @@ def build_design():
     names_seen = [os.path.basename(p) for fam in idx["families"].values() for p, _, _ in fam]
     assert len(names_seen) == len(set(names_seen)), "background basenames are not unique"
     for fi, fam in enumerate(FAMILY_NAMES):
-        items = idx["families"][fam]
+        items = [it for it in idx["families"][fam] if os.path.basename(it[0]) not in EXCLUDE_BG]  # user: drop v1 grass1/grass2
         n = largest_remainder(FAMILY_QUOTA[fam], [w for _, w, _ in items])
         files = np.repeat(np.arange(len(items)), n)
         rng.shuffle(files)
