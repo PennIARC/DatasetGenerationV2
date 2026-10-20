@@ -40,7 +40,7 @@ setTimeout(function(){
     ok("arrow moves focus", document.activeElement === qa(".gcard")[1], document.activeElement.getAttribute("data-id"));
     var c1 = qa(".gcard")[1];
     c1.querySelector("input[type=checkbox]").click();
-    var note = c1.querySelector("input.note"); note.value = "blurry"; note.dispatchEvent(new Event("input", {bubbles: true}));
+    var note = c1.querySelector(".note"); note.value = "blurry"; note.dispatchEvent(new Event("input", {bubbles: true}));
     ok("counts flagged 2", /Flagged 2/.test(q(".counts").textContent), q(".counts").textContent);
     // filters
     var sels = qa(".gfilters select");

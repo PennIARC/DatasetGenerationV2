@@ -1,0 +1,24 @@
+{
+  "pages": [
+    {
+      "id": "dataset",
+      "tab": "Dataset: live sample",
+      "type": "dataset",
+      "title": "Dataset v2: live random sample",
+      "intro": "24 randomly sampled finished images from output_dataset/v2_3000, with their YOLO boxes, plus live progress of the render. Works while the dataset is still being generated: the info panel refreshes every 10 s, and Resample draws a new random 24 from everything finished so far. Needs the local server: python3 scripts/serve_dataset_view.py, then open http://127.0.0.1:8765/showcase.html#dataset.",
+      "glossary": {
+        "finished image": "An image whose label file (labels/<split>/<name>.txt) and sidecar (meta/<name>.json, written last) both exist and are complete.",
+        "box": "One YOLO label line (class xc yc w h, normalised to the image size), drawn as a green rectangle.",
+        "seed": "base_seed:render_index, i.e. render_scene(seed=2026, index=k); retries use index 100000 + 10 k + attempt.",
+        "sun_el / shadow / overcast": "Sun elevation in degrees, direct-sun shadow strength, overcast (soft light) flag.",
+        "scale": "Mean mine scale of the image (MINE_SCALE; 0.1-0.4).",
+        "buried / burial_max": "Number of buried mines; largest achieved hidden fraction of a mine's top-down area.",
+        "face_down / blades_on_mine": "Number of face-down mines; grass blades drawn over mines.",
+        "rate / ETA": "Finished images per minute over the last 10 min, and the time left at that rate."
+      },
+      "port": 8765,
+      "sample_size": 24,
+      "server_cmd": "python3 scripts/serve_dataset_view.py"
+    }
+  ]
+}

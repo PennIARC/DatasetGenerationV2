@@ -186,6 +186,31 @@ table.gt .thumb{all:unset;cursor:zoom-in;display:block}
 .lb .fbtn{margin-top:8px;font:inherit;padding:5px 12px;border-radius:8px;border:1px solid #fff;background:transparent;color:#fff;cursor:pointer}
 .lb .fbtn[aria-pressed="true"]{background:#d33;border-color:#d33}
 @media (max-width:600px){.gfilters .fields{gap:8px}.gbar{max-height:60vh}}
+/* dataset live sample (page type "dataset", needs scripts/serve_dataset_view.py) */
+main:has(.dsview){max-width:none}
+.dinfo{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:0 0 12px;box-shadow:var(--shadow)}
+.dhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.dhead .big{font-size:1.25rem;font-weight:700}
+.badge{font:600 .78rem var(--sans);padding:3px 10px;border-radius:99px;border:1px solid var(--border);background:var(--surface2);color:var(--text)}
+.badge.generating{background:#1f8f4e;border-color:#1f8f4e;color:#fff}
+.badge.complete{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.badge.idle,.badge.offline,.badge.missing{background:var(--warn-bg);border-color:var(--warn-bd)}
+.pbar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden;margin:0 0 10px;border:1px solid var(--border)}
+.pbar>div{height:100%;background:var(--accent);width:0;transition:width .4s}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.stat{background:var(--surface2);border-radius:8px;padding:6px 10px;min-width:0}
+.stat .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.stat .v{font-weight:600;overflow-wrap:anywhere}
+.stat .s{font-size:.78rem;color:var(--muted);overflow-wrap:anywhere}
+.dfail{margin-top:8px;font-size:.88rem;color:var(--muted)}
+.dfail pre{font:.78rem var(--mono);white-space:pre-wrap;margin:4px 0}
+.dgrid.showbox .bbox,.lbwrap.showbox .bbox{display:block}
+.dgrid .gm{font:.78rem var(--sans);color:var(--text)}
+.dgrid .gpar{font:.68rem var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.dgrid.nopar .gpar{display:none}
+.lbwrap{position:relative;display:inline-block;line-height:0}
+.dsview .empty code{background:var(--surface);padding:2px 6px;border-radius:4px}
+@media (max-width:600px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
@@ -250,7 +275,11 @@ var lb = {items: [], idx: 0, opener: null};
 function lbShow(){
   var it = lb.items[lb.idx]; if (!it) return;
   var st = $("lbStage"); st.textContent = "";
-  st.appendChild(img(it.image, it.label, ""));
+  if (it.boxes){   /* dataset page: image + YOLO boxes overlay (b toggles) */
+    var bw = el("div", {"class": "lbwrap" + (it.boxesOn() ? " showbox" : "")}, [img(it.image, it.label, "")]);
+    it.boxes.forEach(function(b){ bw.appendChild(boxDiv(b)); });
+    st.appendChild(bw);
+  } else st.appendChild(img(it.image, it.label, ""));
   var info = $("lbInfo"); info.textContent = "";
   info.appendChild(el("div", {text: it.label + "  (" + (lb.idx+1) + "/" + lb.items.length + ")"}));
   if (str(it.params)) info.appendChild(el("div", {"class":"par", text: it.params}));
@@ -265,6 +294,11 @@ function lbShow(){
     var on = it.isFlagged();
     info.appendChild(el("button", {"class":"fbtn", type:"button", "aria-pressed": String(on), text: on ? "Flagged (f to unflag)" : "Flag as wrong (f)",
       onclick: function(){ it.toggle(); lbShow(); $("lbStage").focus && 0; }}));
+  }
+  if (it.boxes){
+    var bon = it.boxesOn();
+    info.appendChild(el("button", {"class":"fbtn", type:"button", "aria-pressed": String(bon), text: bon ? "Boxes: on (b)" : "Boxes: off (b)",
+      onclick: function(){ it.toggleBoxes(); lbShow(); }}));
   }
   var multi = lb.items.length > 1;
   $("lbPrev").style.display = $("lbNext").style.display = multi ? "" : "none";
@@ -288,6 +322,7 @@ document.addEventListener("keydown", function(e){
   if (e.key === "Escape") { e.preventDefault(); lbClose(); }
   else if (e.key === "ArrowLeft") { e.preventDefault(); lbStep(-1); }
   else if (e.key === "ArrowRight") { e.preventDefault(); lbStep(1); }
+  else if ((e.key === "b" || e.key === "B") && lb.items[lb.idx] && lb.items[lb.idx].toggleBoxes) { e.preventDefault(); lb.items[lb.idx].toggleBoxes(); lbShow(); }
   else if ((e.key === "f" || e.key === "F") && lb.items[lb.idx] && lb.items[lb.idx].toggle) { e.preventDefault(); lb.items[lb.idx].toggle(); lbShow(); }
   else if (e.key === "Tab") { /* keep focus inside dialog */
     var f = [$("lbClose"), $("lbPrev"), $("lbNext")].concat([].slice.call(document.querySelectorAll("#lbInfo button"))).filter(function(b){ return b.style.display !== "none"; });
@@ -764,6 +799,202 @@ function renderGrid(page){
   refresh();
 }
 
+/* ---------- dataset live sample (page.type "dataset", served by scripts/serve_dataset_view.py) ---------- */
+var dsCleanup = null;
+function boxDiv(b){   /* b = [class, xc, yc, w, h], YOLO normalised */
+  var l = (b[1] - b[3] / 2) * 100, t = (b[2] - b[4] / 2) * 100;
+  return el("div", {"class": "bbox", style: "left:" + l + "%;top:" + t + "%;width:" + (b[3] * 100) + "%;height:" + (b[4] * 100) + "%"});
+}
+function fmtBytes(n){
+  if (typeof n !== "number") return "–";
+  var u = ["B", "KB", "MB", "GB", "TB"], i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(n < 10 ? 2 : 1) : String(n)) + " " + u[i];
+}
+function fmtDur(s){
+  if (typeof s !== "number" || !isFinite(s)) return "–";
+  s = Math.max(0, Math.round(s));
+  if (s < 90) return s + " s";
+  if (s < 3600) return Math.round(s / 60) + " min";
+  var h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h + " h " + (m < 10 ? "0" : "") + m + " min";
+}
+function fmtClock(t){ return typeof t === "number" ? new Date(t * 1000).toLocaleString() : "–"; }
+function renderDataset(page){
+  var port = page.port || 8765, N = Math.max(1, Math.min(200, page.sample_size || 24));
+  var cmd = str(page.server_cmd) || "python3 scripts/serve_dataset_view.py";
+  var url = "http://127.0.0.1:" + port + "/showcase.html#" + page.id;
+  var root = el("div", {"class": "dsview"});
+  main.appendChild(root);
+  function offlineBox(why){
+    return el("div", {"class": "empty", role: "status"}, [
+      el("b", {text: "This tab needs the local dataset server. "}), why, el("br"), el("br"),
+      "Start it from the repository root: ", el("code", {text: cmd}), el("br"),
+      "then open ", el("a", {href: url, text: url}), " (Ctrl-C in the terminal stops it). The other tabs work without it."]);
+  }
+  if (location.protocol === "file:"){
+    root.appendChild(offlineBox("This page was opened as a file (file://), and a file page cannot read the dataset folder."));
+    return;
+  }
+  var S = {boxes: store("showcase-dsbox") !== "0", par: store("showcase-dspar") !== "0", auto: store("showcase-dsauto") !== "0",
+    cols: parseInt(store("showcase-dscols"), 10) || (window.innerWidth < 600 ? 1 : 4),
+    items: [], seed: null, available: 0, info: null, timer: null, alive: true, loading: false, everOk: false};
+  S.cols = Math.max(1, Math.min(8, S.cols));
+  function getJSON(u){
+    return fetch(u, {cache: "no-store"}).then(function(r){
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+
+  /* info panel */
+  var big = el("span", {"class": "big", text: "…"}), badge = el("span", {"class": "badge", text: "loading"});
+  var upd = el("span", {"class": "gstatus"}), bar = el("div"), stats = el("div", {"class": "stats"}), extra = el("div", {"class": "dfail"});
+  var warn = el("div", {"class": "empty", role: "alert", hidden: "hidden", style: "margin-bottom:10px"});
+  var info = el("section", {"class": "dinfo", "aria-label": "Dataset information"}, [
+    el("div", {"class": "dhead"}, [big, badge, upd]), el("div", {"class": "pbar", "aria-hidden": "true"}, [bar]), stats, extra]);
+
+  /* toolbar */
+  function btn(text, fn, pressed){
+    var b = el("button", {"class": "btn", type: "button", text: text, "aria-pressed": pressed === undefined ? null : String(pressed)});
+    b.addEventListener("click", fn); return b;
+  }
+  function press(b, on, text){ b.setAttribute("aria-pressed", String(on)); if (text) b.textContent = text; }
+  var counts = el("span", {"class": "counts", "aria-live": "polite"});
+  var status = el("span", {"class": "gstatus", role: "status"});
+  var boxBtn = btn(S.boxes ? "Boxes: on" : "Boxes: off", function(){ setBoxes(!S.boxes); }, S.boxes);
+  var resBtn = btn("Resample " + N, function(){ loadSample(); });
+  var autoBtn = btn(S.auto ? "Auto-refresh: on" : "Auto-refresh: off", function(){
+    S.auto = !S.auto; store("showcase-dsauto", S.auto ? "1" : "0");
+    press(autoBtn, S.auto, S.auto ? "Auto-refresh: on" : "Auto-refresh: off"); schedule(); if (S.auto) loadInfo(); }, S.auto);
+  var parBtn = btn(S.par ? "Parameters: shown" : "Parameters: hidden", function(){
+    S.par = !S.par; store("showcase-dspar", S.par ? "1" : "0");
+    press(parBtn, S.par, S.par ? "Parameters: shown" : "Parameters: hidden"); applyCls(); }, S.par);
+  var nowBtn = btn("Refresh info", function(){ loadInfo(); });
+  var colsIn = el("input", {type: "range", min: "1", max: "8", step: "1", value: String(S.cols), "aria-label": "cards per row"});
+  var colsOut = el("span", {text: String(S.cols)});
+  var colsFld = el("label", {"class": "fld"}, [el("span", null, ["Cards per row: ", colsOut]), colsIn]);
+  colsIn.addEventListener("input", function(){
+    S.cols = parseInt(colsIn.value, 10); colsOut.textContent = String(S.cols); store("showcase-dscols", String(S.cols)); applyCls(); });
+  var tools = el("div", {"class": "gbar", role: "region", "aria-label": "Sample toolbar"}, [
+    el("div", {"class": "grow"}, [counts, status]),
+    el("div", {"class": "grow"}, [boxBtn, resBtn, autoBtn, parBtn, nowBtn, colsFld])]);
+  var gridWrap = el("div");
+  root.appendChild(warn); root.appendChild(info); root.appendChild(tools); root.appendChild(gridWrap);
+  root.appendChild(el("p", {"class": "meta", text: "Click an image to enlarge it (full resolution; b toggles boxes, arrows step). " +
+    "Boxes are the YOLO labels (labels/*.txt). Only images whose label and sidecar are fully written are counted or sampled."}));
+
+  function setBoxes(on){
+    S.boxes = on; store("showcase-dsbox", on ? "1" : "0");
+    press(boxBtn, on, on ? "Boxes: on" : "Boxes: off"); applyCls();
+  }
+  var grid = null;
+  function applyCls(){
+    if (!grid) return;
+    var c = S.cols; if (window.innerWidth < 600) c = Math.min(c, 2);
+    grid.style.setProperty("--cols", String(c));
+    grid.classList.toggle("showbox", S.boxes);
+    grid.classList.toggle("nopar", !S.par);
+  }
+  gridResize = applyCls;
+  function say(t){ status.textContent = t; }
+
+  function stat(k, v, s){ return el("div", {"class": "stat"}, [el("div", {"class": "k", text: k}), el("div", {"class": "v", text: v}), s ? el("div", {"class": "s", text: s}) : null]); }
+  function showInfo(d){
+    S.info = d;
+    var now = d.server_time, tgt = d.target;
+    big.textContent = d.count + (tgt ? " / " + tgt : "") + " images";
+    var lab = {generating: "generating", complete: "complete", idle: "idle (no new files for 60 s)", empty: "no images yet", missing: "dataset folder missing"}[d.status] || d.status;
+    badge.textContent = lab; badge.className = "badge " + d.status;
+    upd.textContent = "updated " + new Date().toLocaleTimeString() + (S.auto ? " · auto-refresh every 10 s" : "");
+    bar.style.width = (tgt ? Math.min(100, d.count / tgt * 100) : 0) + "%";
+    var st = d.storage || {}, by = st.by_dir || {}, sp = d.split || {}, spt = d.split_target || {}, L = d.labels || {};
+    var res = Array.isArray(d.resolution) ? d.resolution[0] + " × " + d.resolution[1] + " px" : "–";
+    stats.textContent = "";
+    [stat("Progress", tgt ? (d.count / tgt * 100).toFixed(1) + " %" : String(d.count), d.pending ? d.pending + " being written" : "finished = label + sidecar written"),
+     stat("Storage on disk", fmtBytes(st.bytes), "images " + fmtBytes(by.images || 0) + " · labels " + fmtBytes(by.labels || 0) + " · meta " + fmtBytes(by.meta || 0) + " · " + (st.files || 0) + " files"),
+     stat("Train / val", (sp.train || 0) + " / " + (sp.val || 0), spt.train ? "planned " + spt.train + " / " + spt.val : ""),
+     stat("First image", fmtClock(d.first_mtime), d.first_mtime ? fmtDur(now - d.first_mtime) + " ago" : ""),
+     stat("Last image", fmtClock(d.last_mtime), d.last_mtime ? fmtDur(now - d.last_mtime) + " ago" : ""),
+     stat("Rate", typeof d.rate_per_min === "number" ? d.rate_per_min.toFixed(1) + " img/min" : "–", d.active ? "last 10 min" : (d.count > 1 ? "average while it ran" : "")),
+     stat("ETA", d.eta_s ? fmtDur(d.eta_s) : (d.status === "complete" ? "done" : "–"), d.eta_s ? "≈ " + fmtClock(now + d.eta_s) : (d.active ? "" : "only while generating")),
+     stat("Resolution", res, "JPEG"),
+     stat("Boxes (mines labelled)", String(L.boxes || 0), d.count ? "mean " + (L.mean_boxes || 0).toFixed(2) + " / image · max " + L.max_boxes + " · " + L.images_without_boxes + " images with 0" : (d.planned_mines ? "planned mines " + d.planned_mines : "")),
+     stat("Dataset folder", d.dataset_dir.split("/").slice(-2).join("/"), d.has && d.has.data_yaml ? "data.yaml written" : "")
+    ].forEach(function(x){ stats.appendChild(x); });
+    extra.textContent = "";
+    var f = d.failures || {};
+    extra.appendChild(el("div", {text: f.render_log ? "render_log.json: " + f.failed.length + " failed, " + f.retried + " retried" :
+      "Failures: render_log.json not written yet (the generator writes it at the end of the run)."}));
+    f.failed && f.failed.slice(0, 10).forEach(function(x){ extra.appendChild(el("pre", {text: "row " + x.index + ": " + x.error})); });
+    (f.log_tail || []).forEach(function(t){ extra.appendChild(el("div", {text: t.file + " (last lines):"})); extra.appendChild(el("pre", {text: t.lines.join("\n")})); });
+    updateCounts();
+  }
+  function updateCounts(){
+    var d = S.info, fresh = d && S.items.length ? d.count - S.available : 0;
+    counts.textContent = S.items.length ? "Sample: " + S.items.length + " of " + S.available + " finished images · seed " + S.seed +
+      (fresh > 0 ? " · " + fresh + " new since this sample (Resample to include them)" : "") : "Sample: none";
+  }
+  function loadInfo(){
+    return getJSON("/api/dataset-info").then(function(d){
+      if (!S.alive) return;
+      S.everOk = true; warn.hidden = true; showInfo(d);
+      if (!S.items.length && d.count > 0 && !S.loading) loadSample();   /* first images appeared */
+      else if (!S.items.length && !S.loading) showGrid();
+    }, function(e){
+      if (!S.alive) return;
+      if (!S.everOk){ root.textContent = ""; root.appendChild(offlineBox("Could not reach /api/dataset-info (" + e.message + "): the server is not running or this page is served by something else.")); dsCleanup && dsCleanup(); return; }
+      warn.hidden = false; warn.textContent = "Lost contact with the dataset server (" + e.message + "). Showing the last data; restart it with: " + cmd;
+      badge.textContent = "server offline"; badge.className = "badge offline";
+    });
+  }
+  function loadSample(){
+    if (S.loading) return;
+    S.loading = true; say("Sampling…");
+    getJSON("/api/sample?n=" + N).then(function(d){
+      S.loading = false; if (!S.alive) return;
+      S.items = d.items || []; S.seed = d.seed; S.available = d.available;
+      say(""); showGrid(); updateCounts();
+    }, function(e){ S.loading = false; if (S.alive) say("Sampling failed: " + e.message); });
+  }
+  function parText(p){
+    return ["background", "sun_el", "overcast", "shadow", "scale", "buried", "burial_max", "face_down", "blades_on_mine", "psf_sigma", "jpeg_q"]
+      .filter(function(k){ return p[k] !== undefined && p[k] !== null; }).map(function(k){ return k + "=" + fmt(p[k]); }).join("  ");
+  }
+  function seedText(p){ return Array.isArray(p.seed) ? p.seed.join(":") : fmt(p.seed); }
+  function showGrid(){
+    gridWrap.textContent = ""; grid = null;
+    if (!S.items.length){
+      var d = S.info, dir = d ? d.dataset_dir : "the dataset folder";
+      gridWrap.appendChild(el("div", {"class": "empty", role: "status"}, [el("b", {text: "No images yet. "}),
+        "No finished images in " + dir + ". " + (S.auto ? "This page checks every 10 s and fills the grid when the first images are written." : "Press Refresh info or turn on auto-refresh.")]));
+      return;
+    }
+    grid = el("div", {"class": "ggrid dgrid", role: "list"});
+    var lbItems = S.items.map(function(v){
+      return {label: v.id + " (" + v.split + ")", image: v.image, caption: v.boxes.length + " boxes · sidecar " + v.meta_url,
+        meta: v.params, boxes: v.boxes, boxesOn: function(){ return S.boxes; }, toggleBoxes: function(){ setBoxes(!S.boxes); }};
+    });
+    S.items.forEach(function(v, i){
+      var p = v.params || {};
+      var thumb = el("button", {"class": "thumb", type: "button", "aria-label": "Enlarge " + v.id,
+        onclick: function(ev){ lbOpen(lbItems, i, ev.currentTarget); }}, [img(v.thumb, v.id, "")]);
+      v.boxes.forEach(function(b){ thumb.appendChild(boxDiv(b)); });
+      grid.appendChild(el("article", {"class": "gcard", role: "listitem", "data-id": v.id}, [thumb, el("div", {"class": "gb"}, [
+        el("div", {"class": "gm"}, [el("b", {text: v.id}), " · seed " + seedText(p) + " · " + v.boxes.length + " mine" + (v.boxes.length === 1 ? "" : "s") + " · " + v.split]),
+        el("div", {"class": "gpar", text: parText(p)})])]));
+    });
+    gridWrap.appendChild(grid); applyCls();
+  }
+  function schedule(){
+    if (S.timer) { clearInterval(S.timer); S.timer = null; }
+    if (S.auto) S.timer = setInterval(function(){ if (!document.hidden) loadInfo(); }, 10000);
+  }
+  dsCleanup = function(){ S.alive = false; if (S.timer) clearInterval(S.timer); S.timer = null; };
+  schedule();
+  loadInfo().then(function(){ if (S.alive && S.info && S.info.count > 0 && !S.items.length) loadSample(); });
+}
+
 /* ---------- tables / figures (optional: page.tables, feature.facts, feature.figure) ---------- */
 function dataTable(cols, rows){
   var t = el("table");
@@ -828,6 +1059,7 @@ var spy = null;
 function renderPage(page, featureId){
   if (spy) { spy.disconnect(); spy = null; }
   if (gridCleanup) { gridCleanup(); gridCleanup = null; }
+  if (dsCleanup) { dsCleanup(); dsCleanup = null; }
   gridResize = null;
   main.textContent = "";
   main.setAttribute("aria-labelledby", "pageTitle");
@@ -848,6 +1080,7 @@ function renderPage(page, featureId){
     main.appendChild(el("details", {"class": "glossary"}, [el("summary", {text: "Terms used on this page"}), dl]));
   }
   if (page.type === "grid"){ renderGrid(page); return; }
+  if (page.type === "dataset"){ renderDataset(page); return; }
   arr(page.tables).forEach(function(t){ main.appendChild(pageTable(t)); });
   if (!feats.length){
     main.appendChild(el("div", {"class": "empty", role: "status", text: "No features listed for this page yet."}));

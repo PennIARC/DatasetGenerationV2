@@ -1,8 +1,8 @@
 # Showcase builder
 
-Builds one offline HTML file with two tabbed pages (v1 and v2) from JSON manifests.
+Builds one offline HTML file with tabbed pages (v1, v2, review grid, dataset parameters, dataset live sample) from JSON manifests.
 
-    python3 build_showcase.py                      # manifest_v1.json + manifest_v2.json (+ manifest_review.json if present) -> showcase.html
+    python3 build_showcase.py                      # manifest_v1/v2.json (+ review/params/dataset manifests if present) -> showcase.html
     python3 build_showcase.py --manifests a.json b.json --out out.html
     python3 build_showcase.py --embed              # inline images as base64 (single sendable file)
 
@@ -56,6 +56,33 @@ Default pages (no `type`) stay feature-card pages. Pass the review manifest as t
 - Flags and notes are stored in localStorage (`showcase-flags:<page id>`, debounced) and the page works without storage.
 - Toolbar buttons: "Copy flagged ids + notes" (one line per flagged item: `id | seed=.. | key meta | note: ..`; falls back to a selectable textarea if the clipboard is blocked), "Download flagged.json", "Clear flags" (click twice; notes are kept).
 - `--embed` stores each image once in an `assets` table and references it by key, so reused thumbnails are not duplicated.
+
+## Dataset live sample page (`"type": "dataset"`, fifth tab)
+
+`manifest_dataset.json` adds the tab "Dataset: live sample": 24 random finished images of `output_dataset/v2_3000`
+with their YOLO boxes, and live render progress. A file:// page cannot read the disk, so this tab needs a local server
+(the tab shows the command and link when opened as a file; the other tabs keep working):
+
+    python3 scripts/serve_dataset_view.py            # then open http://127.0.0.1:8765/showcase.html#dataset
+    python3 scripts/serve_dataset_view.py --port 8800 --dataset-dir /other/dataset   # also --cache-dir, --target, --verbose
+
+- Server: stdlib `http.server`, binds 127.0.0.1 only, read-only, rejects other Host headers. Serves docs/showcase/
+  (html/json/images, no dotfiles) and only `/dataset/images|labels/{train,val}/<name>` and `/dataset/meta/<name>.json`.
+- `/api/dataset-info`: finished count / target (plan.json), pending, train/val (+ planned), storage on disk (by folder),
+  first / last image time, rate (images/min over the last 10 min) and ETA, status (generating = a file newer than 60 s,
+  idle, complete, empty), JPEG resolution, box counts, `render_log.json` failures and the tail of any `*.log` in the dataset dir.
+- `/api/sample?n=24&seed=S`: random finished images (same seed = same sample) with boxes and key sidecar values
+  (seed, background, sun_el, shadow, scale, buried, burial_max, face_down, blades_on_mine, psf_sigma, jpeg_q).
+- An image counts only when its label and its sidecar (`meta/<name>.json`, written last) exist and the sidecar parses,
+  so half-written renders never appear; files vanishing or appearing mid-request are skipped.
+- Thumbnails: `/thumb/<split>/<name>.jpg`, 960 px wide, made with Pillow on first request and cached in
+  `output_dataset/.thumb_cache/` (gitignored, safe to delete). Full 1920x1080 files load only in the click-to-enlarge view.
+- Page: info panel (polled every 10 s while Auto-refresh is on; the sample stays fixed, "N new since this sample" shows
+  when to Resample), buttons Boxes on/off, Resample 24, Auto-refresh, Parameters shown/hidden, Refresh info, cards-per-row
+  slider (1-8, max 2 on phones). Lightbox: arrows step, `b` toggles boxes. Preferences are kept in localStorage.
+- Test: `python3 test_fixture/dataset_view_test.py WORK_DIR` builds a fake dataset (`make_fake_dataset.py`, incl. a
+  half-written image and a truncated sidecar), an empty one, starts two servers on 8799/8800, checks the page in headless
+  Chrome (desktop, empty, file://, narrow) and stops the servers.
 
 ## Tests
 
