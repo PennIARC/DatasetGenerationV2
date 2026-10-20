@@ -85,6 +85,50 @@ def _soil_blend(rgb_pm, alpha, alpha_full, local_bg, length_px, scene_luma, p, c
     return out.astype(np.float32), {"harmonize_gain": gain, **{k: v for k, v in p.items() if k != "noise_seed"}}
 
 
+# ----------------------------------------------------------------------------------------------- soft grains
+def sample_soft_grain_params(rng, cfg):
+    """MINE_SOFT_GRAINS parameters for one mine (always 9 draws from its own stream). -> dict; apply False = skipped."""
+    u = rng.random(9)
+    lerp = lambda r, t: float(r[0] + (r[1] - r[0]) * t)  # noqa: E731
+    return {"apply": bool(u[0] < cfg.SOFT_GRAIN_PROB), "density": lerp(cfg.SOFT_GRAIN_DENSITY, u[1]),
+            "size_frac": lerp(cfg.SOFT_GRAIN_SIZE_FRAC, u[2]), "blur_px": lerp(cfg.SOFT_GRAIN_BLUR_PX, u[3]),
+            "strength": lerp(cfg.SOFT_GRAIN_STRENGTH, u[4]), "tone": lerp(cfg.SOFT_GRAIN_TONE, u[5]),
+            "edge_boost": lerp(cfg.SOFT_GRAIN_EDGE_BOOST, u[6]), "noise_seed": int(u[7] * 2 ** 31)}
+
+
+def soft_grains(rgb_pm, alpha, alpha_full, local_bg, length_px, p, cfg):
+    """Blurred, low-contrast soil speckle on the mine: fBm thresholded at the density quantile (inside the UNCLIPPED
+    silhouette, so burial on / off only removes speckle), density raised in the contact zone near the outline,
+    Gaussian-blurred by blur_px, coloured by the blurred local ground x tone. Only changes colour, never alpha (labels
+    unaffected). -> rgb_pm'."""
+    ys, xs = np.nonzero(alpha_full > 0.01)
+    if not p.get("apply") or len(xs) == 0:
+        return rgb_pm
+    pad = 8
+    y0, y1 = max(0, ys.min() - pad), min(alpha.shape[0], ys.max() + 1 + pad)
+    x0, x1 = max(0, xs.min() - pad), min(alpha.shape[1], xs.max() + 1 + pad)
+    r = (slice(y0, y1), slice(x0, x1))
+    a, af = alpha[r], alpha_full[r]
+    h, w = a.shape
+    L = length_px
+    rng = np.random.default_rng(p["noise_seed"])
+    g = fx.fbm(h, w, max(1.5, p["size_frac"] * L), rng, octaves=2)
+    inside = af > 0.5
+    if not inside.any():
+        return rgb_pm
+    d = cv2.distanceTransform(inside.astype(np.uint8), cv2.DIST_L2, 3)
+    edge = np.clip(1 - d / max(1.0, cfg.SOFT_GRAIN_EDGE_FRAC * L), 0, 1)
+    g = g + 0.15 * p["edge_boost"] * edge                      # more speckle in the contact zone
+    thr = np.quantile(g[inside], 1 - min(0.6, p["density"] * (1 + 0.5 * p["edge_boost"] * edge[inside].mean())))
+    sa = fx.gblur(np.clip((g - thr) / 0.05, 0, 1), p["blur_px"])
+    sa = np.clip(sa / max(float(np.quantile(sa[inside], 0.995)), 0.2), 0, 1)   # blur keeps softness, not the peak
+    sa = sa * p["strength"] * a
+    col = fx.gblur(local_bg[r], max(1.0, 0.1 * L)) * p["tone"]
+    out = rgb_pm.copy()
+    out[r] = rgb_pm[r] * (1 - sa[..., None]) + col * (a * sa)[..., None]
+    return out.astype(np.float32)
+
+
 # ----------------------------------------------------------------------------------------------- burial
 def sample_burial_overlay_params(rng, cfg):
     u = rng.random(5)

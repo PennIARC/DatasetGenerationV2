@@ -307,7 +307,7 @@ class Mine:
     """One mine instance: rendered on the fly from mine.stl (MESH_MINES) or a v1 sprite.
     seed = [SEED, image index, 10, mine number]; sub-streams: 0 core (scale, sprite, placement), 1 pose, 2 colour,
     3 burial, 4 specular, 5 soil blend, 6 burial overlay, 7 shadow / AO, 8 v1 dots, 9 burial cues, 11 contact
-    shadow."""
+    shadow, 12 soft grains."""
 
     def __init__(self, cfg, seed, scene):
         self.sub = lambda k: np.random.default_rng(list(seed) + [k])
@@ -438,6 +438,10 @@ class Mine:
                 sp["band_dust"] *= cfg.BURIAL_CONTACT_BAND_SCALE
             rgb_pm, info = soil.soil_blend(rgb_pm, alpha, self.alpha_full, local, L, sc["luma"], sp, cfg)
             self.meta["soil_blend"] = info
+            if cfg.MINE_SOFT_GRAINS:   # second, blurred grain layer (own sub-stream 12)
+                gp = soil.sample_soft_grain_params(self.sub(12), cfg)
+                rgb_pm = soil.soft_grains(rgb_pm, alpha, self.alpha_full, local, L, gp, cfg)
+                self.meta["soft_grains"] = {k: v for k, v in gp.items() if k != "noise_seed"}
         if not buried_mine:
             fx.over(img, rgb_pm, alpha, self.x, self.y)
             self.visible = alpha.copy()
