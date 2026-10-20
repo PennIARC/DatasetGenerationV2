@@ -1,0 +1,455 @@
+{
+ "description": "kind: clod = raised soil lump (draw a small soft shadow beside it, opacity 0.9-1.0), patch = flat soil/dust patch (alpha overlay only, no shadow, opacity 0.6-0.95), dust = very soft low-opacity (0.15-0.5). Soft edges already baked; re-soften at composite time with tools/soften_alpha.py. Originals with sharp alpha in _orig_sharp/ (not for generator use).",
+ "items": [
+  {
+   "file": "dirt_clod_03_Ground012.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground012",
+   "size": [
+    206,
+    240
+   ],
+   "soften_width": 11.5
+  },
+  {
+   "file": "dirt_clod_06_Ground023.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground023",
+   "size": [
+    107,
+    88
+   ],
+   "soften_width": 3.7
+  },
+  {
+   "file": "dirt_dust_02_Ground008.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground008",
+   "size": [
+    105,
+    90
+   ],
+   "soften_width": 10.1
+  },
+  {
+   "file": "dirt_dust_08_Ground029.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground029",
+   "size": [
+    141,
+    124
+   ],
+   "soften_width": 8.0
+  },
+  {
+   "file": "dirt_dust_11_Ground002.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground002",
+   "size": [
+    103,
+    124
+   ],
+   "soften_width": 10.1
+  },
+  {
+   "file": "dirt_dust_14_Ground013.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground013",
+   "size": [
+    115,
+    138
+   ],
+   "soften_width": 9.4
+  },
+  {
+   "file": "dirt_dust_17_Ground024.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground024",
+   "size": [
+    143,
+    157
+   ],
+   "soften_width": 12.0
+  },
+  {
+   "file": "dirt_patch_04_Ground015.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground015",
+   "size": [
+    235,
+    238
+   ],
+   "soften_width": 12.0
+  },
+  {
+   "file": "dirt_patch_10_Ground049A.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground049A",
+   "size": [
+    187,
+    176
+   ],
+   "soften_width": 12.0
+  },
+  {
+   "file": "dirt_patch_13_Ground009.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground009",
+   "size": [
+    99,
+    84
+   ],
+   "soften_width": 9.0
+  },
+  {
+   "file": "dirt_clod_n01_Ground031.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground031",
+   "size": [
+    53,
+    46
+   ],
+   "soften_width": 4.2
+  },
+  {
+   "file": "dirt_clod_n02_Ground012.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground012",
+   "size": [
+    97,
+    95
+   ],
+   "soften_width": 4.5
+  },
+  {
+   "file": "dirt_clod_n03_Ground005.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground005",
+   "size": [
+    116,
+    112
+   ],
+   "soften_width": 4.3
+  },
+  {
+   "file": "dirt_clod_n04_Ground023.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground023",
+   "size": [
+    75,
+    69
+   ],
+   "soften_width": 4.7
+  },
+  {
+   "file": "dirt_clod_n05_Ground004.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground004",
+   "size": [
+    105,
+    113
+   ],
+   "soften_width": 3.2
+  },
+  {
+   "file": "dirt_clod_n06_Ground049A.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground049A",
+   "size": [
+    70,
+    68
+   ],
+   "soften_width": 3.8
+  },
+  {
+   "file": "dirt_patch_n00_Ground008.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground008",
+   "size": [
+    183,
+    178
+   ],
+   "soften_width": 8.1
+  },
+  {
+   "file": "dirt_patch_n01_Ground029.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground029",
+   "size": [
+    154,
+    161
+   ],
+   "soften_width": 10.3
+  },
+  {
+   "file": "dirt_patch_n04_Ground012.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground012",
+   "size": [
+    178,
+    145
+   ],
+   "soften_width": 11.5
+  },
+  {
+   "file": "dirt_patch_n05_Ground005.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground005",
+   "size": [
+    233,
+    237
+   ],
+   "soften_width": 9.5
+  },
+  {
+   "file": "dirt_dust_n00_Ground012.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground012",
+   "size": [
+    213,
+    202
+   ],
+   "soften_width": 8.1
+  },
+  {
+   "file": "dirt_dust_n01_Ground029.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground029",
+   "size": [
+    241,
+    220
+   ],
+   "soften_width": 10.6
+  },
+  {
+   "file": "dirt_dust_n02_Ground049A.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground049A",
+   "size": [
+    188,
+    182
+   ],
+   "soften_width": 8.0
+  },
+  {
+   "file": "dirt_dust_n03_Ground005.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground005",
+   "size": [
+    109,
+    126
+   ],
+   "soften_width": 8.8
+  },
+  {
+   "file": "dirt_dust_n04_Ground002.png",
+   "kind": "dust",
+   "opacity": [
+    0.15,
+    0.5
+   ],
+   "casts_shadow": false,
+   "source": "Ground002",
+   "size": [
+    179,
+    186
+   ],
+   "soften_width": 8.5
+  },
+  {
+   "file": "dirt_clod_n07_Ground002.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground002",
+   "size": [
+    86,
+    86
+   ],
+   "soften_width": 4
+  },
+  {
+   "file": "dirt_clod_n08_Ground031.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground031",
+   "size": [
+    104,
+    104
+   ],
+   "soften_width": 4
+  },
+  {
+   "file": "dirt_clod_n09_Ground012.png",
+   "kind": "clod",
+   "opacity": [
+    0.9,
+    1.0
+   ],
+   "casts_shadow": true,
+   "source": "Ground012",
+   "size": [
+    114,
+    114
+   ],
+   "soften_width": 4
+  },
+  {
+   "file": "dirt_patch_n06_Ground008.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground008",
+   "size": [
+    174,
+    174
+   ],
+   "soften_width": 9
+  },
+  {
+   "file": "dirt_patch_n07_Ground004.png",
+   "kind": "patch",
+   "opacity": [
+    0.6,
+    0.95
+   ],
+   "casts_shadow": false,
+   "source": "Ground004",
+   "size": [
+    194,
+    194
+   ],
+   "soften_width": 9
+  }
+ ]
+}

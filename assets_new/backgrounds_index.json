@@ -1,0 +1,1013 @@
+{
+ "family_weights": {
+  "grass": 0.65,
+  "non_grass": 0.35
+ },
+ "path_roots": {
+  "v1": "/Users/pranavgupta/PycharmProjects/IARCdatasetGeneration/DatasetGenerator/assets/backgrounds",
+  "new": "assets_new/ (this folder)"
+ },
+ "sampling": "pick family by family_weights, then pick an item of that family with probability proportional to its weight (weight 0 = dropped)",
+ "backgrounds": [
+  {
+   "path": "Screenshot 2026-02-07 at 4.17.23\u202fPM.png",
+   "source": "v1",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: dappled grass with bare soil/stones"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.17.41\u202fPM.png",
+   "source": "v1",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: olive moss/grass with soil"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.21.04\u202fPM.png",
+   "source": "v1",
+   "category": "mixed_ground",
+   "family": "non_grass",
+   "weight": 1.0,
+   "note": "v1: rocks with grass"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.21.15\u202fPM.png",
+   "source": "v1",
+   "category": "mixed_ground",
+   "family": "non_grass",
+   "weight": 1.0,
+   "note": "v1: boulders with grass"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.21.26\u202fPM.png",
+   "source": "v1",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1.0,
+   "note": "v1: dry soil with litter"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.21.38\u202fPM.png",
+   "source": "v1",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1.0,
+   "note": "v1: bare brown soil, edge vegetation"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.21.45\u202fPM.png",
+   "source": "v1",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1.0,
+   "note": "v1: dark rich soil"
+  },
+  {
+   "path": "Screenshot 2026-02-07 at 4.21.51\u202fPM.png",
+   "source": "v1",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "v1: pebbles with dry leaves (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "grass1.png",
+   "source": "v1",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: clover and grass, dark green"
+  },
+  {
+   "path": "grass2.png",
+   "source": "v1",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: bright green lawn, blurry streaks"
+  },
+  {
+   "path": "grass3.png",
+   "source": "v1",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: olive/yellow-green mowed lawn"
+  },
+  {
+   "path": "grass4.png",
+   "source": "v1",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: yellow-green overgrown"
+  },
+  {
+   "path": "grass5.png",
+   "source": "v1",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: green lawn with dry patches"
+  },
+  {
+   "path": "grass6.png",
+   "source": "v1",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: dark grass with straw, shadowed"
+  },
+  {
+   "path": "grass7.png",
+   "source": "v1",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "v1: dry tan lawn"
+  },
+  {
+   "path": "backgrounds/bg_Grass002.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 0.8,
+   "note": "ambientCG Grass002 mosaic: dark green, flat"
+  },
+  {
+   "path": "backgrounds/bg_Grass003.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 0.8,
+   "note": "ambientCG Grass003 mosaic: olive-green, flat"
+  },
+  {
+   "path": "backgrounds/bg_Grass004.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 0.8,
+   "note": "ambientCG Grass004 mosaic: flat CG-like green"
+  },
+  {
+   "path": "backgrounds/bg_Gravel001.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "ambientCG Gravel001 mosaic: grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Gravel002.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.3,
+   "note": "ambientCG Gravel002 mosaic: flat grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Gravel003.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "ambientCG Gravel003 mosaic: grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Gravel004.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "ambientCG Gravel004 mosaic: grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Gravel005.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "ambientCG Gravel005 mosaic: grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Gravel006.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "ambientCG Gravel006 mosaic: grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Gravel007.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.3,
+   "note": "ambientCG Gravel007 mosaic: flat grey gravel (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Ground001.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1,
+   "note": "ambientCG Ground001 mosaic: dark olive mossy ground"
+  },
+  {
+   "path": "backgrounds/bg_Ground002.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground002 mosaic: dark brown soil"
+  },
+  {
+   "path": "backgrounds/bg_Ground003.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1,
+   "note": "ambientCG Ground003 mosaic: green weeds on soil, very natural"
+  },
+  {
+   "path": "backgrounds/bg_Ground004.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground004 mosaic: beige dry soil"
+  },
+  {
+   "path": "backgrounds/bg_Ground005.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground005 mosaic: beige dry soil"
+  },
+  {
+   "path": "backgrounds/bg_Ground008.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 0.7,
+   "note": "ambientCG Ground008 mosaic: flat mauve-brown soil"
+  },
+  {
+   "path": "backgrounds/bg_Ground013.jpg",
+   "source": "new",
+   "category": "mixed_ground",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground013 mosaic: grey-green mossy ground"
+  },
+  {
+   "path": "backgrounds/bg_Ground014.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "ambientCG Ground014 mosaic: DROPPED: flat grey"
+  },
+  {
+   "path": "backgrounds/bg_Ground015.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground015 mosaic: dark litter soil"
+  },
+  {
+   "path": "backgrounds/bg_Ground018.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.24,
+   "note": "ambientCG Ground018 mosaic: dark grey gravel (audit: down-weighted) (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Ground020.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.24,
+   "note": "ambientCG Ground020 mosaic: grey gravel with colour flecks (audit: down-weighted) (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Ground021.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "ambientCG Ground021 mosaic: DROPPED: flat grey"
+  },
+  {
+   "path": "backgrounds/bg_Ground024.jpg",
+   "source": "new",
+   "category": "mixed_ground",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground024 mosaic: grey-green ground with moss"
+  },
+  {
+   "path": "backgrounds/bg_Ground026.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "ambientCG Ground026 mosaic: DROPPED: peach/pink, featureless"
+  },
+  {
+   "path": "backgrounds/bg_Ground028.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.6,
+   "note": "ambientCG Ground028 mosaic: gravel with sand (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Ground029.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0.4,
+   "note": "ambientCG Ground029 mosaic: beige sand"
+  },
+  {
+   "path": "backgrounds/bg_Ground030.jpg",
+   "source": "new",
+   "category": "mixed_ground",
+   "family": "non_grass",
+   "weight": 0.7,
+   "note": "ambientCG Ground030 mosaic: pale ground with green specks"
+  },
+  {
+   "path": "backgrounds/bg_Ground031.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 1,
+   "note": "ambientCG Ground031 mosaic: grey-brown soil"
+  },
+  {
+   "path": "backgrounds/bg_Ground032.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0.48,
+   "note": "ambientCG Ground032 mosaic: grey rough ground (gravel x0.6: pool dominated by similar gravel)"
+  },
+  {
+   "path": "backgrounds/bg_Moss001.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1,
+   "note": "ambientCG Moss001 mosaic: green with tan"
+  },
+  {
+   "path": "backgrounds/bg_Moss002.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 0.8,
+   "note": "ambientCG Moss002 mosaic: cloudy green moss"
+  },
+  {
+   "path": "backgrounds/bg_gen_00_grass_fresh_over.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_01_grass_fresh_normal.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_02_grass_fresh_mowed.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_03_grass_fresh_over.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_04_grass_fresh_normal.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_05_grass_fresh_mowed.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_06_grass_fresh_over.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_07_grass_fresh_normal.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_08_grass_fresh_mowed.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_09_grass_olive_mowed.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_10_grass_olive_normal.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_11_grass_olive_over.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_12_grass_olive_mowed.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_13_grass_olive_normal.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_14_grass_olive_over.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_15_grass_olive_mowed.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_16_grass_olive_normal.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_17_grass_olive_over.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_18_grass_dry_over.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_19_grass_dry_normal.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_20_grass_dry_over.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_21_grass_dry_normal.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_22_grass_dry_over.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_23_grass_dry_normal.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_24_grass_dry_over.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_25_grass_dry_normal.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_26_grass_patchy_normal.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_27_grass_patchy_over.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_28_grass_patchy_normal.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_29_grass_patchy_over.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_30_grass_patchy_normal.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_31_grass_patchy_over.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_32_grass_patchy_normal.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_33_grass_patchy_over.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_34_grass_patchy_normal.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_35_moss_clover_normal.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_36_moss_clover_mowed.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_37_moss_clover_normal.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades), dappled"
+  },
+  {
+   "path": "backgrounds/bg_gen_38_moss_clover_mowed.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_gen_39_moss_clover_normal.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "procedural lawn (make_grass_blades)"
+  },
+  {
+   "path": "backgrounds/bg_real_00_Grass001_grass_fresh.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass001 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_01_Grass001_moss_clover.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass001 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_02_Grass005_grass_fresh.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 0.4,
+   "note": "real CC0 Grass005 texture, photometric treatment, dappled (audit: down-weighted)"
+  },
+  {
+   "path": "backgrounds/bg_real_03_Grass005_grass_patchy.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 0.4,
+   "note": "real CC0 Grass005 texture, photometric treatment (audit: down-weighted)"
+  },
+  {
+   "path": "backgrounds/bg_real_04_Grass006_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass006 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_05_Grass006_grass_dry.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass006 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_08_Grass008_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass008 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_09_Grass008_grass_fresh.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass008 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_12_Grass003_grass_patchy.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass003 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_13_Grass003_grass_dry.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass003 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_14_Grass004_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass004 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_15_Grass004_grass_patchy.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass004 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_16_Moss001_moss_clover.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Moss001 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_17_Moss002_moss_clover.jpg",
+   "source": "new",
+   "category": "moss_clover",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Moss002 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_18_Moss001_grass_patchy.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 0.4,
+   "note": "real CC0 Moss001 texture, photometric treatment, dappled (audit: down-weighted)"
+  },
+  {
+   "path": "backgrounds/bg_real_19_Moss002_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Moss002 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_20_Grass006_grass_patchy.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass006 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_21_Grass004_grass_fresh.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass004 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_22_Grass008_grass_dry.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass008 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_23_Moss001_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Moss001 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/bg_real_24_Grass003_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass003 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/bg_real_25_Grass006_grass_fresh.jpg",
+   "source": "new",
+   "category": "grass_fresh",
+   "family": "grass",
+   "weight": 1.0,
+   "note": "real CC0 Grass006 texture, photometric treatment"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Gravel016.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Gravel016 mosaic: grey gravel"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Gravel020.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Gravel020 mosaic: grey gravel"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground007.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground007 mosaic: pinkish-brown soil"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground009.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground009 mosaic: flat brown soil"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground011.jpg",
+   "source": "new",
+   "category": "mixed_ground",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground011 mosaic: pinkish rocky ground"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground019.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground019 mosaic: grey gravel"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground022.jpg",
+   "source": "new",
+   "category": "gravel",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground022 mosaic: light gravel"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground023.jpg",
+   "source": "new",
+   "category": "soil",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground023 mosaic: brown soil with leaf bits"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground027.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground027 mosaic: pale sand, low detail"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground033.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground033 mosaic: DROPPED: pale pink-beige sand"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground034.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground034 mosaic: pale sand with specks"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground049A.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground049A mosaic: tan sand"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_Ground092A.jpg",
+   "source": "new",
+   "category": "sand",
+   "family": "non_grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): ambientCG Ground092A mosaic: DROPPED: cream, featureless"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_real_06_Grass007_grass_dry.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): real CC0 Grass007 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_real_07_Grass007_grass_patchy.jpg",
+   "source": "new",
+   "category": "grass_patchy",
+   "family": "grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): real CC0 Grass007 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_real_10_Grass002_grass_olive.jpg",
+   "source": "new",
+   "category": "grass_olive",
+   "family": "grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): real CC0 Grass002 texture, photometric treatment, dappled"
+  },
+  {
+   "path": "backgrounds/_rejected/bg_real_11_Grass002_grass_dry.jpg",
+   "source": "new",
+   "category": "grass_dry",
+   "family": "grass",
+   "weight": 0,
+   "note": "REJECTED by audit (file moved to _rejected/): real CC0 Grass002 texture, photometric treatment"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "moved_to_rocks": [
+  "rock_mossy_Ground001.png",
+  "rock_grey_Ground032.png",
+  "rock_beige_Ground005.png",
+  "rock_dark_Ground018.png"
+ ],
+ "dropped": [
+  [
+   "dirt_clod_18_Ground027",
+   "cream cartoon-like blob"
+  ],
+  [
+   "dirt_dust_05_Ground020",
+   "gravel/debris flecks, not soil"
+  ],
+  [
+   "dirt_dust_20_Ground033",
+   "cream sand blob"
+  ],
+  [
+   "dirt_patch_07_Ground026",
+   "peach/orange, unnatural"
+  ],
+  [
+   "dirt_patch_16_Ground021",
+   "blue-grey gravel"
+  ],
+  [
+   "dirt_patch_19_Ground030",
+   "pale grey, not soil"
+  ]
+ ]
+}
