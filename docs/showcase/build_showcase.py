@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_TABS = ["v1: original generator", "v2: new realism features", "Review: buried mines"]
+DEFAULT_TABS = ["v1: original generator", "v2: new realism features", "Review: buried mines",
+                "Dataset v2: parameters"]
 
 
 def load_manifest(path, index):
@@ -54,6 +55,8 @@ def iter_image_slots(page):
         for o in f.get("options") or []:
             if isinstance(o, dict):
                 yield o, "image"
+        if isinstance(f.get("figure"), dict):
+            yield f["figure"], "image"
         for b in f.get("before_after") or []:
             if isinstance(b, dict):
                 yield b, "before"

@@ -1,0 +1,2215 @@
+{
+ "pages": [
+  {
+   "id": "params",
+   "tab": "Dataset v2: parameters",
+   "title": "Dataset v2 (3000 images): every sampled parameter",
+   "intro": "PLAN AWAITING CONFIRMATION: every graph on this page is the planned distribution from the 3000-row sampling plan (scripts/generate_dataset.py --plan-only); the dataset has not been generated yet. Stratified factors are evenly sampled: equal-count buckets per image, value uniform inside the bucket, buckets crossed with each other by a balanced design. Everything else is randomized with the generator's tuned distributions. Before / after pairs use the same seed and change only the named parameter.",
+   "glossary": {
+    "stratified": "Evenly sampled: the range is cut into buckets and every bucket gets exactly the same number of images (or a fixed quota); the value is random inside it.",
+    "randomized": "Each image / mine draws the value independently (i.i.d.) from the configured distribution.",
+    "balanced design": "Bucket columns are shuffled, then rows are swapped inside a column to make every pair of factors as evenly crossed as possible (pairwise chi-square minimised); marginal counts never change.",
+    "chi-square": "Sum over table cells of (count - expected)^2 / expected; 0 = perfectly even crossing.",
+    "PSF": "Point-spread function: how the lens smears a point (here a Gaussian blur).",
+    "YOLO label": "One line per box: class x_centre y_centre width height, normalised to 0-1."
+   },
+   "tables": [
+    {
+     "title": "Decisions to confirm before generating",
+     "columns": [
+      "decision",
+      "plan",
+      "confirm"
+     ],
+     "rows": [
+      [
+       "Dataset size",
+       "3000 images (2700 train / 300 val), 10800 planned mines, 600 empty images",
+       "Confirm 3000, or scale up (the plan is a pure function of N; quotas re-derive)"
+      ],
+      [
+       "Stratified factors",
+       "mines per image (9), mine scale (5 log bins), burial fraction (4), sun elevation (6), light: overcast + 4 shadow bins (5), background family (2, + per-file quotas), lens blur (3)",
+       "Confirm the list; anything else stays randomized"
+      ],
+      [
+       "Randomized factors",
+       "sun azimuth, all per-mine pose / face-down / colour / burial yes-no / dust / position, camera jitter, debris counts",
+       "Confirm (per-mine factors cannot be bucketed without a generator change)"
+      ],
+      [
+       "Mine-scale distribution",
+       "log-uniform (equal count per log bin) instead of the generator's linear uniform",
+       "Confirm the change (more small mines) or switch to 5 linear bins"
+      ],
+      [
+       "Empty images",
+       "20 % (600) - the generator's real P(0) = 0.10 + 0.9 / 9; the controlPanel comment says 10 %",
+       "Keep 20 % or set the quota to 10 %"
+      ],
+      [
+       "Burial",
+       "35 % of mines buried (random), target fraction in 4 equal-count buckets, cap 0.5",
+       "Confirm buckets [0.05, 0.2, 0.3, 0.4, 0.5]"
+      ],
+      [
+       "Image format / resolution",
+       "native 1920x1080 JPEG, NOT resized. JPEG quality: generator samples 70-95 per image (default here); brief said q95 (--jpeg-quality 95)",
+       "Pick sampled 70-95 (recommended: it is an augmentation) or fixed q95"
+      ],
+      [
+       "v1 comparison",
+       "v1 rendered 1920x1080 too, then exportToYOLO.py STRETCHED every image to 640x640 (aspect 16:9 -> 1:1, re-saved at OpenCV's default q95)",
+       "Keep native; resizing can be left to the trainer (imgsz)"
+      ],
+      [
+       "Output location",
+       "output_dataset/v2_3000 (gitignored): images/{train,val}, labels/{train,val}, meta/, manifest.csv, data.yaml, plan/, README.md",
+       "Confirm"
+      ],
+      [
+       "Generation time",
+       "~1.1-1.5 s per image per worker (measured 0.8-2.0 s single-process on plan rows) -> about 15-25 min with 4 low-priority workers",
+       "Confirm 4 workers"
+      ]
+     ]
+    },
+    {
+     "title": "Overview: parameters",
+     "columns": [
+      "parameter",
+      "type",
+      "buckets",
+      "range",
+      "override / config"
+     ],
+     "rows": [
+      [
+       "Mines per image",
+       "stratified",
+       "9 (0..8)",
+       "0-8 mines",
+       "N_MINES"
+      ],
+      [
+       "Mine scale (altitude)",
+       "stratified",
+       "5 log-spaced",
+       "0.10-0.40 (mine length ~43-171 px at 1080p)",
+       "MINE_SCALE_MIN / MINE_SCALE_MAX (per-image bucket)"
+      ],
+      [
+       "Burial fraction (target)",
+       "stratified (fraction) + randomized (buried yes/no)",
+       "4",
+       "0.05-0.50 of the mine's top-down area",
+       "BURIAL_FRACTION (per-image bucket), BURIAL_PROB 0.35"
+      ],
+      [
+       "Sun elevation",
+       "stratified",
+       "6 (9.2 deg wide)",
+       "15-70 deg",
+       "SUN_ELEVATION (per-image bucket)"
+      ],
+      [
+       "Light: overcast and shadow strength",
+       "stratified",
+       "5 (overcast + 4 strength bins)",
+       "overcast 0.03-0.15; direct sun 0.25-0.65",
+       "OVERCAST_PROB (0/1 per image), SHADOW_STRENGTH (bucket)"
+      ],
+      [
+       "Background family and file",
+       "stratified",
+       "2 families; 99 files by quota",
+       "77 grass + 22 non-grass photos",
+       "BG_FAMILY_WEIGHTS + BG_WEIGHT_OVERRIDES (forced file)"
+      ],
+      [
+       "Lens blur (PSF sigma)",
+       "stratified",
+       "3",
+       "0-1.5 px",
+       "PSF_SIGMA (per-image bucket)"
+      ],
+      [
+       "Sun azimuth",
+       "randomized",
+       "randomized",
+       "0-360 deg",
+       "SUN_AZIMUTH"
+      ],
+      [
+       "Shadow cool tint",
+       "randomized",
+       "randomized",
+       "0-0.15",
+       "SHADOW_COOL_TINT"
+      ],
+      [
+       "Motion blur",
+       "randomized",
+       "randomized",
+       "15 % of images, 1-4 px, random angle",
+       "MOTION_BLUR_PROB, MOTION_BLUR_LENGTH"
+      ],
+      [
+       "Exposure",
+       "randomized",
+       "randomized",
+       "0.75-1.25",
+       "EXPOSURE"
+      ],
+      [
+       "Gamma",
+       "randomized",
+       "randomized",
+       "0.85-1.15",
+       "GAMMA"
+      ],
+      [
+       "Saturation",
+       "randomized",
+       "randomized",
+       "0.75-1.25",
+       "SATURATION"
+      ],
+      [
+       "Contrast",
+       "randomized",
+       "randomized",
+       "0.95-1.2",
+       "CONTRAST"
+      ],
+      [
+       "Vignette",
+       "randomized",
+       "randomized",
+       "0.0-0.5",
+       "VIGNETTE"
+      ],
+      [
+       "Chromatic aberration",
+       "randomized",
+       "randomized",
+       "0.0-0.002",
+       "ABERRATION"
+      ],
+      [
+       "White balance (R and B gains)",
+       "randomized",
+       "randomized",
+       "0.92-1.08 each",
+       "WB_GAIN"
+      ],
+      [
+       "Sensor noise",
+       "randomized",
+       "randomized",
+       "sigma 0-0.025, chroma 0-0.5",
+       "NOISE_SIGMA, NOISE_CHROMA"
+      ],
+      [
+       "JPEG quality",
+       "randomized",
+       "randomized",
+       "70-95",
+       "JPEG_QUALITY_RANGE"
+      ],
+      [
+       "Background flips and 90-degree rotations",
+       "randomized",
+       "randomized",
+       "flip H / V each p=0.5; rotate by 90/180/270 with p=0.5",
+       "BG_FLIP_PROB, BG_ROT90_PROB"
+      ],
+      [
+       "Background zoom",
+       "randomized",
+       "randomized",
+       "1.0-2.0",
+       "BG_ZOOM"
+      ],
+      [
+       "Background colour jitter",
+       "randomized",
+       "randomized",
+       "hue +-8 deg, sat 0.8-1.2, bright 0.8-1.2, gains 0.95-1.05",
+       "BG_HUE_SHIFT, BG_SATURATION, BG_BRIGHTNESS, BG_CHANNEL_GAIN"
+      ],
+      [
+       "Ground scale (px per mm)",
+       "stratified (via scale)",
+       "5 (same as mine scale)",
+       "0.36-1.42 px/mm",
+       "derived from the scale bucket"
+      ],
+      [
+       "Mine yaw (in-plane rotation)",
+       "randomized (per mine)",
+       "randomized",
+       "0-360 deg",
+       "MINE_POSE (yaw part)"
+      ],
+      [
+       "Mine pitch and roll (tilt)",
+       "randomized (per mine)",
+       "randomized",
+       "|tilt| up to 30 deg",
+       "TILT_SIGMA, TILT_TAIL_PROB, TILT_TAIL_RANGE, TILT_CAP"
+      ],
+      [
+       "Face down",
+       "randomized (per mine)",
+       "randomized",
+       "yes / no",
+       "FLIP_PROB"
+      ],
+      [
+       "Mine colour family",
+       "randomized (per mine)",
+       "randomized",
+       "5 families",
+       "PALETTE"
+      ],
+      [
+       "Mine hue, saturation, value",
+       "randomized (per mine)",
+       "randomized",
+       "H 18-160 deg, S 0.18-0.65, V 0.15-0.78; brightness x0.85-1.15",
+       "PALETTE ranges, BRIGHTNESS_JITTER"
+      ],
+      [
+       "Sun bleaching",
+       "randomized (per mine)",
+       "randomized",
+       "35 % of mines, amount 0-0.6",
+       "BLEACH_PROB, BLEACH_AMOUNT"
+      ],
+      [
+       "Dirt tint",
+       "randomized (per mine)",
+       "randomized",
+       "40 % of mines, 0-0.3",
+       "DIRT_TINT_PROB, DIRT_TINT_AMOUNT"
+      ],
+      [
+       "Dust on the mine",
+       "randomized (per mine)",
+       "randomized",
+       "0.25-0.50, mode 0.30",
+       "DUST_STRENGTH"
+      ],
+      [
+       "Soil grains and contact band",
+       "randomized (per mine)",
+       "randomized",
+       "grains 0-5 % of mine pixels; band 1.5-4 px, darken 0.1-0.3",
+       "GRAIN_DENSITY, CONTACT_BAND_PX, CONTACT_BAND_DARKEN"
+      ],
+      [
+       "Burial ground-plane tilt",
+       "randomized (per buried mine)",
+       "randomized",
+       "0-25 deg",
+       "BURIAL_TILT"
+      ],
+      [
+       "Specular sheen",
+       "randomized (per mine)",
+       "randomized",
+       "strength 0-0.12, exponent 8-30",
+       "SPECULAR, SPECULAR_EXP"
+      ],
+      [
+       "Mine position",
+       "randomized (per mine)",
+       "randomized",
+       "anywhere with the box fully inside the frame",
+       "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN"
+      ],
+      [
+       "Grass blades, tufts, wisps",
+       "randomized",
+       "randomized",
+       "under 20-80, over 15-60 per image",
+       "BLADES_UNDER, BLADES_OVER, BLADE_KIND_PROBS"
+      ],
+      [
+       "Blades crossing a mine",
+       "randomized (per mine)",
+       "randomized",
+       "60 % of mines get 1-4",
+       "BLADES_OVER_ON_MINE, BLADES_ON_MINE_COUNT"
+      ],
+      [
+       "Leaf-litter clumps",
+       "randomized",
+       "randomized",
+       "under 2-8, over 0-2 per image; 25-60 px",
+       "LEAF_CLUMPS_UNDER, LEAF_CLUMPS_OVER, LEAF_CLUMP_SIZE"
+      ],
+      [
+       "Rocks",
+       "randomized",
+       "randomized",
+       "5-20 per layer (two layers), 40-100 px",
+       "ROCKS_TO_SPAWN_MIN / MAX, ROCK_OUTPUT_SIZE_MIN / MAX"
+      ],
+      [
+       "Dirt snippets and specks",
+       "randomized",
+       "randomized",
+       "2-10 snippets and 50-200 soft specks per layer",
+       "DIRT_SNIPPETS_PER_LAYER, DIRT_RECTS_PER_LAYER"
+      ],
+      [
+       "Grass clippings (v1 photos)",
+       "randomized",
+       "randomized",
+       "4 source photos x 5-16 crops per layer, 40-80 px",
+       "GRASS_IMAGES_TO_SAMPLE, GRASS_CLIPPINGS_PER_IMAGE"
+      ]
+     ],
+     "note": "Balance: pairwise chi-square over all 21 factor pairs 298.01 (shuffled) -> 0.3 (balanced). Planned mines 10800, buried 3763."
+    },
+    {
+     "title": "Planned bucket counts (all images / val)",
+     "columns": [
+      "factor",
+      "all",
+      "val"
+     ],
+     "rows": [
+      [
+       "n_mines",
+       "600 300 300 300 300 300 300 300 300",
+       "60 30 30 30 30 30 30 30 30"
+      ],
+      [
+       "scale_bin",
+       "600 600 600 600 600",
+       "60 60 60 60 60"
+      ],
+      [
+       "burial_bin",
+       "750 750 750 750",
+       "75 75 75 75"
+      ],
+      [
+       "elev_bin",
+       "500 500 500 500 500 500",
+       "50 50 50 50 50 50"
+      ],
+      [
+       "light",
+       "450 638 638 637 637",
+       "45 64 64 63 64"
+      ],
+      [
+       "family",
+       "1950 1050",
+       "194 106"
+      ],
+      [
+       "psf_bin",
+       "1000 1000 1000",
+       "100 100 100"
+      ]
+     ],
+     "note": "Train 2700, val 300. Base seed 2026, image k = index k."
+    }
+   ],
+   "features": [
+    {
+     "id": "split",
+     "title": "Train / val split",
+     "flag": "split column of the plan",
+     "summary": "2700 train / 300 val images (90 / 10), chosen by seed index. The split is a balanced design column: every bucket of every stratified factor has 10 % of its images in val. Val and train indices never overlap (one image = one index; retries use spare indices 100000+, unique per row).",
+     "facts": [
+      [
+       "type",
+       "stratified (balanced column)"
+      ],
+      [
+       "counts",
+       "train 2700, val 300"
+      ],
+      [
+       "balance",
+       "split-vs-factor chi-square 44.23 -> 0.32 after the swap search"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/split_balance.png",
+      "label": "val share per bucket",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     }
+    },
+    {
+     "id": "samples",
+     "title": "Planned rows rendered (examples)",
+     "flag": "render_scene(2026, k)",
+     "summary": "Six plan rows with different scale buckets and light conditions, rendered in memory with their overrides to show what the plan produces. No dataset images were written.",
+     "options": [
+      {
+       "label": "plan row 0 (train)",
+       "params": "n_mines=4 scale_bin=1 burial_bin=0 elev_bin=5 light=4 family=grass psf_bin=0 bg=bg_gen_31_grass_patchy_over.jpg",
+       "image": "images/params/sample_row_00000.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+      },
+      {
+       "label": "plan row 1 (train)",
+       "params": "n_mines=5 scale_bin=4 burial_bin=2 elev_bin=1 light=1 family=grass psf_bin=1 bg=bg_gen_38_moss_clover_mowed.jpg",
+       "image": "images/params/sample_row_00001.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+      },
+      {
+       "label": "plan row 3 (train)",
+       "params": "n_mines=4 scale_bin=0 burial_bin=3 elev_bin=4 light=2 family=grass psf_bin=0 bg=bg_gen_13_grass_olive_normal.jpg",
+       "image": "images/params/sample_row_00003.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+      },
+      {
+       "label": "plan row 9 (val)",
+       "params": "n_mines=5 scale_bin=3 burial_bin=1 elev_bin=3 light=4 family=grass psf_bin=1 bg=bg_gen_28_grass_patchy_normal.jpg",
+       "image": "images/params/sample_row_00009.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+      },
+      {
+       "label": "plan row 29 (train)",
+       "params": "n_mines=6 scale_bin=2 burial_bin=2 elev_bin=0 light=4 family=grass psf_bin=2 bg=bg_gen_21_grass_dry_normal.jpg",
+       "image": "images/params/sample_row_00029.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+      },
+      {
+       "label": "plan row 33 (train)",
+       "params": "n_mines=5 scale_bin=3 burial_bin=0 elev_bin=0 light=0 family=grass psf_bin=2 bg=grass1.png",
+       "image": "images/params/sample_row_00033.jpg",
+       "caption": "Rendered from the plan row exactly as the dataset would (shown at half size, red = YOLO boxes). Not part of a generated dataset."
+      }
+     ]
+    },
+    {
+     "id": "n_mines",
+     "title": "Mines per image",
+     "flag": "N_MINES",
+     "summary": "How many PFM-1 mines are placed in the image (positions by rejection sampling, 50 attempts).",
+     "facts": [
+      [
+       "type",
+       "stratified"
+      ],
+      [
+       "buckets",
+       "9 (0..8)"
+      ],
+      [
+       "range",
+       "0-8 mines"
+      ],
+      [
+       "distribution",
+       "Exact quota: 600 images with 0 mines, 300 with each of 1..8. This is the generator's own distribution (ZERO_MINE_PROB 0.10 plus a uniform draw of 0..8, i.e. P(0) = 0.2, P(k) = 0.1) made exact."
+      ],
+      [
+       "override / config",
+       "N_MINES"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/n_mines.png",
+      "label": "Mines per image",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "notes": "Planned mines in total: 10800. Placement can fail for 8 large mines (50 attempts each); the rendered manifest will record placed vs planned."
+    },
+    {
+     "id": "mine_scale",
+     "title": "Mine scale (altitude)",
+     "flag": "MINE_SCALE_MIN / MINE_SCALE_MAX (per-image bucket)",
+     "summary": "Mine size in the frame (proxy for flight altitude). The ground blade scale (px per mm) is drawn from the same bucket, so grass and mines agree in scale within an image.",
+     "facts": [
+      [
+       "type",
+       "stratified"
+      ],
+      [
+       "buckets",
+       "5 log-spaced"
+      ],
+      [
+       "range",
+       "0.10-0.40 (mine length ~43-171 px at 1080p)"
+      ],
+      [
+       "distribution",
+       "Each image gets one log-spaced bucket (600 images per bucket); every mine in it draws its scale uniformly inside that bucket. Equal counts per log bucket = roughly log-uniform overall (DELIBERATE CHANGE from the generator's linear uniform 0.1-0.4: more small, hard mines; median 0.20 instead of 0.25)."
+      ],
+      [
+       "override / config",
+       "MINE_SCALE_MIN / MINE_SCALE_MAX (per-image bucket)"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/mine_scale.png",
+      "label": "Mine scale (altitude)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
+     },
+     "before_after": [
+      {
+       "label": "Scale 0.10 vs 0.40",
+       "before": "images/params/scale_before.png",
+       "after": "images/params/scale_after.png",
+       "before_label": "scale 0.10",
+       "after_label": "scale 0.40",
+       "caption": "Smallest vs largest end of the range. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Per-image buckets mean all mines in one image share a scale range (like one flight altitude). Mine counts per bucket are exact because the n_mines x scale table is balanced."
+    },
+    {
+     "id": "burial_fraction",
+     "title": "Burial fraction (target)",
+     "flag": "BURIAL_FRACTION (per-image bucket), BURIAL_PROB 0.35",
+     "summary": "How much of a buried mine is hidden under soil (3D clip by a tilted ground plane + wavy soil line, berm, clods).",
+     "facts": [
+      [
+       "type",
+       "stratified (fraction) + randomized (buried yes/no)"
+      ],
+      [
+       "buckets",
+       "4"
+      ],
+      [
+       "range",
+       "0.05-0.50 of the mine's top-down area"
+      ],
+      [
+       "distribution",
+       "Each image gets one of 4 fraction buckets (750 images each); every mine is buried with the tuned probability 0.35 (random) and, if buried, draws its target fraction inside the image's bucket. Hard cap BURIAL_MAX_FRACTION 0.5 (render retries if the cap is exceeded)."
+      ],
+      [
+       "override / config",
+       "BURIAL_FRACTION (per-image bucket), BURIAL_PROB 0.35"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/burial_fraction.png",
+      "label": "Burial fraction (target)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
+     },
+     "before_after": [
+      {
+       "label": "Not buried vs 45% buried",
+       "before": "images/params/burial_none_before.png",
+       "after": "images/params/burial_none_after.png",
+       "before_label": "not buried",
+       "after_label": "45% buried",
+       "caption": "Same mine, fraction 0.45 (top bucket). native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      },
+      {
+       "label": "15% vs 45% buried",
+       "before": "images/params/burial_low_before.png",
+       "after": "images/params/burial_low_after.png",
+       "before_label": "15% buried",
+       "after_label": "45% buried",
+       "caption": "Lowest vs highest bucket. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Buckets are [0.05, 0.2), [0.2, 0.3), [0.3, 0.4), [0.4, 0.5]: the first is wider, so the lightest burials get slightly less density per 0.01 than in the old uniform 0.05-0.5. The achieved hidden fraction is measured after rendering (it differs a little from the target). Images per bucket are exact (750); buried MINES per bucket vary a little (graph) because burial yes / no stays random per mine."
+    },
+    {
+     "id": "sun_elevation",
+     "title": "Sun elevation",
+     "flag": "SUN_ELEVATION (per-image bucket)",
+     "summary": "Height of the sun: drives shadow length (low sun = long, soft shadows) and mine shading.",
+     "facts": [
+      [
+       "type",
+       "stratified"
+      ],
+      [
+       "buckets",
+       "6 (9.2 deg wide)"
+      ],
+      [
+       "range",
+       "15-70 deg"
+      ],
+      [
+       "distribution",
+       "500 images per 9.2-degree bucket, uniform inside the bucket (same overall shape as the generator's U(15, 70), made exact). Overcast images keep a nominal elevation for mine shading."
+      ],
+      [
+       "override / config",
+       "SUN_ELEVATION (per-image bucket)"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/sun_elevation.png",
+      "label": "Sun elevation",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
+     },
+     "before_after": [
+      {
+       "label": "Sun 15 deg vs 70 deg",
+       "before": "images/params/sun_el_before.png",
+       "after": "images/params/sun_el_after.png",
+       "before_label": "15 deg",
+       "after_label": "70 deg",
+       "caption": "Long low-sun shadow vs short noon shadow. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "light",
+     "title": "Light: overcast and shadow strength",
+     "flag": "OVERCAST_PROB (0/1 per image), SHADOW_STRENGTH (bucket)",
+     "summary": "How dark shadows are (ground *= 1 - strength x coverage), shared by mines, rocks and grass; mine shading uses the same value.",
+     "facts": [
+      [
+       "type",
+       "stratified"
+      ],
+      [
+       "buckets",
+       "5 (overcast + 4 strength bins)"
+      ],
+      [
+       "range",
+       "overcast 0.03-0.15; direct sun 0.25-0.65"
+      ],
+      [
+       "distribution",
+       "Exactly 450 overcast images (15 %, the user's setting) with weak, very soft shadows (random strength 0.03-0.15); the 2550 direct-sun images are split into 4 equal strength buckets (637-638 each)."
+      ],
+      [
+       "override / config",
+       "OVERCAST_PROB (0/1 per image), SHADOW_STRENGTH (bucket)"
+      ],
+      [
+       "strength histogram",
+       "direct-sun mean 0.450, overcast mean 0.091"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/light.png",
+      "label": "Light: overcast and shadow strength",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Overcast vs strong direct sun",
+       "before": "images/params/overcast_before.png",
+       "after": "images/params/overcast_after.png",
+       "before_label": "overcast",
+       "after_label": "direct, strength 0.65",
+       "caption": "Diffuse sky vs hard sun. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "background",
+     "title": "Background family and file",
+     "flag": "BG_FAMILY_WEIGHTS + BG_WEIGHT_OVERRIDES (forced file)",
+     "summary": "Which ground photo is used (then flipped / rotated / zoomed / colour-jittered, see below).",
+     "facts": [
+      [
+       "type",
+       "stratified"
+      ],
+      [
+       "buckets",
+       "2 families; 99 files by quota"
+      ],
+      [
+       "range",
+       "77 grass + 22 non-grass photos"
+      ],
+      [
+       "distribution",
+       "Exact 65 / 35 % family split (1950 grass, 1050 non-grass, the user's 60-70 % grass). Inside a family every file gets a fixed count proportional to its tuned weight (largest remainder), so the JPEG-blocky files keep their 0.25 / 0.5 weights and audit 'review' files their 0.4."
+      ],
+      [
+       "override / config",
+       "BG_FAMILY_WEIGHTS + BG_WEIGHT_OVERRIDES (forced file)"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/background.png",
+      "label": "Background family and file",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "options": [
+      {
+       "label": "images per background file",
+       "image": "images/params/background_files.png",
+       "caption": "Counts are fixed by the plan (largest-remainder quotas), not random."
+      }
+     ],
+     "notes": "Per-file counts range 4-75 images (99 files used); see the per-file graph in the options of the 'Background files' card."
+    },
+    {
+     "id": "psf_sigma",
+     "title": "Lens blur (PSF sigma)",
+     "flag": "PSF_SIGMA (per-image bucket)",
+     "summary": "Gaussian defocus of the whole composite (point-spread function).",
+     "facts": [
+      [
+       "type",
+       "stratified"
+      ],
+      [
+       "buckets",
+       "3"
+      ],
+      [
+       "range",
+       "0-1.5 px"
+      ],
+      [
+       "distribution",
+       "1000 images per 0.5-px bucket, uniform inside (same shape as the generator's U(0, 1.5), made exact)."
+      ],
+      [
+       "override / config",
+       "PSF_SIGMA (per-image bucket)"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/psf_sigma.png",
+      "label": "Lens blur (PSF sigma)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
+     },
+     "before_after": [
+      {
+       "label": "Sigma 0 vs 1.5 px",
+       "before": "images/params/psf_before.png",
+       "after": "images/params/psf_after.png",
+       "before_label": "sigma 0",
+       "after_label": "sigma 1.5",
+       "caption": "Sharp vs most blurred. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "sun_azimuth",
+     "title": "Sun azimuth",
+     "flag": "SUN_AZIMUTH",
+     "summary": "Direction the shadows fall; rocks are rotated so their baked-in lit side faces it.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0-360 deg"
+      ],
+      [
+       "distribution",
+       "Uniform U(0, 360) per image."
+      ],
+      [
+       "override / config",
+       "SUN_AZIMUTH"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/sun_azimuth.png",
+      "label": "Sun azimuth",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Azimuth 0 vs 180 deg",
+       "before": "images/params/sun_az_before.png",
+       "after": "images/params/sun_az_after.png",
+       "before_label": "0 deg",
+       "after_label": "180 deg",
+       "caption": "Shadow flips side. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Randomized: azimuth is a nuisance factor and background flips / 90-degree rotations already spread it; 3000 uniform draws fill every 15-degree bin (see graph)."
+    },
+    {
+     "id": "shadow_tint",
+     "title": "Shadow cool tint",
+     "flag": "SHADOW_COOL_TINT",
+     "summary": "Shadows lose more red than blue (sky-lit shadows look bluish).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0-0.15"
+      ],
+      [
+       "distribution",
+       "Uniform per image."
+      ],
+      [
+       "override / config",
+       "SHADOW_COOL_TINT"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/shadow_tint.png",
+      "label": "Shadow cool tint",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Tint 0 vs 0.15",
+       "before": "images/params/tint_before.png",
+       "after": "images/params/tint_after.png",
+       "before_label": "tint 0",
+       "after_label": "tint 0.15",
+       "caption": "Strong shadow so the tint is visible. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "motion_blur",
+     "title": "Motion blur",
+     "flag": "MOTION_BLUR_PROB, MOTION_BLUR_LENGTH",
+     "summary": "Linear smear from camera motion during the exposure.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "15 % of images, 1-4 px, random angle"
+      ],
+      [
+       "distribution",
+       "Bernoulli(0.15) per image, then length U(1, 4) px."
+      ],
+      [
+       "override / config",
+       "MOTION_BLUR_PROB, MOTION_BLUR_LENGTH"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/motion_blur.png",
+      "label": "Motion blur",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "No motion blur vs 4 px",
+       "before": "images/params/motion_before.png",
+       "after": "images/params/motion_after.png",
+       "before_label": "none",
+       "after_label": "4 px",
+       "caption": "Longest smear. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "exposure",
+     "title": "Exposure",
+     "flag": "EXPOSURE",
+     "summary": "Overall brightness multiplier.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.75-1.25"
+      ],
+      [
+       "distribution",
+       "Uniform per image (PHOTOMETRIC_JITTER)."
+      ],
+      [
+       "override / config",
+       "EXPOSURE"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/exposure.png",
+      "label": "Exposure",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "exposure 0.75 vs 1.25",
+       "before": "images/params/exposure_before.png",
+       "after": "images/params/exposure_after.png",
+       "before_label": "0.75",
+       "after_label": "1.25",
+       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "gamma",
+     "title": "Gamma",
+     "flag": "GAMMA",
+     "summary": "Tone curve rgb ** gamma (mid-tone brightness).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.85-1.15"
+      ],
+      [
+       "distribution",
+       "Uniform per image (PHOTOMETRIC_JITTER)."
+      ],
+      [
+       "override / config",
+       "GAMMA"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/gamma.png",
+      "label": "Gamma",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "gamma 0.85 vs 1.15",
+       "before": "images/params/gamma_before.png",
+       "after": "images/params/gamma_after.png",
+       "before_label": "0.85",
+       "after_label": "1.15",
+       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "saturation",
+     "title": "Saturation",
+     "flag": "SATURATION",
+     "summary": "Colour saturation multiplier.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.75-1.25"
+      ],
+      [
+       "distribution",
+       "Uniform per image (PHOTOMETRIC_JITTER)."
+      ],
+      [
+       "override / config",
+       "SATURATION"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/saturation.png",
+      "label": "Saturation",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "saturation 0.75 vs 1.25",
+       "before": "images/params/saturation_before.png",
+       "after": "images/params/saturation_after.png",
+       "before_label": "0.75",
+       "after_label": "1.25",
+       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "contrast",
+     "title": "Contrast",
+     "flag": "CONTRAST",
+     "summary": "Contrast around mid-grey (replaces v1's fixed 1.1).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.95-1.2"
+      ],
+      [
+       "distribution",
+       "Uniform per image (PHOTOMETRIC_JITTER)."
+      ],
+      [
+       "override / config",
+       "CONTRAST"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/contrast.png",
+      "label": "Contrast",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "contrast 0.95 vs 1.2",
+       "before": "images/params/contrast_before.png",
+       "after": "images/params/contrast_after.png",
+       "before_label": "0.95",
+       "after_label": "1.2",
+       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "vignette",
+     "title": "Vignette",
+     "flag": "VIGNETTE",
+     "summary": "Corner darkening.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.0-0.5"
+      ],
+      [
+       "distribution",
+       "Uniform per image (PHOTOMETRIC_JITTER)."
+      ],
+      [
+       "override / config",
+       "VIGNETTE"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/vignette.png",
+      "label": "Vignette",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "vignette 0.0 vs 0.5",
+       "before": "images/params/vignette_before.png",
+       "after": "images/params/vignette_after.png",
+       "before_label": "0.0",
+       "after_label": "0.5",
+       "caption": "Range ends. whole 1920x1080 frame shown at 1/3 size; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "aberration",
+     "title": "Chromatic aberration",
+     "flag": "ABERRATION",
+     "summary": "Chromatic aberration: R / B shift in uv units (0.002 = 3.8 px).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.0-0.002"
+      ],
+      [
+       "distribution",
+       "Uniform per image (PHOTOMETRIC_JITTER)."
+      ],
+      [
+       "override / config",
+       "ABERRATION"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/aberration.png",
+      "label": "Chromatic aberration",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "aberration 0.0 vs 0.002",
+       "before": "images/params/aberration_before.png",
+       "after": "images/params/aberration_after.png",
+       "before_label": "0.0",
+       "after_label": "0.002",
+       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "white_balance",
+     "title": "White balance (R and B gains)",
+     "flag": "WB_GAIN",
+     "summary": "Colour cast of the camera (warm / cool).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.92-1.08 each"
+      ],
+      [
+       "distribution",
+       "Independent uniform R and B gains per image (G = 1)."
+      ],
+      [
+       "override / config",
+       "WB_GAIN"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/white_balance.png",
+      "label": "White balance (R and B gains)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Cool vs warm cast",
+       "before": "images/params/wb_before.png",
+       "after": "images/params/wb_after.png",
+       "before_label": "R, B = 0.92",
+       "after_label": "R, B = 1.08",
+       "caption": "Both gains at the range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "The before / after sets both gains together; in the dataset they are independent."
+    },
+    {
+     "id": "noise",
+     "title": "Sensor noise",
+     "flag": "NOISE_SIGMA, NOISE_CHROMA",
+     "summary": "Zero-mean Gaussian sensor noise; chroma = share that differs per channel.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "sigma 0-0.025, chroma 0-0.5"
+      ],
+      [
+       "distribution",
+       "Uniform per image."
+      ],
+      [
+       "override / config",
+       "NOISE_SIGMA, NOISE_CHROMA"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/noise.png",
+      "label": "Sensor noise",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Noise 0 vs 0.025",
+       "before": "images/params/noise_before.png",
+       "after": "images/params/noise_after.png",
+       "before_label": "sigma 0",
+       "after_label": "sigma 0.025, chroma 0.5",
+       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "jpeg_quality",
+     "title": "JPEG quality",
+     "flag": "JPEG_QUALITY_RANGE",
+     "summary": "JPEG compression strength of the saved file (blocking / ringing at low quality).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "70-95"
+      ],
+      [
+       "distribution",
+       "Uniform integer per image; main.py saves the JPEG at this quality (compression is an augmentation)."
+      ],
+      [
+       "override / config",
+       "JPEG_QUALITY_RANGE"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/jpeg_quality.png",
+      "label": "JPEG quality",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Quality 70 vs 95",
+       "before": "images/params/jpeg_before.png",
+       "after": "images/params/jpeg_after.png",
+       "before_label": "q70",
+       "after_label": "q95",
+       "caption": "Same render, saved at 70 vs 95. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "DECISION: the brief asked for q95 files. The generator instead samples 70-95 per image; the driver keeps that by default (--jpeg-quality sampled) and can force q95 with --jpeg-quality 95."
+    },
+    {
+     "id": "bg_flip_rot",
+     "title": "Background flips and 90-degree rotations",
+     "flag": "BG_FLIP_PROB, BG_ROT90_PROB",
+     "summary": "Geometric augmentation of the ground photo (16 combinations).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "flip H / V each p=0.5; rotate by 90/180/270 with p=0.5"
+      ],
+      [
+       "distribution",
+       "Independent Bernoulli draws per image."
+      ],
+      [
+       "override / config",
+       "BG_FLIP_PROB, BG_ROT90_PROB"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/bg_flip_rot.png",
+      "label": "Background flips and 90-degree rotations",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     }
+    },
+    {
+     "id": "bg_zoom",
+     "title": "Background zoom",
+     "flag": "BG_ZOOM",
+     "summary": "Zoom-crop into the ground photo on top of scale-to-cover (texture scale).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "1.0-2.0"
+      ],
+      [
+       "distribution",
+       "Uniform per image, random offset."
+      ],
+      [
+       "override / config",
+       "BG_ZOOM"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/bg_zoom.png",
+      "label": "Background zoom",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Zoom 1.0 vs 2.0",
+       "before": "images/params/bgzoom_before.png",
+       "after": "images/params/bgzoom_after.png",
+       "before_label": "1.0",
+       "after_label": "2.0",
+       "caption": "Ground texture scale. whole 1920x1080 frame shown at 1/3 size; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "bg_colour",
+     "title": "Background colour jitter",
+     "flag": "BG_HUE_SHIFT, BG_SATURATION, BG_BRIGHTNESS, BG_CHANNEL_GAIN",
+     "summary": "Colour variation of the ground photo before anything is drawn on it.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "hue +-8 deg, sat 0.8-1.2, bright 0.8-1.2, gains 0.95-1.05"
+      ],
+      [
+       "distribution",
+       "Uniform per image."
+      ],
+      [
+       "override / config",
+       "BG_HUE_SHIFT, BG_SATURATION, BG_BRIGHTNESS, BG_CHANNEL_GAIN"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/bg_colour.png",
+      "label": "Background colour jitter",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Background brightness 0.8 vs 1.2",
+       "before": "images/params/bgbright_before.png",
+       "after": "images/params/bgbright_after.png",
+       "before_label": "0.8",
+       "after_label": "1.2",
+       "caption": "Ground only; the mine is harmonised to the ground's brightness. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "ground_scale",
+     "title": "Ground scale (px per mm)",
+     "flag": "derived from the scale bucket",
+     "summary": "Size of grass blades / tufts / wisps (specified in mm) on screen.",
+     "facts": [
+      [
+       "type",
+       "stratified (via scale)"
+      ],
+      [
+       "buckets",
+       "5 (same as mine scale)"
+      ],
+      [
+       "range",
+       "0.36-1.42 px/mm"
+      ],
+      [
+       "distribution",
+       "Drawn per image inside the image's mine-scale bucket (not separately planned)."
+      ],
+      [
+       "override / config",
+       "derived from the scale bucket"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/ground_scale.png",
+      "label": "Ground scale (px per mm)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated). Dotted lines: bucket edges; dashed orange: equal-count target."
+     },
+     "notes": "In the default generator this value is drawn independently of the mines' scale, so blades could be drawn at a different 'altitude' than the mines of the same image; the per-image scale bucket keeps the two within one bucket."
+    },
+    {
+     "id": "yaw",
+     "title": "Mine yaw (in-plane rotation)",
+     "flag": "MINE_POSE (yaw part)",
+     "summary": "Rotation of the mine about the vertical axis.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0-360 deg"
+      ],
+      [
+       "distribution",
+       "Uniform per mine. Drawn per mine inside the renderer, so it cannot be bucketed by per-image overrides without a generator change; with 10800 mines every 30-degree bin is within a few % of equal."
+      ],
+      [
+       "override / config",
+       "MINE_POSE (yaw part)"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/yaw.png",
+      "label": "Mine yaw (in-plane rotation)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Yaw 30 vs 120 deg",
+       "before": "images/params/yaw_before.png",
+       "after": "images/params/yaw_after.png",
+       "before_label": "30 deg",
+       "after_label": "120 deg",
+       "caption": "Same mine rotated. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "pitch_roll",
+     "title": "Mine pitch and roll (tilt)",
+     "flag": "TILT_SIGMA, TILT_TAIL_PROB, TILT_TAIL_RANGE, TILT_CAP",
+     "summary": "Tilt of the mine relative to lying flat.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "|tilt| up to 30 deg"
+      ],
+      [
+       "distribution",
+       "N(0, 5 deg) with prob 0.95 (capped at 35), else +-U(8, 30) (resting on a rock); skewed flat as tuned."
+      ],
+      [
+       "override / config",
+       "TILT_SIGMA, TILT_TAIL_PROB, TILT_TAIL_RANGE, TILT_CAP"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/pitch_roll.png",
+      "label": "Mine pitch and roll (tilt)",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Flat vs 25 deg pitch",
+       "before": "images/params/tilt_before.png",
+       "after": "images/params/tilt_after.png",
+       "before_label": "pitch 3, roll 2",
+       "after_label": "pitch 25",
+       "caption": "Tail of the distribution. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "face_down",
+     "title": "Face down",
+     "flag": "FLIP_PROB",
+     "summary": "Mine lies on its back (underside towards the camera).",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "yes / no"
+      ],
+      [
+       "distribution",
+       "Bernoulli(0.30) per mine (the user's setting)."
+      ],
+      [
+       "override / config",
+       "FLIP_PROB"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/face_down.png",
+      "label": "Face down",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Face up vs face down",
+       "before": "images/params/flip_before.png",
+       "after": "images/params/flip_after.png",
+       "before_label": "face up",
+       "after_label": "face down",
+       "caption": "Same pose otherwise. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Kept random per mine (realistic mixed orientations in one image); 10800 Bernoulli draws give 29.9% face down."
+    },
+    {
+     "id": "colour_family",
+     "title": "Mine colour family",
+     "flag": "PALETTE",
+     "summary": "Base plastic colour of the mine.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "5 families"
+      ],
+      [
+       "distribution",
+       "Family by weight (olive 0.28, dark green 0.22, khaki 0.15, brown 0.20, tan 0.15), then H, S, V uniform inside the family's ranges."
+      ],
+      [
+       "override / config",
+       "PALETTE"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/colour_family.png",
+      "label": "Mine colour family",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Olive vs tan albedo",
+       "before": "images/params/colour_before.png",
+       "after": "images/params/colour_after.png",
+       "before_label": "olive",
+       "after_label": "tan",
+       "caption": "Two fixed albedos from the palette. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "colour_hsv",
+     "title": "Mine hue, saturation, value",
+     "flag": "PALETTE ranges, BRIGHTNESS_JITTER",
+     "summary": "Fine colour variation inside a family.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "H 18-160 deg, S 0.18-0.65, V 0.15-0.78; brightness x0.85-1.15"
+      ],
+      [
+       "distribution",
+       "Uniform inside the family ranges."
+      ],
+      [
+       "override / config",
+       "PALETTE ranges, BRIGHTNESS_JITTER"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/colour_hsv.png",
+      "label": "Mine hue, saturation, value",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     }
+    },
+    {
+     "id": "bleach",
+     "title": "Sun bleaching",
+     "flag": "BLEACH_PROB, BLEACH_AMOUNT",
+     "summary": "Faded plastic: S *= 1 - 0.6 a, V += 0.3 a (1 - V).",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "35 % of mines, amount 0-0.6"
+      ],
+      [
+       "distribution",
+       "Bernoulli(0.35), then U(0, 0.6)."
+      ],
+      [
+       "override / config",
+       "BLEACH_PROB, BLEACH_AMOUNT"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/bleach.png",
+      "label": "Sun bleaching",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "No bleach vs 0.6",
+       "before": "images/params/bleach_before.png",
+       "after": "images/params/bleach_after.png",
+       "before_label": "none",
+       "after_label": "0.6",
+       "caption": "Strongest fading. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "dirt_tint",
+     "title": "Dirt tint",
+     "flag": "DIRT_TINT_PROB, DIRT_TINT_AMOUNT",
+     "summary": "Albedo mixed towards soil brown.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "40 % of mines, 0-0.3"
+      ],
+      [
+       "distribution",
+       "Bernoulli(0.4), then U(0, 0.3)."
+      ],
+      [
+       "override / config",
+       "DIRT_TINT_PROB, DIRT_TINT_AMOUNT"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/dirt_tint.png",
+      "label": "Dirt tint",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "No tint vs 0.3",
+       "before": "images/params/dtint_before.png",
+       "after": "images/params/dtint_after.png",
+       "before_label": "none",
+       "after_label": "0.3",
+       "caption": "Strongest tint. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "dust",
+     "title": "Dust on the mine",
+     "flag": "DUST_STRENGTH",
+     "summary": "Max opacity of the fBm-modulated dust film (local ground colour) on the mine.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0.25-0.50, mode 0.30"
+      ],
+      [
+       "distribution",
+       "Triangular(0.25, 0.30, 0.50), mean 0.35 (the user's ~35 %); planned mean 0.350."
+      ],
+      [
+       "override / config",
+       "DUST_STRENGTH"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/dust.png",
+      "label": "Dust on the mine",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Dust 0.25 vs 0.50",
+       "before": "images/params/dust_before.png",
+       "after": "images/params/dust_after.png",
+       "before_label": "0.25",
+       "after_label": "0.50",
+       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "grain",
+     "title": "Soil grains and contact band",
+     "flag": "GRAIN_DENSITY, CONTACT_BAND_PX, CONTACT_BAND_DARKEN",
+     "summary": "Soil specks on the mine and the darker band where it meets the ground.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "grains 0-5 % of mine pixels; band 1.5-4 px, darken 0.1-0.3"
+      ],
+      [
+       "distribution",
+       "Uniform per mine."
+      ],
+      [
+       "override / config",
+       "GRAIN_DENSITY, CONTACT_BAND_PX, CONTACT_BAND_DARKEN"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/grain.png",
+      "label": "Soil grains and contact band",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Grains 0 vs 5 %",
+       "before": "images/params/grain_before.png",
+       "after": "images/params/grain_after.png",
+       "before_label": "0",
+       "after_label": "0.05",
+       "caption": "Range ends. native-resolution 140x140 px crop around the mine, 3x nearest-neighbour zoom; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "burial_tilt",
+     "title": "Burial ground-plane tilt",
+     "flag": "BURIAL_TILT",
+     "summary": "Tilt of the soil plane that clips the mine (shape of the soil line).",
+     "facts": [
+      [
+       "type",
+       "randomized (per buried mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "0-25 deg"
+      ],
+      [
+       "distribution",
+       "Uniform per buried mine; direction U(0, 360); soil-line wander scaled with the fraction."
+      ],
+      [
+       "override / config",
+       "BURIAL_TILT"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/burial_tilt.png",
+      "label": "Burial ground-plane tilt",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Tilt 0 vs 25 deg",
+       "before": "images/params/btilt_before.png",
+       "after": "images/params/btilt_after.png",
+       "before_label": "tilt 0",
+       "after_label": "tilt 25",
+       "caption": "Fraction 0.35. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "specular",
+     "title": "Specular sheen",
+     "flag": "SPECULAR, SPECULAR_EXP",
+     "summary": "Plastic highlight (Blinn-Phong).",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "strength 0-0.12, exponent 8-30"
+      ],
+      [
+       "distribution",
+       "Uniform per mine."
+      ],
+      [
+       "override / config",
+       "SPECULAR, SPECULAR_EXP"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/specular.png",
+      "label": "Specular sheen",
+      "caption": "Planned distribution from the 3000-row sampling plan (dataset not yet generated)."
+     },
+     "before_after": [
+      {
+       "label": "Sheen 0 vs 0.12",
+       "before": "images/params/spec_before.png",
+       "after": "images/params/spec_after.png",
+       "before_label": "0",
+       "after_label": "0.12",
+       "caption": "Range ends. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ]
+    },
+    {
+     "id": "position",
+     "title": "Mine position",
+     "flag": "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN",
+     "summary": "Where the mine lands in the image.",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "anywhere with the box fully inside the frame"
+      ],
+      [
+       "distribution",
+       "Uniform over the frame, rejection sampling against already-placed boxes (50 attempts, 10 px margin)."
+      ],
+      [
+       "override / config",
+       "MINE_PLACEMENT_ATTEMPTS, MINE_PLACEMENT_MARGIN"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/position.png",
+      "label": "Mine position",
+      "caption": "Approximation from the planned box sizes (positions are decided at render time)."
+     },
+     "notes": "Not replicated in the plan (it depends on the rendered silhouette and on the other mines); the graph is an approximation. Fixing positions (MINE_POSITIONS) would skip the overlap test, so position is left random; the rendered manifest will give the real distribution."
+    },
+    {
+     "id": "blades",
+     "title": "Grass blades, tufts, wisps",
+     "flag": "BLADES_UNDER, BLADES_OVER, BLADE_KIND_PROBS",
+     "summary": "Thin grass under and over the mines (over-layer blades partly occlude mines; labels use the visible mask).",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "under 20-80, over 15-60 per image"
+      ],
+      [
+       "distribution",
+       "Uniform integer counts per image; kind blade 0.6 / tuft 0.25 / wisp 0.15."
+      ],
+      [
+       "override / config",
+       "BLADES_UNDER, BLADES_OVER, BLADE_KIND_PROBS"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/blades.png",
+      "label": "Grass blades, tufts, wisps",
+      "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
+     },
+     "before_after": [
+      {
+       "label": "No over-layer blades vs 60",
+       "before": "images/params/blades_before.png",
+       "after": "images/params/blades_after.png",
+       "before_label": "0 over",
+       "after_label": "60 over",
+       "caption": "Over-layer count only. native-resolution 540x540 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+    },
+    {
+     "id": "blades_on_mine",
+     "title": "Blades crossing a mine",
+     "flag": "BLADES_OVER_ON_MINE, BLADES_ON_MINE_COUNT",
+     "summary": "Extra over-layer blades centred on the mine box (partial occlusion).",
+     "facts": [
+      [
+       "type",
+       "randomized (per mine)"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "60 % of mines get 1-4"
+      ],
+      [
+       "distribution",
+       "Bernoulli(0.6) per mine, then U{1..4}."
+      ],
+      [
+       "override / config",
+       "BLADES_OVER_ON_MINE, BLADES_ON_MINE_COUNT"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/blades_on_mine.png",
+      "label": "Blades crossing a mine",
+      "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
+     },
+     "before_after": [
+      {
+       "label": "0 vs 4 blades on the mine",
+       "before": "images/params/bom_before.png",
+       "after": "images/params/bom_after.png",
+       "before_label": "0",
+       "after_label": "4",
+       "caption": "Partial occlusion. native-resolution 360x360 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+    },
+    {
+     "id": "leaf_clumps",
+     "title": "Leaf-litter clumps",
+     "flag": "LEAF_CLUMPS_UNDER, LEAF_CLUMPS_OVER, LEAF_CLUMP_SIZE",
+     "summary": "RGBA leaf-litter clumps, colour-adapted to the ground.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "under 2-8, over 0-2 per image; 25-60 px"
+      ],
+      [
+       "distribution",
+       "Uniform integer counts per image."
+      ],
+      [
+       "override / config",
+       "LEAF_CLUMPS_UNDER, LEAF_CLUMPS_OVER, LEAF_CLUMP_SIZE"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/leaf_clumps.png",
+      "label": "Leaf-litter clumps",
+      "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
+     },
+     "before_after": [
+      {
+       "label": "0 vs 8 leaf clumps",
+       "before": "images/params/leaf_before.png",
+       "after": "images/params/leaf_after.png",
+       "before_label": "0",
+       "after_label": "10",
+       "caption": "Range ends. native-resolution 540x540 px crop around the mine; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+    },
+    {
+     "id": "rocks",
+     "title": "Rocks",
+     "flag": "ROCKS_TO_SPAWN_MIN / MAX, ROCK_OUTPUT_SIZE_MIN / MAX",
+     "summary": "Rock photos with cast and contact shadows.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "5-20 per layer (two layers), 40-100 px"
+      ],
+      [
+       "distribution",
+       "Uniform integer per layer; under and over layer each draw."
+      ],
+      [
+       "override / config",
+       "ROCKS_TO_SPAWN_MIN / MAX, ROCK_OUTPUT_SIZE_MIN / MAX"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/rocks.png",
+      "label": "Rocks",
+      "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
+     },
+     "before_after": [
+      {
+       "label": "5 vs 20 rocks per layer",
+       "before": "images/params/rocks_before.png",
+       "after": "images/params/rocks_after.png",
+       "before_label": "5 per layer",
+       "after_label": "20 per layer",
+       "caption": "Range ends. whole 1920x1080 frame shown at 1/3 size; seed 11, one mine at the centre."
+      }
+     ],
+     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws). Rocks, grass clippings and dirt are drawn in BOTH debris layers (v1 behaviour), so some land on top of mines."
+    },
+    {
+     "id": "dirt",
+     "title": "Dirt snippets and specks",
+     "flag": "DIRT_SNIPPETS_PER_LAYER, DIRT_RECTS_PER_LAYER",
+     "summary": "Soil clod photos and small soft dirt specks on the ground.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "2-10 snippets and 50-200 soft specks per layer"
+      ],
+      [
+       "distribution",
+       "Uniform integer per layer."
+      ],
+      [
+       "override / config",
+       "DIRT_SNIPPETS_PER_LAYER, DIRT_RECTS_PER_LAYER"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/dirt.png",
+      "label": "Dirt snippets and specks",
+      "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
+     },
+     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+    },
+    {
+     "id": "grass_clippings",
+     "title": "Grass clippings (v1 photos)",
+     "flag": "GRASS_IMAGES_TO_SAMPLE, GRASS_CLIPPINGS_PER_IMAGE",
+     "summary": "Crops of v1 grass photos scattered as clutter.",
+     "facts": [
+      [
+       "type",
+       "randomized"
+      ],
+      [
+       "buckets",
+       "none (randomized)"
+      ],
+      [
+       "range",
+       "4 source photos x 5-16 crops per layer, 40-80 px"
+      ],
+      [
+       "distribution",
+       "Uniform integer per photo."
+      ],
+      [
+       "override / config",
+       "GRASS_IMAGES_TO_SAMPLE, GRASS_CLIPPINGS_PER_IMAGE"
+      ]
+     ],
+     "figure": {
+      "image": "images/params/grass_clippings.png",
+      "label": "Grass clippings (v1 photos)",
+      "caption": "Configured distribution from controlPanel (drawn inside the renderer, not in the plan table)."
+     },
+     "notes": "Configured distribution (drawn inside the renderer, not replicated in the plan; 20000 draws)."
+    }
+   ]
+  }
+ ]
+}

@@ -26,6 +26,12 @@ Builds one offline HTML file with two tabbed pages (v1 and v2) from JSON manifes
 
 Only `id` and `title` of a feature are needed; every other field may be absent or empty.
 
+Optional extras (feature pages): page `"tables":[{"title":"...","columns":["a","b"],"rows":[["1","2"]],"note":"..."}]`
+(rendered after the glossary), feature `"facts":[["key","value"], ...]` (small key/value table) and feature
+`"figure":{"image":"images/x.png","label":"...","caption":"..."}` (full-width, uncropped image, e.g. a graph).
+The fourth tab "Dataset v2: parameters" (`manifest_params.json`) is made by
+`showcase_scripts/params/build_params.py` from the dataset plan of `scripts/generate_dataset.py --plan-only`.
+
 ## Review grid page (`"type": "grid"`)
 
 A page with `"type": "grid"` becomes a review page (e.g. third tab "Review: buried mines") for flagging bad crops.

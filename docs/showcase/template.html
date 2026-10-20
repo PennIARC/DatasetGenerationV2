@@ -102,6 +102,18 @@ details.glossary dd{margin:0;color:var(--muted)}
 .ba .cap{color:var(--muted);font-size:.9rem;margin:6px 0 0;max-width:80ch}
 .notes{background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:8px;padding:10px 14px;margin-top:14px}
 .notes b{display:block;margin-bottom:2px}
+.ptable{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:18px;box-shadow:var(--shadow)}
+.ptable h2{font-size:1.1rem;margin:0 0 8px}
+.ptable .scroll,.facts{overflow-x:auto}
+.ptable table,.facts table{border-collapse:collapse;width:100%;font-size:.9rem}
+.ptable th,.ptable td,.facts th,.facts td{text-align:left;vertical-align:top;padding:5px 8px;border-bottom:1px solid var(--border)}
+.ptable th{background:var(--surface2);font-weight:600;position:sticky;top:0}
+.facts th{width:12em;color:var(--muted);font-weight:600}
+.ptable .tnote{color:var(--muted);font-size:.9rem;margin:8px 0 0}
+.figure{margin:12px 0 0}
+.figure button{all:unset;display:block;cursor:zoom-in;width:100%}
+.figure img,.figure .ph{width:100%;height:auto;display:block;border:1px solid var(--border);border-radius:8px;background:#fff;min-height:120px}
+.figure figcaption{color:var(--muted);font-size:.9rem;margin-top:4px}
 .empty{background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:10px;padding:18px;max-width:70ch}
 .lb{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px}
 .lb.open{display:flex}
@@ -752,6 +764,37 @@ function renderGrid(page){
   refresh();
 }
 
+/* ---------- tables / figures (optional: page.tables, feature.facts, feature.figure) ---------- */
+function dataTable(cols, rows){
+  var t = el("table");
+  if (cols.length) t.appendChild(el("thead", null, [el("tr", null, cols.map(function(c){ return el("th", {scope: "col", text: String(c)}); }))]));
+  var tb = el("tbody");
+  rows.forEach(function(r){ tb.appendChild(el("tr", null, arr(r).map(function(c){ return el("td", {text: c === null || c === undefined ? "" : String(c)}); }))); });
+  t.appendChild(tb);
+  return t;
+}
+function pageTable(t){
+  t = t || {};
+  var box = el("section", {"class": "ptable"});
+  if (str(t.title)) box.appendChild(el("h2", {text: t.title}));
+  box.appendChild(el("div", {"class": "scroll"}, [dataTable(arr(t.columns), arr(t.rows))]));
+  if (str(t.note)) box.appendChild(el("p", {"class": "tnote", text: t.note}));
+  return box;
+}
+function factsTable(facts){
+  var t = el("table");
+  var tb = el("tbody");
+  facts.forEach(function(kv){ kv = arr(kv); tb.appendChild(el("tr", null, [el("th", {scope: "row", text: String(kv[0] || "")}), el("td", {text: String(kv[1] === undefined ? "" : kv[1])})])); });
+  t.appendChild(tb);
+  return el("div", {"class": "facts"}, [t]);
+}
+function figureBlock(fg){
+  var it = {label: str(fg.label) || "figure", params: str(fg.params), caption: str(fg.caption), image: str(fg.image)};
+  var b = el("button", {type: "button", "aria-label": "Enlarge: " + it.label, onclick: function(ev){ lbOpen([it], 0, ev.currentTarget); }},
+    [img(it.image, it.label, "")]);
+  return el("figure", {"class": "figure"}, [b, it.caption ? el("figcaption", {text: it.caption}) : null]);
+}
+
 /* ---------- feature card ---------- */
 function featureCard(pageId, f){
   f = f || {};
@@ -763,6 +806,9 @@ function featureCard(pageId, f){
   if (str(f.summary)) card.appendChild(el("p", {"class": "summary", text: f.summary}));
   if (str(f.how)) card.appendChild(el("p", {"class": "meta"}, [el("b", {text: "How it works: "}), f.how]));
   if (str(f.code)) card.appendChild(el("p", {"class": "meta"}, [el("b", {text: "Code: "}), el("code", {text: f.code})]));
+  var facts = arr(f.facts);
+  if (facts.length) card.appendChild(factsTable(facts));
+  if (f.figure && typeof f.figure === "object") card.appendChild(figureBlock(f.figure));
   var opts = arr(f.options);
   if (opts.length){
     card.appendChild(el("h3", {text: "Options"}));
@@ -802,6 +848,7 @@ function renderPage(page, featureId){
     main.appendChild(el("details", {"class": "glossary"}, [el("summary", {text: "Terms used on this page"}), dl]));
   }
   if (page.type === "grid"){ renderGrid(page); return; }
+  arr(page.tables).forEach(function(t){ main.appendChild(pageTable(t)); });
   if (!feats.length){
     main.appendChild(el("div", {"class": "empty", role: "status", text: "No features listed for this page yet."}));
     return;
