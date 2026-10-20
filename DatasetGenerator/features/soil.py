@@ -107,10 +107,23 @@ def burial_overlay(alpha, alpha_full, height, local_bg, length_px, p):
     n1 = fx.fbm(h, w, max(2.0, 0.08 * L), rng)
     A = float(p.get("wander", 0.0))
     surf = 0.0
-    if A > 0:   # soil surface = nominal plane + low-frequency wander + mid / high-frequency bays and lumps
+    if A > 0:   # wavy soil surface = nominal plane + a sum of sine waves (random per mine) + a little noise
         rw = np.random.default_rng(p.get("wander_seed", 0))
-        wf = sum(wt * (2 * fx.fbm(h, w, max(2.0, sc * L), rw, octaves=2) - 1)
-                 for sc, wt in zip(p.get("wander_scales", (0.35, 0.12, 0.04)), p.get("wander_weights", (0.6, 0.3, 0.1))))
+        yy, xx = np.mgrid[:h, :w].astype(np.float32)
+        nw = int(rw.integers(p.get("waves", (4, 7))[0], p.get("waves", (4, 7))[1] + 1))
+        lo, hi = p.get("wave_length", (0.2, 0.8))
+        wf = np.zeros((h, w), np.float32)
+        tot = 0.0
+        for _ in range(nw):
+            lam = max(3.0, L * float(np.exp(rw.uniform(np.log(lo), np.log(hi)))))   # wavelength, px
+            th, ph = rw.uniform(0, np.pi), rw.uniform(0, 2 * np.pi)
+            amp_k = (lam / (hi * L)) ** 0.7 * rw.uniform(0.6, 1.0)                  # longer waves are taller
+            fn = np.sin if rw.random() < 0.5 else np.cos
+            wf += amp_k * fn(2 * np.pi * (xx * np.cos(th) + yy * np.sin(th)) / lam + ph)
+            tot += amp_k
+        wf /= max(tot, 1e-6)
+        nz = p.get("wave_noise", 0.15)
+        wf = (1 - nz) * wf / (np.abs(wf).max() + 1e-6) + nz * (2 * fx.fbm(h, w, max(2.0, 0.05 * L), rw, octaves=2) - 1)
         surf = A * wf
     cover = np.clip((surf + amp * n1 - hgt) / (0.25 * amp + 0.1 * A + 1e-6), 0, 1) * (alpha > 0)
     buried = np.clip(alpha_full - alpha, 0, 1)

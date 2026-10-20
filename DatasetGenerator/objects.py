@@ -306,7 +306,8 @@ def light_aligned_angle(rgb, alpha, sun_az, jitter):
 class Mine:
     """One mine instance: rendered on the fly from mine.stl (MESH_MINES) or a v1 sprite.
     seed = [SEED, image index, 10, mine number]; sub-streams: 0 core (scale, sprite, placement), 1 pose, 2 colour,
-    3 burial, 4 specular, 5 soil blend, 6 burial overlay, 7 shadow / AO, 8 v1 dots."""
+    3 burial, 4 specular, 5 soil blend, 6 burial overlay, 7 shadow / AO, 8 v1 dots, 9 burial cues, 11 contact
+    shadow."""
 
     def __init__(self, cfg, seed, scene):
         self.sub = lambda k: np.random.default_rng(list(seed) + [k])
@@ -424,34 +425,34 @@ class Mine:
             sB = burial_fx.strength_scale(self.meta["burial"]["fraction"])
             rngb = np.random.default_rng(bp["seed"])
             buried = np.clip(self.alpha_full - self.alpha, 0, 1)
-            ground = local
-            if cfg.BURIAL_DISTURBED_SOIL:   # turned soil on the ground, under shadow and mine
+            if cfg.BURIAL_DISTURBED_SOIL:   # faint turned soil on the ground, under shadow and mine
                 prgb, pa = burial_fx.disturbed_patch(self.alpha_full, buried, local, L, bp, sB, rngb, cfg)
                 fx.over(img, prgb, pa, self.x, self.y)
-            # ground as it now looks under the mine (incl. turned soil): the soil cover, ridge and clods take their
-            # colour / texture from it, so the covered part of the mine merges with the surrounding ground
-            ground = fx.crop_padded(img, self.x, self.y, h, w)
-        if cfg.SHADOWS:
+        elif cfg.SHADOWS:
             self._draw_shadow(img)
         rgb_pm, alpha = self.rgb_pm, self.alpha
         if cfg.SOIL_BLEND:
-            rgb_pm, info = soil.soil_blend(rgb_pm, alpha, self.alpha_full, local, L, sc["luma"],
-                                           soil.sample_soil_params(self.sub(5), cfg), cfg)
+            sp = soil.sample_soil_params(self.sub(5), cfg)
+            if buried_mine:   # weaker dark contact band around the exposed outline of a buried mine
+                sp["band_darken"] *= cfg.BURIAL_CONTACT_BAND_SCALE
+                sp["band_dust"] *= cfg.BURIAL_CONTACT_BAND_SCALE
+            rgb_pm, info = soil.soil_blend(rgb_pm, alpha, self.alpha_full, local, L, sc["luma"], sp, cfg)
             self.meta["soil_blend"] = info
         if not buried_mine:
             fx.over(img, rgb_pm, alpha, self.x, self.y)
             self.visible = alpha.copy()
             return
+        ground = fx.crop_padded(img, self.x, self.y, h, w)   # ground incl. turned soil, before the shadow
         p = soil.sample_burial_overlay_params(self.sub(6), cfg)
         b = self.meta["burial"]
-        p.update(wander=b.get("wander", 0.0), wander_seed=b.get("wander_seed", 0),
-                 wander_scales=cfg.BURIAL_WANDER_SCALES, wander_weights=cfg.BURIAL_WANDER_WEIGHTS,
+        p.update(wander=b.get("wander", 0.0), wander_seed=b.get("wander_seed", 0), waves=cfg.BURIAL_WAVES,
+                 wave_length=cfg.BURIAL_WAVE_LENGTH_FRAC, wave_noise=cfg.BURIAL_WAVE_NOISE,
                  ragged=cfg.BURIAL_RAGGED_EDGE, crumb_reach=cfg.BURIAL_CRUMB_REACH)
         if cfg.BURIAL_BERM:
             p["berm_opacity"] *= 0.5            # the shaded ridge below takes over most of the lip
         full = float((self.alpha_full > 0.5).sum())
         def soil_and_cleanup(p_):
-            """soil cover + removal of slivers / islands it leaves (covered with ground-coloured soil)."""
+            """soil cover + removal of slivers / islands it leaves (they count as covered by soil)."""
             s_rgb_, s_a_ = soil.burial_overlay(alpha, self.alpha_full, self.r["height"], ground, L, p_)
             vis_ = alpha * (1.0 - s_a_)
             keep_ = burial_fx.clean_mask(vis_ > 0.5, cfg.BURIAL_MIN_FRAGMENT_FRAC * full, self._open_r(L))
@@ -469,25 +470,25 @@ class Mine:
         else:  # still over the cap: keep soil off the visible mine (only the clip itself hides it)
             s_rgb, s_a, drop = soil_and_cleanup(p)
             s_a = np.where(alpha > 0.5, 0.0, s_a).astype(np.float32)
-            s_rgb = s_rgb * (s_a > 0)[..., None]
         stages = {"clip": float(1 - (alpha > 0.5).sum() / max(full, 1)),
                   "soil_line": float(1 - (alpha * (1.0 - s_a) > 0.5).sum() / max(full, 1))}
-        if drop.any():
-            soil_col = fx.gblur(ground, 1.0)
-            s_rgb = s_rgb * (1 - drop)[..., None] + soil_col * drop[..., None]
-            s_a = np.maximum(s_a, drop)
+        s_a = np.maximum(s_a, drop)
         vis = alpha * (1.0 - s_a)
         stages["fragments"] = float(1 - (vis > 0.5).sum() / max(full, 1))
+        if cfg.SHADOWS:   # cast by the final visible part only, never beyond the unburied shadow
+            self._draw_buried_shadow(img, vis, s_a)
+        # the soil over the mine IS the ground: its own pixels incl. turned soil, cast shadow and contact shading, so
+        # the covered part continues the surrounding ground without a seam or a separate shadow line (b002/b019/b020)
+        ground = fx.crop_padded(img, self.x, self.y, h, w)
+        s_rgb = ground * s_a[..., None]
         core = np.maximum(np.clip(self.alpha_full - alpha, 0, 1), s_a)
-        # the ridge / occlusion gradient follow the CLIP line (visible mine against the part cut away by the soil
-        # plane, incl. dropped fragments); the noisy soil cover over low rims only roughens the edge
-        # plus the soil cover connected to it (the irregular soil edge); isolated cover over low rims is ignored
+        # the ridge / occlusion gradient / clods follow the soil line: the clip boundary plus soil cover close to it;
+        # cover running along the outer outline of the exposed part (low wing rims) gets no ridge / clods
         clip_core = np.maximum(np.clip(self.alpha_full - alpha, 0, 1), drop)
-        n_cc, lab = cv2.connectedComponents((core > 0.5).astype(np.uint8), connectivity=8)
-        seeds = np.unique(lab[cv2.dilate((clip_core > 0.5).astype(np.uint8), burial_fx.K3) > 0])
-        seeds = seeds[seeds > 0]
-        clip_core = np.maximum(clip_core, np.isin(lab, seeds).astype(np.float32))
-        line, dist = burial_fx.soil_line(vis, clip_core)
+        near = cv2.distanceTransform((clip_core <= 0.5).astype(np.uint8), cv2.DIST_L2, 3) < max(3.0, 0.08 * L)
+        line, dist = burial_fx.soil_line(vis, np.maximum(clip_core, core * near))
+        if line.any():
+            dist = cv2.distanceTransform((~line).astype(np.uint8), cv2.DIST_L2, 3)
         if cfg.BURIAL_DIRTY_EXPOSED:
             rgb_pm = burial_fx.dirty_exposed(rgb_pm, alpha, dist, ground, L, bp, sB, rngb, cfg)
         fx.over(img, rgb_pm, alpha, self.x, self.y)
@@ -495,11 +496,13 @@ class Mine:
         cover = np.zeros_like(alpha)
         if cfg.BURIAL_BERM and line.any():
             r_rgb, r_a, r_sh = burial_fx.berm_ridge(dist, core, vis, ground, L, sc["sun"], bp, sB, rngb, cfg)
+            # the ridge's own short shadow stays inside the mine's unburied shadow region (never extends it)
+            r_sh = r_sh * np.clip(fx.gblur(self.r["shadow_full"], 1.5) * 2.0, 0, 1)
             fx.darken(img, fx.shadow_factor(r_sh, sc["sun"]["shadow_strength"], sc["sun"]["shadow_tint"]), self.x, self.y)
             fx.over(img, r_rgb, r_a, self.x, self.y)
             cover = np.maximum(cover, r_a)
         if cfg.BURIAL_CLODS and line.any():
-            for c_rgb, c_a, cx, cy, f, pad in burial_fx.clods(cfg, line, L, sc["sun"], bp, sB, rngb, ground):
+            for c_rgb, c_a, cx, cy, f, pad in burial_fx.clods(cfg, line, L, sc["sun"], bp, sB, rngb, ground, vis):
                 if cfg.SHADOWS:
                     fx.darken(img, f, self.x + cx - pad, self.y + cy - pad)
                 fx.over(img, c_rgb, c_a, self.x + cx, self.y + cy)
@@ -546,9 +549,29 @@ class Mine:
             return
         ao_s, ao_sig = shadows.sample_ao(self.sub(7), cfg)
         length = self.r["info"]["shadow_length_px"]
-        f, sigma = shadows.mine_shadow(self.r["shadow"], self.alpha, length, sun, ao_s, ao_sig, cfg)
+        contact = shadows.sample_contact(self.sub(11), self.meta["length_px"], sun, cfg)
+        f, sigma = shadows.mine_shadow(self.r["shadow"], self.alpha, length, sun, ao_s, ao_sig, cfg, contact)
         fx.darken(img, f, self.x, self.y)
-        self.meta["shadow"] = {"length_px": float(length), "penumbra_sigma_px": float(sigma), "contact_ao": ao_s}
+        self.meta["shadow"] = {"length_px": float(length), "penumbra_sigma_px": float(sigma), "contact_ao": ao_s,
+                               "contact_shadow": contact}
+
+    def _draw_buried_shadow(self, img, vis, soil_a):
+        """Buried mesh mine: cast shadow of the FINAL visible part (after soil cover / fragment clean-up) from its
+        height above the soil (height-field sweep), intersected with the unburied shadow, so burial can only shorten
+        or clip the shadow; contact AO from the visible footprint. Same penumbra as without burial."""
+        cfg, sun = self.cfg, self.scene["sun"]
+        ao_s, ao_sig = shadows.sample_ao(self.sub(7), cfg)
+        tilt = np.deg2rad(self.r["info"].get("plane_tilt", 0.0))
+        hpx = self.r["height"] * self.meta["length_px"] / max(np.cos(tilt), 0.5)
+        cov = np.minimum(burial_fx.height_shadow(vis, hpx, sun), self.r["shadow_full"])
+        length = self.r["info"]["shadow_length_px"]
+        contact = shadows.sample_contact(self.sub(11), self.meta["length_px"], sun, cfg)
+        # the exposed part goes INTO the soil there: contact shading on the soil cover is soft and low-contrast
+        damp = 1.0 - cfg.BURIAL_EDGE_AO_DAMP * fx.gblur(soil_a, 1.0)
+        f, sigma = shadows.mine_shadow(cov, vis, length, sun, ao_s, ao_sig, cfg, contact, damp)
+        fx.darken(img, f, self.x, self.y)
+        self.meta["shadow"] = {"length_px": float(length), "penumbra_sigma_px": float(sigma), "contact_ao": ao_s,
+                               "contact_shadow": contact, "buried_length_px": self.r["info"].get("shadow_length_buried_px")}
 
     def label(self, W, H, occlusion):
         """YOLO box. v1: un-occluded mask. LABEL_VISIBLE_MASK: mask after burial soil and overgrowth.

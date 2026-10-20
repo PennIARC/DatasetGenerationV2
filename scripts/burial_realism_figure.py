@@ -1,8 +1,10 @@
 """docs/burial_realism.png: partial burial before / after the soil-displacement cues.
 
 Rows: gravel, dark grass, light (dry) grass, bare soil, face-down mine, low sun (18 deg), high sun (65 deg).
-Columns: burial off | OLD 40% (all new burial cues and the fragment clean-up switched off) | NEW 40% |
-NEW 40% with BLADES_OVER_ON_MINE = 1 (blades lifted where they cross the soil line). Same seed per row; 4x zoom.
+Columns: burial off | OLD 40% (the pre-ragged baseline: all burial cues, the wavy soil line and the fragment
+clean-up switched off; the user's reference for "believable") | NEW 40% | NEW 40% with BLADES_OVER_ON_MINE = 1
+(blades lifted where they cross the soil line). Same seed per row; 4x zoom. The non-burial MINE_CONTACT_SHADOW is on
+in every column, so columns differ only by burial.
 
     python3 scripts/burial_realism_figure.py [--zoom 4] [--out docs/burial_realism.png]
 """
@@ -24,7 +26,7 @@ BUR = dict(burial_prob=1.0, burial_fraction=0.4, burial_tilt=15)
 OLD = dict(burial_berm=False, burial_disturbed_soil=False, burial_clods=False, burial_dirty_exposed=False,
            blade_soil_lift=False, blade_emerge=False, burial_min_fragment_frac=0.0, burial_open_px=0,
            burial_open_frac=0.0, burial_clip_share=1.0, burial_irregular_line=False,
-           burial_ragged_edge=False)
+           burial_ragged_edge=False, burial_contact_band_scale=1.0)
 CASES = [("gravel", 1, dict(mine_pose=(3, -2, 30))),
          ("dark grass", 12, dict(mine_pose=(3, -2, 30))),
          ("light dry grass", 8, dict(mine_pose=(4, 3, 120))),

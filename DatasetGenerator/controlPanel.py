@@ -192,6 +192,9 @@ PENUMBRA_BASE_PX = 0.6              # Gaussian sigma of the shadow edge at 1080p
 PENUMBRA_PER_LENGTH = 0.06          # ... + this * shadow length (px); low sun -> longer, softer shadows
 CONTACT_AO_STRENGTH = (0.1, 0.3)    # extra darkening right around the mine footprint (ambient occlusion)
 CONTACT_AO_SIGMA = (1.5, 3.5)       # px
+MINE_CONTACT_SHADOW = True          # soft contact shadow hugging the mine footprint on ALL sides, incl. the sun side
+MINE_CONTACT_STRENGTH = (0.2, 0.4)  #   (user review b008 / b022: "looks like it's floating"); darkening at the edge ...
+MINE_CONTACT_WIDTH_FRAC = (0.03, 0.06) # ... x clip(shadow strength / 0.45, 0.35, 1.3); Gaussian sigma / mine length
 MINE_HEIGHT_FRAC = 21.2 / 120.0     # PFM-1 thickness / length (sprite-mode 2D shadows)
 ROCK_HEIGHT_FRAC = (0.1, 0.35)      # rock height / on-screen width for the swept cast shadow (user: was 0.25-0.5)
 ROCK_SMALL_HEIGHT_SCALE = 0.5       # smallest rocks use this share of the drawn height (scales up to 1 for largest)
@@ -243,12 +246,13 @@ BURIAL_TILT = (0.0, 25.0)           # ground-plane tilt
 SOIL_EDGE_NOISE = (0.01, 0.035)     # soil-line roughness, mesh units (mine length = 1)
 BERM_WIDTH_PX = (2.0, 6.0)          # soil lip / berm along the buried edge
 BERM_OPACITY = (0.4, 0.85)
-BERM_DARKEN = (0.75, 0.95)          # disturbed soil is a little darker / damper than the surface
+BERM_DARKEN = (0.75, 0.95)          # (unused since round 4: the soil over the mine is the ground pixels themselves)
 BURIAL_IRREGULAR_LINE = True        # organic soil line instead of a straight clip edge: the soil surface is the
-BURIAL_LINE_WANDER = (0.015, 0.04)  # nominal plane +- this (mesh units, mine length = 1; x sqrt(fraction / 0.4))
-BURIAL_WANDER_SCALES = (0.35, 0.12, 0.04)   # fBm feature sizes (x mine length): low-frequency wander, bays, lumps
-BURIAL_WANDER_WEIGHTS = (0.6, 0.3, 0.1)
-BURIAL_RAGGED_EDGE = True           # soil edge made of crumbs (dithered grainy alpha + spilled crumbs) and the cover
+BURIAL_LINE_WANDER = (0.025, 0.055)  # nominal plane +- this (mesh units, mine length = 1; x sqrt(fraction / 0.4))
+BURIAL_WAVES = (4, 7)               # the wander is a sum of this many sin / cos waves (random direction, phase) ...
+BURIAL_WAVE_LENGTH_FRAC = (0.2, 0.8)   # ... with wavelengths log-uniform in this range x mine length ...
+BURIAL_WAVE_NOISE = 0.15            # ... plus this share of fBm noise on top
+BURIAL_RAGGED_EDGE = False          # soil edge made of crumbs (dithered grainy alpha + spilled crumbs) and the cover
 BURIAL_CRUMB_REACH = 0.06           # copies the ground pixels; crumbs reach this x mine length onto the exposed part
 BURIAL_MIN_FRAGMENT_FRAC = 0.06     # after clipping: visible islands smaller than this x full area are dropped ...
 BURIAL_OPEN_PX = 1                  # ... and structures thinner than ~2 r px removed (morphological opening, radius
@@ -258,22 +262,27 @@ BURIAL_OPEN_FRAC = 0.025            #     r = max(BURIAL_OPEN_PX, BURIAL_OPEN_FR
 BURIAL_BERM = True                  # raised, clumpy ridge along the soil line, sun-shaded, casting a short shadow
 BERM_RIDGE_WIDTH_FRAC = (0.03, 0.08)    # ridge width / mine length
 BERM_RIDGE_HEIGHT_FRAC = (0.02, 0.05)   # ridge height / mine length (cast-shadow length)
-BERM_RIDGE_OPACITY = (0.5, 0.8)
-BERM_RIDGE_SHADE = 0.35             # sun shading contrast of the ridge (lit side x (1 + this), far side x (1 - this))
+BERM_RIDGE_OPACITY = (0.3, 0.6)
+BERM_RIDGE_SHADE = 0.25             # sun shading contrast of the ridge (lit side x (1 + this), far side x (1 - this))
+BERM_RIDGE_SHADOW = 0.5            # ridge cast-shadow strength x this (soft, low contrast)
 BURIAL_DISTURBED_SOIL = True        # darker, rougher turned-soil patch around the buried part (on the ground)
 DISTURBED_RADIUS_FRAC = (0.08, 0.2) # patch extent beyond the buried region / mine length (noise-modulated edge)
-DISTURBED_DARKEN = (0.72, 0.88)
-DISTURBED_DESAT = (0.1, 0.3)
-DISTURBED_OPACITY = (0.35, 0.65)
+DISTURBED_DARKEN = (0.85, 0.95)
+DISTURBED_DESAT = (0.05, 0.15)
+DISTURBED_OPACITY = (0.15, 0.35)
+DISTURBED_SOIL_TINT = 0.35          # share of the brown turned-soil tone in the patch (rest = the ground pixels)
 BURIAL_CLODS = True                 # displaced soil clods (assets_new/dirt clods) along the soil line, with shadows
-BURIAL_CLOD_COUNT = (4.0, 10.0)     # at s = 1
-BURIAL_CLOD_SIZE_FRAC = (0.025, 0.06)   # clod width / mine length
+BURIAL_CLOD_COUNT = (2.0, 6.0)      # at s = 1 (user: few clods, clustered on 1-2 line segments)
+BURIAL_CLOD_SIZE_FRAC = (0.015, 0.09)   # clod width / mine length, log-uniform skewed to small (wide spread)
+BURIAL_CLOD_CLUSTER_FRAC = 0.06     # clods scatter around their cluster centre by this x mine length
+BURIAL_EDGE_AO_DAMP = 0.6           # contact AO / contact shadow on the soil covering a buried mine x (1 - this)
+BURIAL_CONTACT_BAND_SCALE = 0.5     # buried mines: SOIL_BLEND contact band darkening x this (no dark rim)
 BURIAL_CLOD_COLOUR_ADAPT = 0.85     # clod colour pulled towards the turned-soil colour at its position
 BURIAL_SOIL_RGB = (0.40, 0.31, 0.22)    # brown reference for turned soil (brightness follows the local ground) ...
 BURIAL_SOIL_MIX = (0.3, 0.75)       # ... mixed in by this much (more on green, grassy ground)
 BURIAL_DIRTY_EXPOSED = True         # exposed part: occlusion gradient at the soil line, darker / desaturated, grains,
 EXPOSED_AO_PX = (2.0, 6.0)          #   streaks and a dusty film, denser towards the buried side
-EXPOSED_AO_STRENGTH = (0.25, 0.45)
+EXPOSED_AO_STRENGTH = (0.1, 0.25)
 EXPOSED_DARKEN = (0.03, 0.1)
 EXPOSED_DESAT = (0.05, 0.15)
 EXPOSED_GRAIN_DENSITY = (0.04, 0.12)

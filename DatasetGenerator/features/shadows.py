@@ -70,13 +70,36 @@ def contact_shadow(alpha, width_px, sun, strength, width_frac, offset_frac):
     return (1.0 - strength * cov)[..., None] * np.ones(3, np.float32), pad
 
 
-def mine_shadow(shadow_cov, alpha, length_px, sun, ao_strength, ao_sigma, cfg):
+def mine_shadow(shadow_cov, alpha, length_px, sun, ao_strength, ao_sigma, cfg, contact=None, damp=None):
     """Mesh mine: shadow_cov is the rasterised projection of the 3D mesh along the sun (mesh.render_mine), on the
-    mine's canvas. Penumbra blur + contact AO from the mine's footprint. -> factor (h, w, 3) on the same canvas."""
+    mine's canvas. Penumbra blur + contact AO from the mine's footprint. contact = (strength, sigma_px) adds the
+    MINE_CONTACT_SHADOW ring: the footprint dilated by ~0.3 sigma and blurred by sigma, darkening the ground right
+    around the mine on ALL sides (incl. the sun side, where the cast shadow is hidden under the mine), so it sits in
+    the ground instead of floating (review b008 / b022). damp (h, w) in [0, 1] scales the AO / ring down (e.g. on
+    soil covering a buried mine). -> factor (h, w, 3) on the same canvas."""
     sigma = penumbra_sigma(length_px, sun, cfg)
     cov = fx.gblur(shadow_cov, sigma)
     ao = fx.gblur(alpha, ao_sigma) * ao_strength
+    if contact is not None and contact[0] > 0:
+        st, r = contact
+        k = max(1, int(round(0.3 * r)))
+        ring = cv2.dilate(alpha.astype(np.float32), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * k + 1, 2 * k + 1)))
+        ao = 1.0 - (1.0 - ao) * (1.0 - st * fx.gblur(ring, max(0.5, r)))
+    if damp is not None:
+        ao = ao * damp
     return fx.shadow_factor(cov, sun["shadow_strength"], sun["shadow_tint"]) * (1.0 - ao)[..., None], sigma
+
+
+def sample_contact(rng, length_px, sun, cfg):
+    """MINE_CONTACT_SHADOW parameters -> (strength, sigma_px) or None (flag off). Strength scales with the image's
+    shadow strength like the rock contact shadow (overcast images keep a weaker one)."""
+    u = rng.random(2)
+    if not (cfg.SHADOWS and cfg.MINE_CONTACT_SHADOW):
+        return None
+    st = cfg.MINE_CONTACT_STRENGTH[0] + (cfg.MINE_CONTACT_STRENGTH[1] - cfg.MINE_CONTACT_STRENGTH[0]) * u[0]
+    st *= float(np.clip(sun["shadow_strength"] / cfg.ROCK_CONTACT_SUN_REF, cfg.ROCK_CONTACT_MIN_SCALE, 1.3))
+    wf = cfg.MINE_CONTACT_WIDTH_FRAC[0] + (cfg.MINE_CONTACT_WIDTH_FRAC[1] - cfg.MINE_CONTACT_WIDTH_FRAC[0]) * u[1]
+    return float(st), float(max(1.0, wf * length_px))
 
 
 def sample_ao(rng, cfg):

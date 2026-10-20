@@ -2,9 +2,10 @@
 
 Without these, a buried mine looks like a mine with a piece cut away. Real burial disturbs the soil:
   * clean_fragments      drop slivers / tiny islands the clip plane leaves on thin wings and rims
-  * disturbed_patch      BURIAL_DISTURBED_SOIL: a darker, rougher patch of turned soil around the buried part
-  * berm_ridge           BURIAL_BERM: a raised, clumpy ridge along the soil line, shaded by the sun (lit side
-                         lighter, far side darker) and casting a short shadow onto the mine and the ground
+  * height_shadow        cast shadow of the final visible part only (height-field sweep)
+  * disturbed_patch      BURIAL_DISTURBED_SOIL: a faint, patchy, slightly darker turned-soil patch near the buried part
+  * berm_ridge           BURIAL_BERM: an intermittent low ridge along the soil line made of the ground's own pixels,
+                         shaded by the sun (lit side lighter, far side darker), soft short shadow
   * dirty_exposed        BURIAL_DIRTY_EXPOSED: the exposed part gets an occlusion gradient at the soil line, is
                          darker / less saturated overall, and carries grains, streaks and a dusty film whose density
                          rises towards the buried side
@@ -81,6 +82,31 @@ def soil_colour(local_blur, cfg):
     return (local_blur * (1 - mix) + brown * mix).astype(np.float32)
 
 
+def height_shadow(vis, height_px, sun, step_px=0.75, max_steps=160):
+    """Cast-shadow coverage of the VISIBLE part of a buried mine only: each visible pixel (coverage vis, height
+    height_px above the soil) shades the ground from itself up to height / tan(elevation) px away from the sun
+    (height-field sweep). Soil-covered / dropped parts cast nothing, so no outline of the hidden part remains
+    (review b004), and the soil cover gets exactly the shadow the surrounding ground gets (review b002).
+    -> coverage (h, w) incl. the visible footprint."""
+    h, w = vis.shape
+    off = np.nan_to_num(np.maximum(height_px, 0), nan=0.0) / np.tan(np.deg2rad(max(sun["elevation"], 5.0)))
+    v = np.clip(vis, 0, 1).astype(np.float32)
+    m = v > 0.01
+    if not m.any():
+        return v
+    D = float(off[m].max())
+    n = int(np.clip(np.ceil(D / step_px), 1, max_steps))
+    dt = D / n
+    sd = _sun_dir_img(sun["azimuth"])
+    cov = v.copy()
+    for k in range(1, n + 1):
+        t = k * dt
+        src = v * np.clip((off - t) / dt + 1, 0, 1)
+        M = np.float32([[1, 0, -sd[0] * t], [0, 1, -sd[1] * t]])
+        cov = np.maximum(cov, cv2.warpAffine(src, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=0))
+    return cov
+
+
 # ----------------------------------------------------------------------------------------------- params
 def sample_params(rng, cfg):
     u = rng.random(24)
@@ -107,12 +133,15 @@ def disturbed_patch(alpha_full, buried, local, L, p, s, rng, cfg):
     d = cv2.distanceTransform(1 - seed_m, cv2.DIST_L2, 3)
     n = fx.fbm(h, w, max(2.0, 0.2 * L), rng)
     a = np.clip(1 - d / (R * (0.5 + 1.0 * n)), 0, 1)          # irregular, noise-modulated boundary
-    a = fx.gblur(a, max(1.0, 0.05 * L)) * p["patch_opacity"] * min(1.0, s)
-    tex = 0.8 + 0.4 * fx.fbm(h, w, max(1.5, 0.03 * L), rng, octaves=3)   # rough, clumpy texture
-    base = soil_colour(fx.gblur(local, max(1.0, 0.1 * L)), cfg)
+    # patchy, not a filled copy of the buried footprint: large-scale noise breaks it up so its outline cannot trace
+    # the hidden wing (review b004: a smooth, darker ghost of the old footprint)
+    blot = np.clip(fx.fbm(h, w, max(3.0, 0.25 * L), rng, octaves=2) * 2.0 - 0.6, 0, 1)
+    a = fx.gblur(a * blot, max(1.0, 0.08 * L)) * p["patch_opacity"] * min(1.0, s)
+    tex = 0.9 + 0.2 * fx.fbm(h, w, max(1.5, 0.03 * L), rng, octaves=3)   # rough, clumpy texture
+    # the ground's own pixels (unblurred: same grain / stones / grass bits), only a little darker and browner
+    base = local * (1 - cfg.DISTURBED_SOIL_TINT) + soil_colour(local, cfg) * cfg.DISTURBED_SOIL_TINT
     lum = fx.luminance(base)[..., None]
     col = (base * (1 - p["patch_desat"]) + lum * p["patch_desat"]) * p["patch_darken"] * tex[..., None]
-    col = col * np.array([1.02, 0.98, 0.94], np.float32)          # turned soil: slightly warmer / browner
     return (col * a[..., None]).astype(np.float32), a.astype(np.float32)
 
 
@@ -138,9 +167,10 @@ def berm_ridge(line_dist, core, vis, local, L, sun, p, s, rng, cfg):
     shade = -(gx * sd[0] + gy * sd[1]) * (width * 1.5)            # >0 on the sunlit slope
     k = cfg.BERM_RIDGE_SHADE * sun["shadow_strength"] / 0.45
     shade = np.clip(1 + k * np.clip(shade, -1, 1), 0.7, 1.15)   # no bright outline on light ground
-    g = fx.gblur(local, max(1.0, 0.04 * L))
-    # turned soil: same tone as the disturbed patch (darker than the undisturbed surface), clumpy texture
-    base = (0.6 * g + 0.4 * soil_colour(g, cfg)) * p["patch_darken"] * (0.85 + 0.3 * clumps)[..., None]
+    # same material as the ground right there (its own pixels, lightly smoothed), with a little clump texture; only
+    # the sun shading tells it is raised (no darker / browner band along the line)
+    g = fx.gblur(local, 0.7)
+    base = g * (0.94 + 0.12 * clumps)[..., None]
     rgb = base * shade[..., None]
     # cast shadow of the ridge (height ~ ridge_height_frac x L) away from the sun
     hpx = p["ridge_height_frac"] * L * min(1.0, s)
@@ -148,7 +178,7 @@ def berm_ridge(line_dist, core, vis, local, L, sun, p, s, rng, cfg):
     dx, dy = -sd[0] * length, -sd[1] * length
     M = np.float32([[1, 0, dx], [0, 1, dy]])
     sh = cv2.warpAffine((height > 0.25).astype(np.float32), M, (w, h), flags=cv2.INTER_LINEAR)
-    sh = fx.gblur(np.clip(sh - (height > 0.25), 0, 1), max(0.7, 0.3 * length))
+    sh = fx.gblur(np.clip(sh - (height > 0.25), 0, 1), max(1.0, 0.5 * length)) * cfg.BERM_RIDGE_SHADOW
     return (rgb * a[..., None]).astype(np.float32), a.astype(np.float32), sh.astype(np.float32)
 
 
@@ -192,36 +222,47 @@ def dirty_exposed(rgb_pm, alpha, line_dist, local, L, p, s, rng, cfg):
 
 
 # ----------------------------------------------------------------------------------------------- clods
-def clods(cfg, line, L, sun, p, s, rng, local):
-    """A few displaced soil clods along / near the soil line. -> list of (rgb_pm, alpha, x, y, shadow_factor, pad)
-    in canvas coordinates (centre placed near random soil-line pixels)."""
+def clods(cfg, line, L, sun, p, s, rng, local, vis=None):
+    """A few displaced soil clods, clustered on one or two segments of the soil line (not all around the mine), with
+    a wide size spread (log-uniform: a few large, several small). -> list of (rgb_pm, alpha, x, y, shadow_factor,
+    pad) in canvas coordinates."""
     ys, xs = np.nonzero(line)
     files = [f for f in (assets.list_files(assets.asset_path(cfg, d)) for d, _ in cfg.DIRT_SOURCES) for f in f
              if "clod" in f.rsplit("/", 1)[-1] and assets.audit_status(cfg, f) != "exclude"]
     n = int(round(p["clod_count"] * s))
     out = []
-    ground = local
-    soil_col = soil_colour(fx.gblur(local, max(1.0, 0.1 * L)), cfg)
     if not len(xs) or not files or n <= 0:
         return out
-    for _ in range(n):
+    ground = local
+    soil_col = soil_colour(fx.gblur(local, max(1.0, 0.1 * L)), cfg)
+    # 1-2 cluster centres on the line; clods scatter around them along / across the line
+    n_cl = 1 if rng.random() < 0.5 else 2
+    centres = [(xs[i], ys[i]) for i in rng.integers(0, len(xs), n_cl)]
+    lo, hi = cfg.BURIAL_CLOD_SIZE_FRAC
+    for k in range(n):
         u = rng.random(6)
         cut = assets.load_cutout(files[min(int(u[0] * len(files)), len(files) - 1)])
         if cut is None:
             continue
         rgb, a, _ = cut
-        size = max(3, int((cfg.BURIAL_CLOD_SIZE_FRAC[0] + (cfg.BURIAL_CLOD_SIZE_FRAC[1] - cfg.BURIAL_CLOD_SIZE_FRAC[0]) * u[1]) * L))
+        size = max(2, int(L * float(np.exp(np.log(lo) + (np.log(hi) - np.log(lo)) * u[1] ** 1.6))))  # skewed small
         th = max(2, int(size * a.shape[0] / a.shape[1]))
         prgb, pa = edges.resize_rotate(rgb, a, size, th, float(u[2] * 360), True, 0.6)
-        i = min(int(u[3] * len(xs)), len(xs) - 1)
-        off = (u[4] - 0.5) * 0.25 * L
-        cx, cy = xs[i] + off * np.cos(u[5] * 6.28), ys[i] + off * np.sin(u[5] * 6.28)
-        # colour / brightness matched to the ground right there (mean over the clod footprint), a touch lighter on
-        # top (lumps catch the light); the clod keeps its own texture
+        ccx, ccy = centres[k % n_cl]
+        spread = cfg.BURIAL_CLOD_CLUSTER_FRAC * L
+        for _try in range(6):   # on the soil side of the line: a clod centred on the exposed mine reads as a hole
+            cx, cy = ccx + rng.normal(0, spread), ccy + rng.normal(0, spread * 0.6)
+            iy, ix = int(np.clip(cy, 0, line.shape[0] - 1)), int(np.clip(cx, 0, line.shape[1] - 1))
+            if vis is None or vis[iy, ix] < 0.5:
+                break
+        else:
+            continue
         y0, x0 = int(np.clip(cy - size, 0, ground.shape[0] - 1)), int(np.clip(cx - size, 0, ground.shape[1] - 1))
         patch = ground[y0:y0 + 2 * size + 1, x0:x0 + 2 * size + 1].reshape(-1, 3)
         tgt = 0.7 * patch.mean(0) + 0.3 * soil_col[int(np.clip(cy, 0, soil_col.shape[0] - 1)),
                                                    int(np.clip(cx, 0, soil_col.shape[1] - 1))]
+        # lumps catch the light: never darker than the median ground around them (no dark "holes")
+        tgt = np.maximum(tgt, np.median(patch, 0) * 0.95) if len(patch) else tgt
         prgb = blades.adapt_colour(prgb, pa, tgt, cfg.BURIAL_CLOD_COLOUR_ADAPT, 1.0 + 0.15 * u[5])
         f, pad = shadows.debris_shadow(pa, 0.15 * size, sun, 0.6 * sun["shadow_strength"], cfg, max_length=0.6 * size)
         out.append((prgb, pa, int(cx - pa.shape[1] / 2), int(cy - pa.shape[0] / 2), f, pad))

@@ -92,6 +92,13 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
     U(`ROCK_GROUND_TINT`=0.1-0.35) towards the local ground colour, and the rim on the side away from the sun is
     darkened by U(`ROCK_RIM_DARKEN`=0.15-0.35) x shadow strength / 0.45 (a thin self-shadow line). The 0.8 px alpha
     feather (`DEBRIS_ALPHA_FEATHER`) is unchanged.
+- **Mine contact shadow** (`MINE_CONTACT_SHADOW`, separate flag; user review b008 "looks like it's floating ... not
+  enough of [the shadow] is under the mine itself" and b022 "mine looks like it's floating"): the cast shadow starts
+  at the footprint and runs away from the sun, so on the sun side nothing grounded the mine (the 1.5-3.5 px contact
+  AO was invisible on busy grass). Now a soft ring hugs the footprint on all sides: the silhouette dilated by 0.3
+  sigma and blurred by sigma = U(`MINE_CONTACT_WIDTH_FRAC`=0.03-0.06) x mine length, darkening by
+  U(`MINE_CONTACT_STRENGTH`=0.2-0.4) x clip(shadow strength / 0.45, 0.35, 1.3). Own random sub-stream (11). Seed 5008:
+  ground 1-6 px outside the sun-side edge 0.94 -> 0.87 of the no-mine ground; seed 5022 (sun 60 deg) 0.98 -> 0.94.
 - **Why rocks too**: otherwise "has a shadow => mine" becomes a shortcut.
 - **Limitations**: the background photos have their own baked shadows in arbitrary directions; mine shadows fall
   on a flat (or the tilted burial) plane, not on rocks or grass relief; the PFM-1 wings are thin, so mine shadows
@@ -113,8 +120,8 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
 - **How** (`features/mesh.py`): a soil plane tilted U(`BURIAL_TILT`=0-25) deg in a random direction. Because the
   top-down visible surface is a height field, the plane offset is the burial-fraction quantile of n.p over the top
   surface points (from a low-res depth render), which hits the target area exactly. The 3D triangles are then
-  clipped against the plane (Sutherland-Hodgman) and the clipped mesh is rendered and shadow-projected onto that
-  plane. `soil.burial_overlay` adds a rough soil line (surface within fBm x `SOIL_EDGE_NOISE` of the plane is
+  clipped against the plane (Sutherland-Hodgman) and the clipped mesh is rendered and shadow-projected onto the
+  (horizontal) soil level (round 4: the visible part's own height-field shadow, never longer than the unburied one). `soil.burial_overlay` adds a rough soil line (surface within fBm x `SOIL_EDGE_NOISE` of the plane is
   covered) and a berm (soil lip, `BERM_WIDTH_PX` 2-6, irregular width) in the local ground colour, darkened
   by `BERM_DARKEN`. If the soil line pushes the hidden area past the cap, it is shrunk (up to 4 times).
   Achieved fraction is recorded (`burial.achieved`).
@@ -160,7 +167,8 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
     drawn but count for the label mask with the largest weight that keeps the cap (bisection). Sidecar:
     `burial.hidden_by_stage` (clip, soil_line, fragments, final), `burial.realism` (all sampled cue parameters),
     `burial.scale`, `burial.cap_exceeded`. 50-image sample: 63 buried mines, max hidden 0.50, cap never exceeded.
-- **Organic soil line (third round of user feedback: "the burial line is too straight")** (`BURIAL_IRREGULAR_LINE`):
+- **Organic soil line (third round of user feedback: "the burial line is too straight"; the fBm wander below was replaced
+  by sin / cos waves in the round-4 rework)** (`BURIAL_IRREGULAR_LINE`):
   the soil surface is no longer the clip plane itself but the plane +- a wander of U(`BURIAL_LINE_WANDER`=0.015-0.04)
   mesh units x sqrt(fraction / 0.4) (clipped to 0.5-1.2), built from three fBm layers (`BURIAL_WANDER_SCALES` =
   0.35 / 0.12 / 0.04 x mine length, `BURIAL_WANDER_WEIGHTS` = 0.6 / 0.3 / 0.1: slow wander, bays, small lumps) plus
@@ -173,7 +181,8 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
   covered part merges with the surrounding ground without a seam. The 50% cap check now includes the fragment
   clean-up and the final label clean-up (50-image sample: 63 buried mines, max hidden 0.50, cap never exceeded);
   `tests/test_burial.py` passes (no slivers / islands, anchor fixed).
-- **Ragged, ground-textured soil edge (fourth round of user feedback)** (`BURIAL_RAGGED_EDGE`): the covered edge is
+- **Ragged, ground-textured soil edge (fourth round of user feedback; REJECTED by the user, now off:
+  `BURIAL_RAGGED_EDGE` = False; replaced by the round-4 rework below)** (`BURIAL_RAGGED_EDGE`): the covered edge is
   no longer a smooth feather of the silhouette. (a) The soil-cover ramp is dithered against clustered multi-scale
   grain noise, so the transition is made of soil crumbs with grainy partial coverage (0.35 px anti-aliasing only);
   (b) crumbs spill onto the exposed mine up to `BURIAL_CRUMB_REACH`=6% of the mine length from the covered part,
@@ -187,6 +196,44 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
   `EXPOSED_DESAT`=0.05-0.15, `EXPOSED_FILM`=0.05-0.15). Tuned on gravel, dark grass, light dry grass and bare soil
   at 6x. Tests pass (1-2 px structures now 0.3-1.9% of the visible pixels, from the intentional crumbs; limit 6%);
   50-image sample: max hidden 0.50, cap never exceeded.
+- **Round-4 rework: wavy edge, soil = ground, physical shadow (user feedback 0024 and review-grid notes 0100 / 0102;
+  ADR `docs/history/0012-burial-round4.md`)**. Baseline is the pre-ragged "OLD 40%" look, which the user found more
+  believable; everything new is subtle and local.
+  - Wavy soil line: the soil surface is the nominal plane + `wander` x (sum of `BURIAL_WAVES`=4-7 sin / cos plane
+    waves, random direction and phase, wavelengths log-uniform in `BURIAL_WAVE_LENGTH_FRAC`=0.2-0.8 x mine length,
+    longer waves taller) + `BURIAL_WAVE_NOISE`=15% fBm. `BURIAL_LINE_WANDER`=0.025-0.055 mesh units. On flat wings this
+    gives gentle bays; where the line meets a real height step of the mesh it stays on the step (user, b005: "a
+    straight line ... along the ridge ... is believable").
+  - No crumbs, no dotted rim: `BURIAL_RAGGED_EDGE` off; the soil lip is no longer darkened; the SOIL_BLEND contact band
+    of a buried mine is halved (`BURIAL_CONTACT_BAND_SCALE`=0.5).
+  - Soil over the mine = the ground itself: the cover alpha is computed first, then the shadow is drawn, then the
+    cover is filled with the ground pixels as they look after the shadow (incl. the turned-soil patch, the exposed
+    part's cast shadow and contact shading). No seam, no separate brighter patch, no shadow line between the soil on
+    the mine and the ground (b002, b019, b020). Dropped slivers are filled with the same pixels (no blur).
+  - Shadow of a buried mine (b002 "extends further than in the non-buried image", b004 "outline/shadow around the
+    mine"): (a) `mesh.render_mine` now projects onto a horizontal surface at the soil level under each vertex
+    (max(soil plane height, z0)) instead of onto the tilted plane (whose 1 / (n.L) stretch made it up to ~4x longer
+    at low sun), and the result is intersected with the unburied shadow raster (`shadow_full`); (b) the shadow drawn
+    is cast by the FINAL visible part only (`burial_fx.height_shadow`: height-field sweep of the visible mask, height
+    above the soil / tan(elevation)), intersected with `shadow_full`, so soil-covered or dropped parts cast nothing;
+    (c) the penumbra uses the unburied shadow length (burial does not sharpen it); (d) contact AO / contact shadow on
+    the soil cover is damped by `BURIAL_EDGE_AO_DAMP`=0.6 (soft, low-contrast shading only at the edge).
+  - Ridge (`BURIAL_BERM`): made of the ground's own pixels (lightly smoothed) with sun shading only
+    (`BERM_RIDGE_SHADE`=0.25, `BERM_RIDGE_OPACITY`=0.3-0.6); its cast shadow is softer, x `BERM_RIDGE_SHADOW`=0.5,
+    and clipped to the mine's unburied shadow region. Exposed-part occlusion at the line `EXPOSED_AO_STRENGTH`=0.1-0.25.
+  - Turned-soil patch (`BURIAL_DISTURBED_SOIL`): faint and patchy (broken up by large-scale noise so it cannot trace
+    the hidden wing), unblurred ground pixels only slightly darker / browner (`DISTURBED_DARKEN`=0.85-0.95,
+    `DISTURBED_DESAT`=0.05-0.15, `DISTURBED_OPACITY`=0.15-0.35, `DISTURBED_SOIL_TINT`=0.35). Before, a blurred,
+    darkened copy shaped like the buried footprint left a ghost outline (b004) and made the soil on the mine darker
+    than the ground (b019).
+  - Clods: `BURIAL_CLOD_COUNT`=2-6 (x s), in 1-2 clusters on segments of the soil line (`BURIAL_CLOD_CLUSTER_FRAC`
+    =0.06), sizes log-uniform 1.5-9% of the mine length skewed to small; never centred on the exposed mine (read as
+    holes) and never darker than the median ground around them.
+  - Tests: `tests/test_burial_shadow_edge.py` (shadow reach with burial <= without + 2 px for 6 seeds incl. low sun
+    18 deg, tilt 25 deg, face down; soil line departs from the plain clip line, crosses it, stays within 15% of the
+    mine length); `tests/test_burial.py` now checks the final visible mask (the 3D clip alone hides less because
+    the soil surface decides the rest). 50-image sample: 85 buried mines, max hidden 0.50, cap never exceeded,
+    1.16 s / image.
 - **Blades over buried mines** (`BLADE_SOIL_LIFT`, `BLADE_EMERGE`): every over-layer blade / tuft / wisp that
   crosses a buried mine's soil-line zone is warped (cv2.remap with a smooth weight around the clip line): its pixels
   are lifted by up to ~4% of the mine length (1.5-6 px) towards the sun side (away from the shadow direction), a soft
@@ -194,7 +241,10 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
   soil-covered region are partly covered by soil (`BLADE_EMERGE_COVER`=0.6, noise-modulated), so they look rooted /
   emerging. Pool blades are also capped in width (`BLADE_WIDTH_MM` max; tufts / wisps 3x) so no flat, wide strips.
 - **Limitations**: the soil plane is a plane (no local relief); no soil spilled onto the wings away from the line;
-  where the tilted plane runs close to a low wing rim, the noisy soil line can cover a thin strip of that rim.
+  where the tilted plane runs close to a low wing rim, the noisy soil line can cover a thin strip of that rim. The
+  wave can split the visible part into two pieces (each above the minimum fragment size). Soil copies the photo
+  under the mine, so a mine on a thick straw / grass mat does not "weigh into" it (user, b001: not worth solving).
+  Blades over a buried mine can push the total hidden share past 50% (b001: left as is for now).
 
 ## 6. Colours (`COLOUR_PALETTE`), photometric jitter (`PHOTOMETRIC_JITTER`), backgrounds (`BG_AUGMENT`, `NEW_ASSETS`)
 - **Palette** (`features/colour.py`), HSV ranges and weights (H deg, S, V):

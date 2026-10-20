@@ -28,7 +28,8 @@ def _place(m, W=1920, H=1080):
     m.set_position(W, H, centre=(960, 540))
     canvas = np.zeros((H, W), np.float32)
     h, w = m.alpha.shape
-    canvas[m.y:m.y + h, m.x:m.x + w] = m.alpha
+    m.draw(np.full((H, W, 3), 0.4, np.float32))     # final visible mask (clip + wavy soil cover + clean-up)
+    canvas[m.y:m.y + h, m.x:m.x + w] = m.visible
     full = np.zeros((H, W), np.float32)
     full[m.y:m.y + h, m.x:m.x + w] = m.alpha_full
     return canvas, full, (m.x + m.bx0, m.y + m.by0)
@@ -39,7 +40,8 @@ def check(seed, pose):
     out = {}
     for b in (0.0, 1.0):
         cfg = make_config({**ov, "burial_prob": b})
-        scene = {"sun": sunmod.sample_sun(np.random.default_rng([seed, 0, 0]), cfg), "luma": 0.4}
+        scene = {"sun": sunmod.sample_sun(np.random.default_rng([seed, 0, 0]), cfg), "luma": 0.4, "px_per_mm": 1.0,
+                 "blade_budget": [0]}
         m = Mine(cfg, [seed, 0, 10, 0], scene)
         out[b] = _place(m)
     vis_off, _, anchor_off = out[0.0]

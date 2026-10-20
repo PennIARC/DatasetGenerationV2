@@ -179,7 +179,8 @@ def render_mine(cp, pose, ppu, sun_az, sun_el, albedo, shadow_strength, burial=N
 
     -> dict with (all arrays share one canvas, float32):
        rgb_pm (h, w, 3) premultiplied colour, alpha (h, w) visible coverage, alpha_full (h, w) coverage before
-       burial, shadow (h, w) shadow coverage (unblurred, includes the mine footprint), height (h, w) height of the
+       burial, shadow (h, w) shadow coverage (unblurred, includes the mine footprint), shadow_full (h, w) the same
+       without burial (burial only ever shrinks the shadow: shadow <= shadow_full), height (h, w) height of the
        visible surface above the soil plane in mesh units (NaN outside), and info (burial plane etc.).
     """
     V, F = load_mesh(asset_path(cp, cp.MINE_STL_PATH))
@@ -226,15 +227,26 @@ def render_mine(cp, pose, ppu, sun_az, sun_el, albedo, shadow_strength, burial=N
     else:
         tri_full = tri
 
-    # shadow: project vertices along the sun onto the soil plane (orthographic, all triangles, union fill)
-    denom = max(float(n_pl @ L), 0.1)
+    # shadow: project vertices along the sun onto the ground (orthographic, all triangles, union fill). The ground
+    # around the mine is the (flat) photo, so the shadow falls on a HORIZONTAL surface at the soil level under each
+    # vertex (the tilted soil plane only decides what is buried, never stretches the shadow): soil level =
+    # max(plane height at the vertex, z0). A vertex's offset is then (z - soil) / L_z <= (z - z0) / L_z, its offset
+    # without burial, so burial can only shorten the shadow (user feedback, review card b002).
+    Lz = max(float(L[2]), 0.1)
     flat = tri.reshape(-1, 3)
-    d = (flat @ n_pl - c_pl) / denom
+    if burial_frac > 0 and abs(n_pl[2]) > 1e-6:
+        soil_z = np.maximum((c_pl - flat[:, 0] * n_pl[0] - flat[:, 1] * n_pl[1]) / n_pl[2], z0)
+    else:
+        soil_z = np.full(len(flat), z0)
+    d = (flat[:, 2] - soil_z) / Lz
     sh = (flat - np.outer(np.maximum(d, 0), L)).reshape(tri.shape)
+    flat_full = tri_full.reshape(-1, 3)
+    sh_full = (flat_full - np.outer(np.maximum((flat_full[:, 2] - z0) / Lz, 0), L)).reshape(tri_full.shape)
 
     pts = np.concatenate([tri_full[..., :2].reshape(-1, 2), sh[..., :2].reshape(-1, 2)])
     pad = 4 + int(np.ceil(3 * (cp.PENUMBRA_BASE_PX + cp.PENUMBRA_PER_LENGTH * 0.4 * ppu) + cp.BERM_WIDTH_PX[1] * 2
-                           + 3 * cp.CONTACT_AO_SIGMA[1]))
+                           + 3 * cp.CONTACT_AO_SIGMA[1]
+                           + (3.5 * cp.MINE_CONTACT_WIDTH_FRAC[1] * ppu if cp.MINE_CONTACT_SHADOW else 0)))
     lo, hi = pts.min(0), pts.max(0)
     # Canvas origin snapped to whole pixels relative to the UNCLIPPED mesh's top-left corner, so the mine has the
     # same sub-pixel phase (identical anti-aliased silhouette / bbox) with or without burial, whatever the shadow does.
@@ -279,14 +291,23 @@ def render_mine(cp, pose, ppu, sun_az, sun_el, albedo, shadow_strength, burial=N
         ff = tri_full[front_all]
         alpha_full = (_raster_union(_to_px(ff[..., :2], org, ppu, ss), S) > 0).astype(np.float32)
     shadow = (_raster_union(_to_px(sh[..., :2], org, ppu, ss), S) > 0).astype(np.float32)
+    if tri_full is tri:
+        shadow_full = shadow
+    else:   # unburied shadow on the same canvas; the buried one never reaches outside it
+        shadow_full = (_raster_union(_to_px(sh_full[..., :2], org, ppu, ss), S) > 0).astype(np.float32)
+        shadow = np.minimum(shadow, shadow_full)
 
     if ss > 1:
         down = lambda a: cv2.resize(a, (w, h), interpolation=cv2.INTER_AREA)
-        rgb, alpha, alpha_full, shadow = down(rgb), down(alpha), down(alpha_full), down(shadow)
+        rgb, alpha, alpha_full, shadow, shadow_full = down(rgb), down(alpha), down(alpha_full), down(shadow), down(shadow_full)
         hz = np.nan_to_num(height, nan=0.0)
         hsum = down(hz * m)
         height = np.where(alpha > 1e-3, hsum / np.maximum(alpha, 1e-3), np.nan).astype(np.float32)
-    info["shadow_length_px"] = float(np.max(np.linalg.norm((flat - sh.reshape(-1, 3))[:, :2], axis=1)) * ppu) \
+    # penumbra follows the UNBURIED shadow length, so burial does not make the remaining shadow sharper
+    info["shadow_length_px"] = float(np.max(np.linalg.norm((flat_full - sh_full.reshape(-1, 3))[:, :2], axis=1))
+                                     * ppu) if len(flat_full) else 0.0
+    info["shadow_length_buried_px"] = float(np.max(np.linalg.norm((flat - sh.reshape(-1, 3))[:, :2], axis=1)) * ppu) \
         if len(flat) else 0.0
-    return {"rgb_pm": rgb, "alpha": alpha, "alpha_full": alpha_full, "shadow": shadow, "height": height,
+    return {"rgb_pm": rgb, "alpha": alpha, "alpha_full": alpha_full, "shadow": shadow, "shadow_full": shadow_full,
+            "height": height,
             "info": info, "length_px": float(ppu)}
