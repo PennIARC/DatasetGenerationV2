@@ -173,6 +173,20 @@ point-spread function (camera blur kernel); **HSV** = hue (deg), saturation, val
   covered part merges with the surrounding ground without a seam. The 50% cap check now includes the fragment
   clean-up and the final label clean-up (50-image sample: 63 buried mines, max hidden 0.50, cap never exceeded);
   `tests/test_burial.py` passes (no slivers / islands, anchor fixed).
+- **Ragged, ground-textured soil edge (fourth round of user feedback)** (`BURIAL_RAGGED_EDGE`): the covered edge is
+  no longer a smooth feather of the silhouette. (a) The soil-cover ramp is dithered against clustered multi-scale
+  grain noise, so the transition is made of soil crumbs with grainy partial coverage (0.35 px anti-aliasing only);
+  (b) crumbs spill onto the exposed mine up to `BURIAL_CRUMB_REACH`=6% of the mine length from the covered part,
+  with density falling off with distance; (c) the cover copies the actual ground pixels under the mine (unblurred:
+  its grain, stones and grass bits, plus +-6% brightness texture), so the covered area continues the surrounding
+  ground exactly; (d) only soil connected to the buried part is kept (no soil ring along low wing rims elsewhere).
+  Clods are smaller and more numerous (`BURIAL_CLOD_SIZE_FRAC`=2.5-6%, `BURIAL_CLOD_COUNT`=4-10), colour- and
+  brightness-matched to the ground under their footprint (slightly lighter on top), keep their own texture, and cast a
+  weaker, shorter shadow (no more dark "holes"). The ridge comes and goes along the line (low-frequency mask) instead
+  of a continuous bead-like rim. The exposed part keeps more of its contrast (`EXPOSED_DARKEN`=0.03-0.10,
+  `EXPOSED_DESAT`=0.05-0.15, `EXPOSED_FILM`=0.05-0.15). Tuned on gravel, dark grass, light dry grass and bare soil
+  at 6x. Tests pass (1-2 px structures now 0.3-1.9% of the visible pixels, from the intentional crumbs; limit 6%);
+  50-image sample: max hidden 0.50, cap never exceeded.
 - **Blades over buried mines** (`BLADE_SOIL_LIFT`, `BLADE_EMERGE`): every over-layer blade / tuft / wisp that
   crosses a buried mine's soil-line zone is warped (cv2.remap with a smooth weight around the clip line): its pixels
   are lifted by up to ~4% of the mine length (1.5-6 px) towards the sun side (away from the shadow direction), a soft
@@ -298,11 +312,11 @@ saved_look = jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"])
   `burial_fraction`, `psf_sigma`, `exposure`, ...
 - Assets / debris toggles: `grass_blades`, `blades_under` / `blades_over` (count ranges, e.g. (0, 0)),
   `burial_berm`, `burial_disturbed_soil`, `burial_clods`, `burial_dirty_exposed`, `blade_soil_lift`, `blade_emerge`,
-  `burial_irregular_line`, `burial_line_wander`, `burial_wander_scales`, `burial_wander_weights`,
+  `burial_ragged_edge`, `burial_crumb_reach`, `burial_irregular_line`, `burial_line_wander`, `burial_wander_scales`, `burial_wander_weights`,
   `burial_min_fragment_frac`, `burial_open_frac`, `burial_open_px`, `burial_clip_share`, `berm_ridge_width_frac`,
   `berm_ridge_shade`, `disturbed_radius_frac`, `disturbed_opacity`, `burial_clod_count`, `exposed_ao_strength`,
   `exposed_film`, `burial_soil_rgb` (old-style burial for comparisons: set the four BURIAL_* cue flags and the two
-  blade flags False, `burial_irregular_line=False`, `burial_min_fragment_frac=0`, `burial_open_px=0`,
+  blade flags False, `burial_irregular_line=False`, `burial_ragged_edge=False`, `burial_min_fragment_frac=0`, `burial_open_px=0`,
   `burial_open_frac=0`, `burial_clip_share=1`),
   `blades_over_on_mine` (probability per mine, 1.0 = every mine), `blades_on_mine_count`, `dust_strength` (scalar
   fixes it; or a (low, mode, high) triangle),
@@ -331,7 +345,7 @@ saved_look = jpeg_roundtrip(rgb, meta["post"]["jpeg_quality"])
 | v1 (original, pygame + moderngl) | 0.49 |
 | v2, all features (before new assets / blades) | 0.64 (1.3x v1) |
 | v2, all features incl. blades, new assets, rock seating, leaf clumps, blades on mines, audit filter | 0.93 (1.9x v1) |
-| v2, + burial soil-displacement cues, organic soil line | 1.04 (2.1x v1) |
+| v2, + burial soil-displacement cues, organic + ragged soil line | 1.02 (2.1x v1) |
 | v2 engine, `--v1` | 0.33 |
 `--workers N` parallelises (50 images with 4 workers: 0.32 s / image wall clock). The extra time is mostly the
 on-the-fly blades (capped at 3 per image), ~100 more debris elements with shadows, and the soft dirt grains.

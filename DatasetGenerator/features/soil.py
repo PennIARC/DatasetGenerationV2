@@ -114,6 +114,17 @@ def burial_overlay(alpha, alpha_full, height, local_bg, length_px, p):
         surf = A * wf
     cover = np.clip((surf + amp * n1 - hgt) / (0.25 * amp + 0.1 * A + 1e-6), 0, 1) * (alpha > 0)
     buried = np.clip(alpha_full - alpha, 0, 1)
+    # keep only soil that is connected to the buried part (the real soil edge); isolated cover on low wing rims far
+    # from it would draw a ring of soil around the whole visible outline
+    seedm = (buried > 0.5).astype(np.uint8)
+    if seedm.any():
+        n_cc, lab = cv2.connectedComponents(((cover > 0.05) | (seedm > 0)).astype(np.uint8), connectivity=8)
+        ids = np.unique(lab[seedm > 0])
+        conn = np.isin(lab, ids[ids > 0])
+        cover = cover * conn
+        zone = cv2.distanceTransform((~conn).astype(np.uint8), cv2.DIST_L2, 3) < max(2.0, 0.08 * L)
+    else:
+        zone = np.zeros((h, w), bool)
     core = ((buried > 0.5) | (cover > 0.5)).astype(np.uint8)
     vis = ((alpha > 0.5) & (cover <= 0.5)).astype(np.uint8)
     bw = p["berm_width_px"]
@@ -128,13 +139,34 @@ def burial_overlay(alpha, alpha_full, height, local_bg, length_px, p):
         berm = fx.gblur(berm, 0.7) * p["berm_opacity"]
     else:
         berm = np.zeros((h, w), np.float32)
+    # Ragged, grainy edge instead of a smooth feather: the soft cover ramp is dithered against fine noise, so the
+    # transition is made of soil crumbs (partial coverage with grainy alpha), not a fade of the mine.
+    ramp = np.clip((surf + amp * n1 - hgt) / (0.6 * amp + 0.3 * A + 1e-6) + 0.5, 0, 1) * (alpha > 0)
+    # clustered (multi-scale) grain rather than per-pixel noise: irregular crumbs of varying size, no bead chains
+    hf = 0.55 * fx.fbm(h, w, max(1.5, 0.03 * L), rng, octaves=3) + 0.45 * rng.random((h, w), dtype=np.float32)
+    hf = fx.gblur(hf, 0.5)
+    hf = (hf - hf.min()) / (hf.max() - hf.min() + 1e-6)
+    grainy = np.clip((ramp - hf) * 4 + 0.5, 0, 1)
+    ragged = p.get("ragged", True)
+    if ragged:
+        cover = np.maximum(cover, grainy * (ramp > 0.05) * zone)
+    # crumbs spilled onto the exposed mine near the edge: density falls off with distance from the covered part
+    covered = (cover > 0.5).astype(np.uint8)
+    if covered.any() and ragged:
+        d_out = cv2.distanceTransform(1 - covered, cv2.DIST_L2, 3)
+        reach = max(1.5, p.get("crumb_reach", 0.06) * L)
+        cf = 0.6 * fx.fbm(h, w, max(1.2, 0.02 * L), rng, octaves=3) + 0.4 * rng.random((h, w), dtype=np.float32)
+        cf = (cf - cf.min()) / (cf.max() - cf.min() + 1e-6)
+        crumbs = ((cf > 0.68 + 0.3 * np.clip(d_out / reach, 0, 1)) & (d_out > 0) & (alpha > 0)).astype(np.float32)
+        crumbs = cv2.dilate(crumbs, np.ones((2, 2), np.uint8)) * (alpha > 0) * (d_out < reach) * zone
+        cover = np.maximum(cover, 0.92 * crumbs)
     a = np.maximum(cover, berm).astype(np.float32)
-    # cover takes the ground's own colour / texture (seamless with the surrounding soil); only the lip is darker
-    tex = (0.9 + 0.2 * fx.fbm(h, w, 2.0, rng, octaves=3))[..., None]
-    base = fx.gblur(local_bg, 0.8)
+    # colour = the ground itself, unblurred (its own grain, stones, grass bits), so the covered part continues the
+    # surrounding ground; only the lip is darker; crumbs get a little brightness variation
+    tex = (0.94 + 0.12 * fx.fbm(h, w, 1.5, rng, octaves=2))[..., None]
     wb = (berm / np.maximum(a, 1e-4))[..., None]
-    soil = base * tex * (1 - wb + wb * p["berm_darken"])
-    a = fx.gblur(a, 0.6)                                    # soft feathered edge, no hard seam
+    soil = local_bg * tex * (1 - wb + wb * p["berm_darken"])
+    a = fx.gblur(a, 0.35 if ragged else 0.6)               # ragged: only a hint of anti-aliasing, edge stays grainy
     return (soil * a[..., None]).astype(np.float32), a.astype(np.float32)
 
 

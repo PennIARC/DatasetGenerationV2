@@ -248,6 +248,8 @@ BURIAL_IRREGULAR_LINE = True        # organic soil line instead of a straight cl
 BURIAL_LINE_WANDER = (0.015, 0.04)  # nominal plane +- this (mesh units, mine length = 1; x sqrt(fraction / 0.4))
 BURIAL_WANDER_SCALES = (0.35, 0.12, 0.04)   # fBm feature sizes (x mine length): low-frequency wander, bays, lumps
 BURIAL_WANDER_WEIGHTS = (0.6, 0.3, 0.1)
+BURIAL_RAGGED_EDGE = True           # soil edge made of crumbs (dithered grainy alpha + spilled crumbs) and the cover
+BURIAL_CRUMB_REACH = 0.06           # copies the ground pixels; crumbs reach this x mine length onto the exposed part
 BURIAL_MIN_FRAGMENT_FRAC = 0.06     # after clipping: visible islands smaller than this x full area are dropped ...
 BURIAL_OPEN_PX = 1                  # ... and structures thinner than ~2 r px removed (morphological opening, radius
 BURIAL_OPEN_FRAC = 0.025            #     r = max(BURIAL_OPEN_PX, BURIAL_OPEN_FRAC x mine length); ~4 px at 150 px)
@@ -264,19 +266,19 @@ DISTURBED_DARKEN = (0.72, 0.88)
 DISTURBED_DESAT = (0.1, 0.3)
 DISTURBED_OPACITY = (0.35, 0.65)
 BURIAL_CLODS = True                 # displaced soil clods (assets_new/dirt clods) along the soil line, with shadows
-BURIAL_CLOD_COUNT = (3.0, 9.0)      # at s = 1
-BURIAL_CLOD_SIZE_FRAC = (0.03, 0.09)    # clod width / mine length
+BURIAL_CLOD_COUNT = (4.0, 10.0)     # at s = 1
+BURIAL_CLOD_SIZE_FRAC = (0.025, 0.06)   # clod width / mine length
 BURIAL_CLOD_COLOUR_ADAPT = 0.85     # clod colour pulled towards the turned-soil colour at its position
 BURIAL_SOIL_RGB = (0.40, 0.31, 0.22)    # brown reference for turned soil (brightness follows the local ground) ...
 BURIAL_SOIL_MIX = (0.3, 0.75)       # ... mixed in by this much (more on green, grassy ground)
 BURIAL_DIRTY_EXPOSED = True         # exposed part: occlusion gradient at the soil line, darker / desaturated, grains,
 EXPOSED_AO_PX = (2.0, 6.0)          #   streaks and a dusty film, denser towards the buried side
 EXPOSED_AO_STRENGTH = (0.25, 0.45)
-EXPOSED_DARKEN = (0.05, 0.15)
-EXPOSED_DESAT = (0.1, 0.25)
+EXPOSED_DARKEN = (0.03, 0.1)
+EXPOSED_DESAT = (0.05, 0.15)
 EXPOSED_GRAIN_DENSITY = (0.04, 0.12)
 EXPOSED_STREAKS = (0.05, 0.15)
-EXPOSED_FILM = (0.1, 0.25)
+EXPOSED_FILM = (0.05, 0.15)
 BLADE_SOIL_LIFT = True              # over-layer blades crossing a soil line are lifted by the berm (warp + shadow)
 BLADE_EMERGE = True                 # blades lying on the soil-covered part are partly covered (emerging from soil)
 BLADE_EMERGE_COVER = 0.6

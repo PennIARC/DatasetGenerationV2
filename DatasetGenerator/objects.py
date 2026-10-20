@@ -445,7 +445,8 @@ class Mine:
         p = soil.sample_burial_overlay_params(self.sub(6), cfg)
         b = self.meta["burial"]
         p.update(wander=b.get("wander", 0.0), wander_seed=b.get("wander_seed", 0),
-                 wander_scales=cfg.BURIAL_WANDER_SCALES, wander_weights=cfg.BURIAL_WANDER_WEIGHTS)
+                 wander_scales=cfg.BURIAL_WANDER_SCALES, wander_weights=cfg.BURIAL_WANDER_WEIGHTS,
+                 ragged=cfg.BURIAL_RAGGED_EDGE, crumb_reach=cfg.BURIAL_CRUMB_REACH)
         if cfg.BURIAL_BERM:
             p["berm_opacity"] *= 0.5            # the shaded ridge below takes over most of the lip
         full = float((self.alpha_full > 0.5).sum())

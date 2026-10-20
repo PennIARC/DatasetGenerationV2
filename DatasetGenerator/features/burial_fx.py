@@ -128,7 +128,9 @@ def berm_ridge(line_dist, core, vis, local, L, sun, p, s, rng, cfg):
     # the ridge sits on the soil side and only laps onto the exposed mine by ~25% of its width
     inside = cv2.distanceTransform((vis > 0.5).astype(np.uint8), cv2.DIST_L2, 3)
     prof *= np.clip(1 - inside / max(1.0, 0.25 * width), 0, 1)
-    height = fx.gblur(prof ** 0.7 * (0.7 + 0.6 * clumps), max(0.8, 0.15 * width))
+    # intermittent, not a continuous bead-like rim: the ridge comes and goes along the line (low-frequency mask)
+    seg = np.clip(fx.fbm(h, w, max(3.0, 0.2 * L), rng, octaves=2) * 2.2 - 0.7, 0, 1)
+    height = fx.gblur(prof ** 0.7 * (0.6 + 0.8 * clumps) * seg, max(0.8, 0.15 * width))
     a = np.clip(height * 1.6, 0, 1) * p["ridge_opacity"] * min(1.0, s)
     # shading from the height field: lit where the surface faces the sun
     gy, gx = np.gradient(height)
@@ -166,7 +168,7 @@ def dirty_exposed(rgb_pm, alpha, line_dist, local, L, p, s, rng, cfg):
     out *= (1 - p["exp_darken"] * s * (0.5 + 0.5 * toward))[..., None]
     ao = p["ao_strength"] * np.exp(-line_dist / max(0.5, p["ao_px"])) * min(1.0, s)
     out *= (1 - ao)[..., None]
-    soil = soil_colour(fx.gblur(local, max(1.0, 0.1 * L)), cfg) * 0.9
+    soil = soil_colour(fx.gblur(local, max(1.0, 0.04 * L)), cfg)
     # dusty film
     film = p["film"] * s * (0.3 + 0.7 * toward) * fx.fbm(h, w, max(2.0, 0.15 * L), rng)
     # grains: fine noise thresholded with a density that rises towards the soil line
@@ -198,7 +200,8 @@ def clods(cfg, line, L, sun, p, s, rng, local):
              if "clod" in f.rsplit("/", 1)[-1] and assets.audit_status(cfg, f) != "exclude"]
     n = int(round(p["clod_count"] * s))
     out = []
-    soil_col = soil_colour(fx.gblur(local, max(1.0, 0.1 * L)), cfg) * 0.9
+    ground = local
+    soil_col = soil_colour(fx.gblur(local, max(1.0, 0.1 * L)), cfg)
     if not len(xs) or not files or n <= 0:
         return out
     for _ in range(n):
@@ -213,9 +216,14 @@ def clods(cfg, line, L, sun, p, s, rng, local):
         i = min(int(u[3] * len(xs)), len(xs) - 1)
         off = (u[4] - 0.5) * 0.25 * L
         cx, cy = xs[i] + off * np.cos(u[5] * 6.28), ys[i] + off * np.sin(u[5] * 6.28)
-        tgt = soil_col[int(np.clip(cy, 0, soil_col.shape[0] - 1)), int(np.clip(cx, 0, soil_col.shape[1] - 1))]
-        prgb = blades.adapt_colour(prgb, pa, tgt, cfg.BURIAL_CLOD_COLOUR_ADAPT, 1.0)
-        f, pad = shadows.debris_shadow(pa, 0.25 * size, sun, sun["shadow_strength"], cfg, max_length=size)
+        # colour / brightness matched to the ground right there (mean over the clod footprint), a touch lighter on
+        # top (lumps catch the light); the clod keeps its own texture
+        y0, x0 = int(np.clip(cy - size, 0, ground.shape[0] - 1)), int(np.clip(cx - size, 0, ground.shape[1] - 1))
+        patch = ground[y0:y0 + 2 * size + 1, x0:x0 + 2 * size + 1].reshape(-1, 3)
+        tgt = 0.7 * patch.mean(0) + 0.3 * soil_col[int(np.clip(cy, 0, soil_col.shape[0] - 1)),
+                                                   int(np.clip(cx, 0, soil_col.shape[1] - 1))]
+        prgb = blades.adapt_colour(prgb, pa, tgt, cfg.BURIAL_CLOD_COLOUR_ADAPT, 1.0 + 0.15 * u[5])
+        f, pad = shadows.debris_shadow(pa, 0.15 * size, sun, 0.6 * sun["shadow_strength"], cfg, max_length=0.6 * size)
         out.append((prgb, pa, int(cx - pa.shape[1] / 2), int(cy - pa.shape[0] / 2), f, pad))
     return out
 
