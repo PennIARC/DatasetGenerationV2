@@ -1,0 +1,14 @@
+freetype-py==2.5.1
+glcontext==3.0.0
+ImageIO==2.37.2
+moderngl==5.12.0
+networkx==3.6.1
+numpy==2.4.2
+pillow==12.1.0
+pygame==2.6.1
+pyglet==2.1.13
+PyOpenGL==3.1.0
+pyrender==0.1.45
+scipy==1.17.0
+six==1.17.0
+trimesh==4.11.1
