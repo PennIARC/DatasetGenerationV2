@@ -1,0 +1,127 @@
+{
+ "id": "photometric",
+ "title": "Photometric jitter and background augmentation",
+ "flag": "PHOTOMETRIC_JITTER, BG_AUGMENT",
+ "summary": "Real footage varies with camera exposure, white balance, sensor noise, JPEG quality and lens vignetting, and with the ground it flies over. v1 applied almost the same grain, colour fringe, vignette and contrast to every image, and gave the background only a small zoom. v2 randomises all of these per image (domain randomisation: deliberately varying nuisance factors so the detector cannot rely on them), and flips, rotates, zooms and colour-shifts the background photo.",
+ "how": "features/camera.py sample_camera_params / apply_camera: exposure 0.75-1.25, gamma 0.85-1.15, red and blue white-balance gains 0.92-1.08, saturation 0.75-1.25, contrast 0.95-1.2, zero-mean Gaussian noise sigma 0-0.025 (0-50% colour), chromatic aberration up to 0.2% of width, vignette 0-0.5, JPEG quality 70-95. features/background.py: flips, 90-degree rotations, zoom 1-2, hue +-8 deg, saturation / brightness 0.8-1.2, channel gains 0.95-1.05.",
+ "code": "DatasetGenerator/features/camera.py: sample_camera_params, apply_camera, jpeg_roundtrip; features/background.py: sample_background_params, make_background; fx.py: photometric",
+ "options": [
+  {
+   "label": "exposure 0.75 (dark)",
+   "params": "camera dict: exposure=0.75 (others neutral)",
+   "image": "images/v2/jitter_0_exposure.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "exposure 1.25 (bright)",
+   "params": "camera dict: exposure=1.25 (others neutral)",
+   "image": "images/v2/jitter_1_exposure.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "gamma 1.15",
+   "params": "camera dict: gamma=1.15 (others neutral)",
+   "image": "images/v2/jitter_2_gamma.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "white balance R 1.08 / B 0.92 (warm)",
+   "params": "camera dict: wb_r=1.08, wb_b=0.92 (others neutral)",
+   "image": "images/v2/jitter_3_wb_r.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "white balance R 0.92 / B 1.08 (cool)",
+   "params": "camera dict: wb_r=0.92, wb_b=1.08 (others neutral)",
+   "image": "images/v2/jitter_4_wb_r.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "saturation 0.75 (washed out)",
+   "params": "camera dict: saturation=0.75 (others neutral)",
+   "image": "images/v2/jitter_5_saturation.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "saturation 1.25",
+   "params": "camera dict: saturation=1.25 (others neutral)",
+   "image": "images/v2/jitter_6_saturation.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "contrast 1.2",
+   "params": "camera dict: contrast=1.2 (others neutral)",
+   "image": "images/v2/jitter_7_contrast.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "sensor noise sigma 0.025",
+   "params": "camera dict: noise_sigma=0.025, noise_chroma=0.5 (others neutral)",
+   "image": "images/v2/jitter_8_noise_sigma.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "JPEG quality 70",
+   "params": "camera dict: jpeg_quality=70 (others neutral)",
+   "image": "images/v2/jitter_9_jpeg_quality.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "vignette 0.5",
+   "params": "camera dict: vignette=0.5 (others neutral)",
+   "image": "images/v2/jitter_10_vignette.jpg",
+   "caption": "2x zoom of the same scene; one parameter pushed to the end of its sampled range."
+  },
+  {
+   "label": "background: off (reference)",
+   "params": "bg_augment=False",
+   "image": "images/v2/bgaug_0.jpg",
+   "caption": "Background photo only (no mines), photometric jitter off."
+  },
+  {
+   "label": "background: horizontal flip",
+   "params": "bg_flip_prob=1.0, bg_rot90_prob=0.0, bg_zoom=1.0",
+   "image": "images/v2/bgaug_1.jpg",
+   "caption": "Background photo only (no mines), photometric jitter off."
+  },
+  {
+   "label": "background: rotate 90 + zoom 1.8",
+   "params": "bg_flip_prob=0.0, bg_rot90_prob=1.0, bg_zoom=1.8",
+   "image": "images/v2/bgaug_2.jpg",
+   "caption": "Background photo only (no mines), photometric jitter off."
+  },
+  {
+   "label": "background: colour jitter hue +8, sat 1.2, brightness 1.2",
+   "params": "bg_flip_prob=0, bg_rot90_prob=0, bg_zoom=1.0, bg_hue_shift=8.0, bg_saturation=1.2, bg_brightness=1.2",
+   "image": "images/v2/bgaug_3.jpg",
+   "caption": "Background photo only (no mines), photometric jitter off."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "v1 shader vs photometric jitter (seed 13)",
+   "before": "images/v2/photo_ba_a_off.jpg",
+   "after": "images/v2/photo_ba_a_on.jpg",
+   "before_label": "PHOTOMETRIC_JITTER off (v1 shader)",
+   "after_label": "on",
+   "caption": "2x zoom. Off: v1's fixed grain / 3.8 px colour fringe / vignette / contrast / JPEG 85. On (this draw): exposure 0.76, gamma 0.91, saturation 0.92, noise 0.001, vignette 0.23, JPEG 74."
+  },
+  {
+   "label": "v1 shader vs photometric jitter (seed 8)",
+   "before": "images/v2/photo_ba_b_off.jpg",
+   "after": "images/v2/photo_ba_b_on.jpg",
+   "before_label": "PHOTOMETRIC_JITTER off (v1 shader)",
+   "after_label": "on",
+   "caption": "2x zoom. Off: v1's fixed grain / 3.8 px colour fringe / vignette / contrast / JPEG 85. On (this draw): exposure 1.24, gamma 0.99, saturation 1.04, noise 0.019, vignette 0.17, JPEG 84."
+  },
+  {
+   "label": "Background augmentation off / on",
+   "before": "images/v2/bgaug_ba_off.jpg",
+   "after": "images/v2/bgaug_ba_on.jpg",
+   "before_label": "BG_AUGMENT off",
+   "after_label": "BG_AUGMENT on",
+   "caption": "Same scene (mines at identical positions); the background photo is flipped / rotated / zoomed / recoloured."
+  }
+ ],
+ "notes": "No sensor-specific noise model (Poisson noise, banding); colour jitter is global per image, not per region. The eight jitter images below are the same scene with hand-picked, deliberately strong values (taken from the edges of the sampled ranges) so the effect is visible; real draws are usually milder. They are produced by temporarily substituting the sampled camera dict in the showcase script (the generator is untouched). JPEG q shown is applied via jpeg_roundtrip."
+}

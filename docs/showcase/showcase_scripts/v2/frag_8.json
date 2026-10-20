@@ -1,0 +1,127 @@
+{
+ "id": "assets",
+ "title": "New assets and sampling",
+ "flag": "NEW_ASSETS, GRASS_BLADES",
+ "summary": "v1 drew from 15 background photos, a handful of rock and grass photos and flat coloured dirt squares. v2 adds many more backgrounds (indexed by family, e.g. grass vs non-grass), 34 transparent rock cut-outs, a separate layer of leaf-litter clumps (2-10 per image, desaturated and tinted towards the ground), soft dirt/dust snippets and a layer of thin grass blades, tufts and wisps that lie under and over the mines (the overgrowth partly hides mines and is counted in the labels). More varied clutter and ground means the detector cannot tie 'mine' to the few textures it saw in v1.",
+ "how": "features/assets.py picks a source folder by weight, then a file; RGBA PNGs use their real alpha (no Otsu cut-out). features/background.py reads assets_new/backgrounds_index.json when BG_USE_INDEX is on. features/blades.py makes blades / tufts / wisps (about half generated on the fly, half from assets_new/grassBlades), sized in millimetres via the scene's px-per-mm.",
+ "code": "DatasetGenerator/features/assets.py: sources, pick_file, load_cutout; features/background.py: pick_background; features/blades.py: make_blade_elements; objects.py: EnvironmentDebris; controlPanel: BACKGROUND_SOURCES, ROCK_SOURCES, GRASS_SOURCES, DIRT_SOURCES, GRASS_BLADES, BLADES_*",
+ "options": [
+  {
+   "label": "asset contact sheet",
+   "params": "docs/showcase/images/assets_contact_sheet.jpg",
+   "image": "images/assets_contact_sheet.jpg",
+   "caption": "Backgrounds, rocks, leaf litter, dirt snippets and grass blades available to the sampler (sheet produced by the assets agent)."
+  },
+  {
+   "label": "new-asset scene: w/backgrounds/bg_Ground005.jpg",
+   "params": "seed 7, 3 mines, defaults",
+   "image": "images/v2/assets_scene_7.jpg",
+   "caption": "2x zoom: new ground, rocks, leaf litter, soil snippets and grass blades around the mines."
+  },
+  {
+   "label": "new-asset scene: w/backgrounds/bg_Ground005.jpg",
+   "params": "seed 16, 3 mines, defaults",
+   "image": "images/v2/assets_scene_16.jpg",
+   "caption": "2x zoom: new ground, rocks, leaf litter, soil snippets and grass blades around the mines."
+  },
+  {
+   "label": "new-asset scene: g_gen_02_grass_fresh_mowed.jpg",
+   "params": "seed 12, 3 mines, defaults",
+   "image": "images/v2/assets_scene_12.jpg",
+   "caption": "2x zoom: new ground, rocks, leaf litter, soil snippets and grass blades around the mines."
+  },
+  {
+   "label": "blade length 40 mm",
+   "params": "grass_blades=True, blades_under=60, blades_over=0, blade_size_mm=40.0",
+   "image": "images/v2/blades_size_40.jpg",
+   "caption": "2x zoom, 60 blades under the mines. Length is in millimetres and converted with the scene's px/mm, so blades are a few px wide."
+  },
+  {
+   "label": "blade length 100 mm",
+   "params": "grass_blades=True, blades_under=60, blades_over=0, blade_size_mm=100.0",
+   "image": "images/v2/blades_size_100.jpg",
+   "caption": "2x zoom, 60 blades under the mines. Length is in millimetres and converted with the scene's px/mm, so blades are a few px wide."
+  },
+  {
+   "label": "blade length 160 mm",
+   "params": "grass_blades=True, blades_under=60, blades_over=0, blade_size_mm=160.0",
+   "image": "images/v2/blades_size_160.jpg",
+   "caption": "2x zoom, 60 blades under the mines. Length is in millimetres and converted with the scene's px/mm, so blades are a few px wide."
+  },
+  {
+   "label": "blades under the mines (60)",
+   "params": "blades_under=60, blades_over=0",
+   "image": "images/v2/blades_under_60.jpg",
+   "caption": "Blades drawn before the mines; the mines lie on top of them."
+  },
+  {
+   "label": "blades on each mine: probability 0.0",
+   "params": "blades_over_on_mine=0.0, blades_on_mine_count=3 (default 1-4)",
+   "image": "images/v2/blades_onmine_0_0.jpg",
+   "caption": "2x zoom, three mines. BLADES_OVER_ON_MINE is the per-mine chance of extra over-layer blades centred on the mine's box (expanded 20%), so they cross the mine."
+  },
+  {
+   "label": "blades on each mine: probability 0.6",
+   "params": "blades_over_on_mine=0.6, blades_on_mine_count=3 (default 1-4)",
+   "image": "images/v2/blades_onmine_0_6.jpg",
+   "caption": "2x zoom, three mines. BLADES_OVER_ON_MINE is the per-mine chance of extra over-layer blades centred on the mine's box (expanded 20%), so they cross the mine."
+  },
+  {
+   "label": "blades on each mine: probability 1.0",
+   "params": "blades_over_on_mine=1.0, blades_on_mine_count=3 (default 1-4)",
+   "image": "images/v2/blades_onmine_1_0.jpg",
+   "caption": "2x zoom, three mines. BLADES_OVER_ON_MINE is the per-mine chance of extra over-layer blades centred on the mine's box (expanded 20%), so they cross the mine."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "v1 assets only vs new assets (seed 3)",
+   "before": "images/v2/assets_ba_a_off.jpg",
+   "after": "images/v2/assets_ba_a_on.jpg",
+   "before_label": "NEW_ASSETS off (v1 set)",
+   "after_label": "on",
+   "caption": "2x zoom. The background photo is drawn from a different pool (same random stream), so the ground may differ, plus the new rock / leaf / dirt layers."
+  },
+  {
+   "label": "v1 assets only vs new assets (seed 7)",
+   "before": "images/v2/assets_ba_b_off.jpg",
+   "after": "images/v2/assets_ba_b_on.jpg",
+   "before_label": "NEW_ASSETS off (v1 set)",
+   "after_label": "on",
+   "caption": "2x zoom. The background photo is drawn from a different pool (same random stream), so the ground may differ, plus the new rock / leaf / dirt layers."
+  },
+  {
+   "label": "Grass blades off / on (seed 7)",
+   "before": "images/v2/blades_ba_a_off.jpg",
+   "after": "images/v2/blades_ba_a_on.jpg",
+   "before_label": "GRASS_BLADES off",
+   "after_label": "on",
+   "caption": "2x zoom. Thin blades, tufts and wisps lie under and over the mines; blades over a mine hide part of it."
+  },
+  {
+   "label": "Grass blades off / on (seed 16)",
+   "before": "images/v2/blades_ba_b_off.jpg",
+   "after": "images/v2/blades_ba_b_on.jpg",
+   "before_label": "GRASS_BLADES off",
+   "after_label": "on",
+   "caption": "2x zoom. Thin blades, tufts and wisps lie under and over the mines; blades over a mine hide part of it."
+  },
+  {
+   "label": "Blades crossing a mine: 0 vs 1.0 (seed 7)",
+   "before": "images/v2/blades_ba_a_off.png",
+   "after": "images/v2/blades_ba_a_on.png",
+   "before_label": "blades_over_on_mine=0",
+   "after_label": "blades_over_on_mine=1.0 (3 blades)",
+   "caption": "6x zoom on the middle mine, same seed. Blades lie over the mine and hide part of it; the visible-mask label shrinks accordingly."
+  },
+  {
+   "label": "Blades crossing a mine: 0 vs 1.0 (seed 16)",
+   "before": "images/v2/blades_ba_b_off.png",
+   "after": "images/v2/blades_ba_b_on.png",
+   "before_label": "blades_over_on_mine=0",
+   "after_label": "blades_over_on_mine=1.0 (3 blades)",
+   "caption": "6x zoom on the middle mine, same seed. Blades lie over the mine and hide part of it; the visible-mask label shrinks accordingly."
+  }
+ ],
+ "notes": "Assets are CC0 close-up textures (ambientCG, see assets_new/ATTRIBUTION.md), not true aerial photos: scale, perspective and baked-in shadows differ from the v1 photos. Leaf clumps are now desaturated and ground-tinted, which looks more natural than the earlier garish yellow/orange, but they are still visibly pasted textures; rock cut-outs have no baked shadow but receive the synthetic one. The contact sheet is owned by another agent and may be updated."
+}

@@ -1,0 +1,71 @@
+{
+ "id": "mesh_mines",
+ "title": "On-the-fly mine rendering",
+ "flag": "MESH_MINES",
+ "summary": "v1 pasted one of 50 pre-rendered mine pictures, so the detector saw the same 50 shapes and one near-constant colour over and over. v2 draws every mine from the 3D model when the image is made, with its own tilt, rotation, size, colour, lighting and dust, so no two mines are alike. A detector trained on a small pool of look-alike sprites tends to memorise them; real mines in the field never match a fixed pool.",
+ "how": "The STL mesh is rotated (yaw 0-360, pitch/roll mostly small with a thin tail), projected top-down and rasterised triangle by triangle, far to near, at 4x resolution. Lighting is Lambert + specular from the image's sun. Scale uses the same pixels-per-unit as v1 sprites, so MINE_SCALE_MIN/MAX mean the same.",
+ "code": "DatasetGenerator/features/mesh.py: sample_pose, render_mine; objects.py: Mine._render_mesh; assets/mine.stl",
+ "options": [
+  {
+   "label": "grid of 42 v2 mines",
+   "params": "n_mines=8 per image, seeds 100+, default settings (burial excluded)",
+   "image": "images/v2/mesh_grid_42.jpg",
+   "caption": "Each tile is one distinct instance cropped around its box (200 px windows, true relative size). Tag: scale, pitch, roll, yaw in degrees. Colour, size, tilt, light and dust all differ."
+  },
+  {
+   "label": "v1 for contrast (21 sprites)",
+   "params": "v1=True, n_mines=8 per image",
+   "image": "images/v2/mesh_grid_v1_21.jpg",
+   "caption": "The same kind of grid from v1: sprites from a pool of 50, near-identical dark olive, only the in-plane rotation and size change."
+  },
+  {
+   "label": "pose distribution (2000 mines)",
+   "params": "features.mesh.sample_pose, TILT_SIGMA=5, TILT_TAIL_PROB=0.05, TILT_CAP=35",
+   "image": "images/v2/mesh_pose_distribution.png",
+   "caption": "Left: histogram of |pitch| and |roll| with median, 90th and 99th percentile. Right: pitch vs roll scatter."
+  },
+  {
+   "label": "pitch 0, roll 0",
+   "params": "mine_pose=(0, 0, 30), seed 13, scale 0.35",
+   "image": "images/v2/mesh_pose_0_0.png",
+   "caption": "Real 3D tilt: the raised edge catches the light, the low edge goes dark, and the outline changes; a flat rotated picture cannot do this."
+  },
+  {
+   "label": "pitch 12, roll 0",
+   "params": "mine_pose=(12, 0, 30), seed 13, scale 0.35",
+   "image": "images/v2/mesh_pose_12_0.png",
+   "caption": "Real 3D tilt: the raised edge catches the light, the low edge goes dark, and the outline changes; a flat rotated picture cannot do this."
+  },
+  {
+   "label": "pitch 20, roll 15",
+   "params": "mine_pose=(20, 15, 30), seed 13, scale 0.35",
+   "image": "images/v2/mesh_pose_20_15.png",
+   "caption": "Real 3D tilt: the raised edge catches the light, the low edge goes dark, and the outline changes; a flat rotated picture cannot do this."
+  },
+  {
+   "label": "pitch -30, roll 8",
+   "params": "mine_pose=(-30, 8, 30), seed 13, scale 0.35",
+   "image": "images/v2/mesh_pose_m30_8.png",
+   "caption": "Real 3D tilt: the raised edge catches the light, the low edge goes dark, and the outline changes; a flat rotated picture cannot do this."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "v1 sprite vs v2 mesh (seed 13)",
+   "before": "images/v2/mesh_ba_a_v1.png",
+   "after": "images/v2/mesh_ba_a_v2.png",
+   "before_label": "v1-style mine",
+   "after_label": "v2 mine",
+   "caption": "Same seed, background, position and size, 4x zoom. Before = the five mine features switched off (sprite, hard edges, hard dots, v1 colour, no shadow) on the v2 background so only the mine differs. v1 is a flat pre-baked picture with hard dots; v2 has smooth shading, a cast shadow, dust and a sun-consistent look."
+  },
+  {
+   "label": "v1 sprite vs v2 mesh (seed 12)",
+   "before": "images/v2/mesh_ba_b_v1.png",
+   "after": "images/v2/mesh_ba_b_v2.png",
+   "before_label": "v1-style mine",
+   "after_label": "v2 mine",
+   "caption": "Same seed, background, position and size, 4x zoom. Before = the five mine features switched off (sprite, hard edges, hard dots, v1 colour, no shadow) on the v2 background so only the mine differs. v1 is a flat pre-baked picture with hard dots; v2 has smooth shading, a cast shadow, dust and a sun-consistent look."
+  }
+ ],
+ "notes": "Flat shading per triangle (the STL is faceted); no self-shadowing between body and wings; no plastic texture or moulding detail; about 35-60 ms per mine. Grid tiles are plain 200 px windows around each mine (not rescaled), so the size differences are real."
+}

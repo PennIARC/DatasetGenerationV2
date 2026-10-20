@@ -1,0 +1,59 @@
+{
+ "id": "soil_blend",
+ "title": "Soil blending",
+ "flag": "SOIL_BLEND",
+ "summary": "In v1 the mine sprite was pasted with a clean outline and a few hard-edged brown dots. In reality a mine lying in the field is dusty, partly coated with the local soil, darker where it touches the ground and shares the scene's exposure. v2 adds a noisy dust layer in the local ground colour, a darker contact band, soft soil grains and matches the mine's brightness to its surroundings. This removes the 'clean sticker on a photo' look.",
+ "how": "soil.soil_blend samples the composite under the mine: (a) exposure harmonisation, (b) dust layer coloured by the blurred local ground, with opacity from fBm noise, (c) 1.5-4 px contact band inside the edge, darker and dustier, (d) thresholded-noise soil grains 0-5% of the mine, local colour. Ground dirt squares also become soft, tinted irregular grains (soil.dirt_grain).",
+ "code": "DatasetGenerator/features/soil.py: soil_blend, dirt_grain; objects.py: Mine.draw; controlPanel: DUST_STRENGTH, CONTACT_BAND_*, GRAIN_*",
+ "options": [
+  {
+   "label": "blend off (v1 look)",
+   "params": "soil_blend=False",
+   "image": "images/v2/soil_opt_off.png",
+   "caption": "5x zoom: clean paste with hard dots."
+  },
+  {
+   "label": "0% (blend on, no dust)",
+   "params": "soil_blend=True, dust_strength=0 (grain_density=0.03)",
+   "image": "images/v2/soil_dust_0.png",
+   "caption": "Contact band, grains and exposure matching only; no dust layer."
+  },
+  {
+   "label": "dust 25%",
+   "params": "dust_strength=0.25 (grain_density=0.03)",
+   "image": "images/v2/soil_dust_25.png",
+   "caption": "Dust opacity ceiling (before the fBm noise modulates it). The sampler now draws it per mine from a triangle: low 0.25, mode 0.30, high 0.50 (mean 0.35)."
+  },
+  {
+   "label": "dust 35%",
+   "params": "dust_strength=0.35 (grain_density=0.03)",
+   "image": "images/v2/soil_dust_35.png",
+   "caption": "Dust opacity ceiling (before the fBm noise modulates it). The sampler now draws it per mine from a triangle: low 0.25, mode 0.30, high 0.50 (mean 0.35)."
+  },
+  {
+   "label": "dust 50%",
+   "params": "dust_strength=0.5 (grain_density=0.03)",
+   "image": "images/v2/soil_dust_50.png",
+   "caption": "Dust opacity ceiling (before the fBm noise modulates it). The sampler now draws it per mine from a triangle: low 0.25, mode 0.30, high 0.50 (mean 0.35)."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "Soil blending off / on (seed 13)",
+   "before": "images/v2/soil_ba_a_off.png",
+   "after": "images/v2/soil_ba_a_on.png",
+   "before_label": "SOIL_BLEND off (hard dots)",
+   "after_label": "SOIL_BLEND on",
+   "caption": "8x zoom (no lens blur). Look at the contact band at the edge, the blotchy dust that picks up the ground colour, and the grains that replace v1's round dots."
+  },
+  {
+   "label": "Soil blending off / on (seed 12)",
+   "before": "images/v2/soil_ba_b_off.png",
+   "after": "images/v2/soil_ba_b_on.png",
+   "before_label": "SOIL_BLEND off (hard dots)",
+   "after_label": "SOIL_BLEND on",
+   "caption": "8x zoom (no lens blur). Look at the contact band at the edge, the blotchy dust that picks up the ground colour, and the grains that replace v1's round dots."
+  }
+ ],
+ "notes": "Dust is a 2D overlay (no accumulation in crevices) and there is no wetness or mud. Default dust is drawn per mine from a triangular distribution (0.25 / 0.30 / 0.50, mean 0.35). With dust 0 the contact band, grains and exposure matching are still active. In the strength images grain density is fixed at 3% so that only the dust differs."
+}

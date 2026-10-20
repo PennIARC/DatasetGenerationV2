@@ -1,0 +1,61 @@
+{
+ "id": "soft_edges",
+ "title": "Soft edges and optics (blur)",
+ "flag": "SOFT_EDGES, BLUR",
+ "summary": "v1 enlarged and rotated sprites with nearest-neighbour sampling, giving jagged, hard-edged cut-outs that no real camera produces, and then added no lens blur. v2 draws at 4x size and averages down once (so edges get partial-coverage pixels), feathers rocks and grass, and finally blurs the whole picture with a lens-like kernel (sometimes plus motion blur). Without this the detector can learn 'razor-sharp pasted edge = mine'; real aerial frames are soft and slightly motion-smeared.",
+ "how": "SOFT_EDGES: features/edges.py resize_rotate (area downscale on premultiplied RGBA, one resample, 0.8 px alpha feather on debris, 1 px erosion of Otsu masks). BLUR: features/camera.py apply_blur: Gaussian PSF sigma U(0, 1.5) px, with probability 0.15 a linear motion blur of 1-4 px at a random angle.",
+ "code": "DatasetGenerator/features/edges.py: resize_rotate; features/camera.py: apply_blur; controlPanel: SUPERSAMPLE, DEBRIS_ALPHA_FEATHER, PSF_SIGMA, MOTION_BLUR_PROB, MOTION_BLUR_LENGTH",
+ "options": [
+  {
+   "label": "lens blur sigma 0.0 px",
+   "params": "psf_sigma=0.0, motion_blur_prob=0",
+   "image": "images/v2/blur_psf_0_0.png",
+   "caption": "4x zoom. sigma 0 keeps the anti-aliased edge sharp, 0.7 is mild defocus, 1.5 (top of the sampled range) is clearly soft."
+  },
+  {
+   "label": "lens blur sigma 0.7 px",
+   "params": "psf_sigma=0.7, motion_blur_prob=0",
+   "image": "images/v2/blur_psf_0_7.png",
+   "caption": "4x zoom. sigma 0 keeps the anti-aliased edge sharp, 0.7 is mild defocus, 1.5 (top of the sampled range) is clearly soft."
+  },
+  {
+   "label": "lens blur sigma 1.5 px",
+   "params": "psf_sigma=1.5, motion_blur_prob=0",
+   "image": "images/v2/blur_psf_1_5.png",
+   "caption": "4x zoom. sigma 0 keeps the anti-aliased edge sharp, 0.7 is mild defocus, 1.5 (top of the sampled range) is clearly soft."
+  },
+  {
+   "label": "motion blur 4 px",
+   "params": "psf_sigma=0, motion_blur_prob=1, motion_blur_length=4",
+   "image": "images/v2/blur_motion_4.png",
+   "caption": "A 4 px line-shaped smear at a random angle (the angle is drawn per image); applied to everything, mine and ground alike."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "Hard v1-style edge vs soft edge (seed 13)",
+   "before": "images/v2/edges_ba_a_off.png",
+   "after": "images/v2/edges_ba_a_on.png",
+   "before_label": "SOFT_EDGES off",
+   "after_label": "SOFT_EDGES on",
+   "caption": "6x zoom, no lens blur. Off: stair-stepped outline with a coloured fringe; on: the boundary pixels blend part mine, part ground."
+  },
+  {
+   "label": "Hard v1-style edge vs soft edge (seed 12)",
+   "before": "images/v2/edges_ba_b_off.png",
+   "after": "images/v2/edges_ba_b_on.png",
+   "before_label": "SOFT_EDGES off",
+   "after_label": "SOFT_EDGES on",
+   "caption": "6x zoom, no lens blur. Off: stair-stepped outline with a coloured fringe; on: the boundary pixels blend part mine, part ground."
+  },
+  {
+   "label": "Lens blur off vs on (psf_sigma 1.2)",
+   "before": "images/v2/blur_ba_off.png",
+   "after": "images/v2/blur_ba_on.png",
+   "before_label": "BLUR off (sigma 0)",
+   "after_label": "BLUR on (sigma 1.2)",
+   "caption": "4x zoom: fine ground texture and the mine's outline lose their crispness."
+  }
+ ],
+ "notes": "Blur is spatially uniform (no depth-of-field variation) and motion blur is a straight line. For the edge zoom both images have blur switched off (psf_sigma=0, no motion blur) so you see the raw edge. The 'off' image also turns SOFT_EDGES off only; everything else is identical."
+}

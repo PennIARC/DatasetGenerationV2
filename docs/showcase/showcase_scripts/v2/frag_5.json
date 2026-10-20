@@ -1,0 +1,71 @@
+{
+ "id": "burial",
+ "title": "Partial burial",
+ "flag": "BURIAL",
+ "summary": "Real mines are often half-sunk in soil, so only part of the body shows. In v1 every mine was whole and sitting on top. In v2 35% of mines are buried: a soil plane (tilted up to 25 deg) hides a chosen fraction of the mine, with a rough soil line and a small soil lip along it. The label box covers only the part that is still visible. This teaches the detector to find mines from a fragment (a wing, an edge) rather than only from the complete outline.",
+ "how": "features/mesh.py: the soil plane offset is the burial-fraction quantile of the surface heights, so the hidden fraction of the top-down area is hit exactly; the 3D triangles are clipped against the plane (Sutherland-Hodgman) and the shadow is projected onto the same plane. soil.burial_overlay adds an fBm-roughened soil line and a berm (lip) in the local ground colour. The hidden fraction is capped at 50% (BURIAL_MAX_FRACTION); the achieved fraction is stored in the sidecar.",
+ "code": "DatasetGenerator/features/mesh.py: sample_burial, clip_triangles, render_mine; features/soil.py: burial_overlay; controlPanel: BURIAL_PROB, BURIAL_FRACTION, BURIAL_MAX_FRACTION, BURIAL_TILT, BERM_*",
+ "options": [
+  {
+   "label": "hidden 0%",
+   "params": "burial_prob=0",
+   "image": "images/v2/burial_frac_0.png",
+   "caption": "Green box = YOLO label from the visible part. 0.5 is the cap: at least half the mine always stays visible."
+  },
+  {
+   "label": "hidden 20%",
+   "params": "burial_prob=1, burial_fraction=0.2, burial_tilt=12 (achieved 0.35)",
+   "image": "images/v2/burial_frac_20.png",
+   "caption": "Green box = YOLO label from the visible part. 0.5 is the cap: at least half the mine always stays visible."
+  },
+  {
+   "label": "hidden 35%",
+   "params": "burial_prob=1, burial_fraction=0.35, burial_tilt=12 (achieved 0.50)",
+   "image": "images/v2/burial_frac_35.png",
+   "caption": "Green box = YOLO label from the visible part. 0.5 is the cap: at least half the mine always stays visible."
+  },
+  {
+   "label": "hidden 50%",
+   "params": "burial_prob=1, burial_fraction=0.5, burial_tilt=12 (achieved 0.50)",
+   "image": "images/v2/burial_frac_50.png",
+   "caption": "Green box = YOLO label from the visible part. 0.5 is the cap: at least half the mine always stays visible."
+  },
+  {
+   "label": "plane tilt 0 deg",
+   "params": "burial_fraction=0.35, burial_tilt=0",
+   "image": "images/v2/burial_tilt_0.png",
+   "caption": "Tilt of the buried soil plane (its direction is random but fixed for the seed): the soil line runs at a different angle and the shadow lies on the tilted plane."
+  },
+  {
+   "label": "plane tilt 12 deg",
+   "params": "burial_fraction=0.35, burial_tilt=12",
+   "image": "images/v2/burial_tilt_12.png",
+   "caption": "Tilt of the buried soil plane (its direction is random but fixed for the seed): the soil line runs at a different angle and the shadow lies on the tilted plane."
+  },
+  {
+   "label": "plane tilt 25 deg",
+   "params": "burial_fraction=0.35, burial_tilt=25",
+   "image": "images/v2/burial_tilt_25.png",
+   "caption": "Tilt of the buried soil plane (its direction is random but fixed for the seed): the soil line runs at a different angle and the shadow lies on the tilted plane."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "Not buried vs 40% buried (seed 13)",
+   "before": "images/v2/burial_ba_a_off.png",
+   "after": "images/v2/burial_ba_a_on.png",
+   "before_label": "BURIAL off",
+   "after_label": "40% buried",
+   "caption": "4x zoom, same mine, pose and position. The box shrinks to the visible part (green). Achieved hidden fraction 0.47."
+  },
+  {
+   "label": "Not buried vs 40% buried (seed 12)",
+   "before": "images/v2/burial_ba_b_off.png",
+   "after": "images/v2/burial_ba_b_on.png",
+   "before_label": "BURIAL off",
+   "after_label": "40% buried",
+   "caption": "4x zoom, same mine, pose and position. The box shrinks to the visible part (green). Achieved hidden fraction 0.42."
+  }
+ ],
+ "notes": "The soil plane is a plane (no local relief) and no soil is spilled onto the wings away from the line. The soil lip lies only along the true soil line and is tinted like the local ground, so it is subtle: the main cue is the missing part of the mine and the shrunken box (the earlier 1-2 px leftover outline is fixed, and the mine no longer shifts between burial off and on). The hidden fraction is the target; the soil-line roughness can add a few percent (achieved is capped at 50%). Boxes are drawn in green on every image below."
+}

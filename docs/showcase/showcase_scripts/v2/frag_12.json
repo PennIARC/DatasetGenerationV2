@@ -1,0 +1,75 @@
+{
+ "id": "rock_seating",
+ "title": "Rock and debris seating (contact shadows)",
+ "flag": "SHADOWS (ROCK_CONTACT_SHADOW, ROCK_CAST_SHADOW, ROCK_RIM_BLEND)",
+ "summary": "A pasted rock cut-out looks like a sticker unless it appears to touch the ground. v2 adds a soft contact shadow right under rocks, dirt clods and leaf clumps, a sun-direction cast shadow, and a rim blend that tints the rock edge toward the local ground and darkens the side away from the sun. Mines already had such cues; without them on the clutter, 'seated and shadowed = mine' would be a shortcut for the detector.",
+ "how": "debris_shadow: contact shadow = dilated, blurred alpha shifted slightly away from the sun, darkening 20-50% scaled by the image's shadow strength; cast shadow = swept silhouette with capped length; rim blend = 1.5 px edge tinted toward the ground, darker on the shadow side. Rocks are otherwise rotated so their baked-in bright side faces the sun; these comparisons set rock_align_light=False so rotation is identical across variants.",
+ "code": "DatasetGenerator/features/shadows.py: debris_shadow; objects.py: EnvironmentDebris.draw; controlPanel: ROCK_CONTACT_SHADOW, ROCK_CAST_SHADOW, ROCK_RIM_BLEND, ROCK_CONTACT_*, ROCK_HEIGHT_FRAC",
+ "options": [
+  {
+   "label": "shadows off",
+   "params": "shadows=False",
+   "image": "images/v2/rock_opt_0.png",
+   "caption": "6x zoom on one rock; same rock, same rotation."
+  },
+  {
+   "label": "contact shadow only",
+   "params": "rock_cast_shadow=False",
+   "image": "images/v2/rock_opt_1.png",
+   "caption": "6x zoom on one rock; same rock, same rotation."
+  },
+  {
+   "label": "full, sun 18 deg",
+   "params": "sun_elevation=18",
+   "image": "images/v2/rock_opt_2.png",
+   "caption": "6x zoom on one rock; same rock, same rotation."
+  },
+  {
+   "label": "full, sun 35 deg",
+   "params": "sun_elevation=35",
+   "image": "images/v2/rock_opt_3.png",
+   "caption": "6x zoom on one rock; same rock, same rotation."
+  },
+  {
+   "label": "full, sun 65 deg",
+   "params": "sun_elevation=65",
+   "image": "images/v2/rock_opt_4.png",
+   "caption": "6x zoom on one rock; same rock, same rotation."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "Rock 1: no shadows vs full",
+   "before": "images/v2/rock_ba0_off.png",
+   "after": "images/v2/rock_ba0_on.png",
+   "before_label": "SHADOWS off",
+   "after_label": "contact + cast + rim",
+   "caption": "6x zoom, sun elevation 35: the rock sits on the ground instead of floating."
+  },
+  {
+   "label": "Rock 1: contact only vs full",
+   "before": "images/v2/rock_ba0_contact.png",
+   "after": "images/v2/rock_ba0_full.png",
+   "before_label": "contact shadow only",
+   "after_label": "contact + cast",
+   "caption": "Adding the sun-direction cast shadow on top of the contact shadow."
+  },
+  {
+   "label": "Rock 2: no shadows vs full",
+   "before": "images/v2/rock_ba1_off.png",
+   "after": "images/v2/rock_ba1_on.png",
+   "before_label": "SHADOWS off",
+   "after_label": "contact + cast + rim",
+   "caption": "6x zoom, sun elevation 35: the rock sits on the ground instead of floating."
+  },
+  {
+   "label": "Rock 2: contact only vs full",
+   "before": "images/v2/rock_ba1_contact.png",
+   "after": "images/v2/rock_ba1_full.png",
+   "before_label": "contact shadow only",
+   "after_label": "contact + cast",
+   "caption": "Adding the sun-direction cast shadow on top of the contact shadow."
+  }
+ ],
+ "notes": "On this busy grass background the shadow is hard to see at 35-65 deg elevation (best at 18 deg, where the dark side of the rock and the shadow edge show); on pale ground the effect is clearer. The shadows are 2D approximations (swept silhouettes) and the rock photos have their own baked-in lighting, so a rock can still look flat or lit from a different side, especially with rock_align_light off. Contact shadow is weaker in overcast images. Seed 30 with leaf clumps and blades off to keep the rock clear; azimuth 120 deg in every image (arrow overlay shows sun direction)."
+}

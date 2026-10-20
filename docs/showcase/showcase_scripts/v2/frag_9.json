@@ -1,0 +1,60 @@
+{
+ "id": "labels",
+ "title": "Label policy (visible-mask boxes)",
+ "flag": "LABEL_VISIBLE_MASK",
+ "summary": "v1 drew the label box around the mine as it would look unobstructed, even when rocks, grass or soil covered part of it, so the box could include things the camera cannot see. v2 builds the box from the pixels of the mine that are actually visible after burial soil and the overgrowth layer. That matches what a human annotator would draw on a real photo.",
+ "how": "Mine.label: with LABEL_VISIBLE_MASK the visible mask = mine alpha after burial soil, minus accumulated overgrowth alpha; box = bounding box of pixels with alpha > 0.5. A mine with fewer than LABEL_MIN_VISIBLE_PX (default 1) visible pixels gets no box.",
+ "code": "DatasetGenerator/objects.py: Mine.label; scene.py (occlusion buffer); controlPanel: LABEL_VISIBLE_MASK, LABEL_ALPHA_THRESHOLD, LABEL_MIN_VISIBLE_PX",
+ "options": [],
+ "before_after": [
+  {
+   "label": "Partly covered mine, seed 213 #5 (box area x0.38)",
+   "before": "images/v2/label_ba_0_off.png",
+   "after": "images/v2/label_ba_0_on.png",
+   "before_label": "mask off: v1 box (red)",
+   "after_label": "mask on: visible-part box (green)",
+   "caption": "3x zoom. Same pixels in both images; the red box (v1 policy) includes the covered part of the mine, the green one hugs what is visible."
+  },
+  {
+   "label": "Partly covered mine, seed 201 #4 (box area x0.60)",
+   "before": "images/v2/label_ba_1_off.png",
+   "after": "images/v2/label_ba_1_on.png",
+   "before_label": "mask off: v1 box (red)",
+   "after_label": "mask on: visible-part box (green)",
+   "caption": "3x zoom. Same pixels in both images; the red box (v1 policy) includes the covered part of the mine, the green one hugs what is visible."
+  },
+  {
+   "label": "Partly covered mine, seed 221 #3 (box area x0.60)",
+   "before": "images/v2/label_ba_2_off.png",
+   "after": "images/v2/label_ba_2_on.png",
+   "before_label": "mask off: v1 box (red)",
+   "after_label": "mask on: visible-part box (green)",
+   "caption": "3x zoom. Same pixels in both images; the red box (v1 policy) includes the covered part of the mine, the green one hugs what is visible."
+  },
+  {
+   "label": "Half-buried mine",
+   "before": "images/v2/label_ba_bur_off.png",
+   "after": "images/v2/label_ba_bur_on.png",
+   "before_label": "mask off: v1 box (red)",
+   "after_label": "mask on (green)",
+   "caption": "3x zoom, 50% burial. Hidden fraction achieved 0.50. Note: v1 mode took the box from the clipped sprite alpha before soil; the visible-mask box also excludes the soil line and lip."
+  },
+  {
+   "label": "Mine covered by grass / debris, seed 307 #2 (box area x0.05)",
+   "before": "images/v2/label_ba_over0_off.png",
+   "after": "images/v2/label_ba_over0_on.png",
+   "before_label": "mask off: v1 box (red)",
+   "after_label": "mask on: visible-part box (green)",
+   "caption": "3x zoom, no burial. Overgrowth (blades, leaves, rocks drawn over the mine) is subtracted from the mask, so the green box shrinks to the visible part."
+  },
+  {
+   "label": "Mine covered by grass / debris, seed 312 #2 (box area x0.77)",
+   "before": "images/v2/label_ba_over1_off.png",
+   "after": "images/v2/label_ba_over1_on.png",
+   "before_label": "mask off: v1 box (red)",
+   "after_label": "mask on: visible-part box (green)",
+   "caption": "3x zoom, no burial. Overgrowth (blades, leaves, rocks drawn over the mine) is subtracted from the mask, so the green box shrinks to the visible part."
+  }
+ ],
+ "notes": "OPEN QUESTION: a mine fully hidden by overgrowth currently gets no box (LABEL_MIN_VISIBLE_PX = 1), so it becomes an unlabelled mine, i.e. a (rare) false negative for training; alternatives are keeping it labelled or dropping that image. A mine that is only a few pixels visible still gets a tiny box. Red = box with the mask switched off (v1 policy), green = visible-mask box. (No fully hidden mine turned up in the sampled seeds, so no example image.) In about 64 sampled 8-mine images no mine was fully hidden, so no example image is shown (the CHANGES notes report 2 of 192 mines hidden in their sample)."
+}

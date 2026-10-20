@@ -1,0 +1,97 @@
+{
+ "id": "shadows",
+ "title": "Cast shadows",
+ "flag": "SHADOWS",
+ "summary": "v1 had no shadows at all: mines floated on the ground. In v2 each image has one sun (direction, height, strength) and mines, rocks, grass and dirt all cast shadows that agree with it, and mines are shaded by the same light. Shadows are one of the most important real cues for an object lying on the ground. Rocks get shadows too, otherwise 'has a shadow = mine' would become a shortcut.",
+ "how": "features/sun.py samples one sun per image (azimuth, elevation 15-70 deg, strength 0.25-0.65; 15% overcast images with weak, very soft shadows). Mines: the 3D triangles are projected along the sun onto the ground and blurred by a distance-dependent penumbra, plus a little contact darkening. Rocks / grass / dirt: the alpha silhouette is swept away from the sun by height / tan(elevation) and blurred the same way.",
+ "code": "DatasetGenerator/features/sun.py: sample_sun; features/shadows.py: mine_shadow, debris_shadow; objects.py: Mine._draw_shadow, EnvironmentDebris.draw",
+ "options": [
+  {
+   "label": "elevation 15 deg",
+   "params": "sun_elevation=15, sun_azimuth=120, shadow_strength=0.45",
+   "image": "images/v2/shadow_el_15.jpg",
+   "caption": "Same scene, 2x zoom. Low sun: long soft shadows; high sun: short, tight ones under each object."
+  },
+  {
+   "label": "elevation 35 deg",
+   "params": "sun_elevation=35, sun_azimuth=120, shadow_strength=0.45",
+   "image": "images/v2/shadow_el_35.jpg",
+   "caption": "Same scene, 2x zoom. Low sun: long soft shadows; high sun: short, tight ones under each object."
+  },
+  {
+   "label": "elevation 70 deg",
+   "params": "sun_elevation=70, sun_azimuth=120, shadow_strength=0.45",
+   "image": "images/v2/shadow_el_70.jpg",
+   "caption": "Same scene, 2x zoom. Low sun: long soft shadows; high sun: short, tight ones under each object."
+  },
+  {
+   "label": "overcast",
+   "params": "overcast_prob=1 (strength U(0.03, 0.15), penumbra x6)",
+   "image": "images/v2/shadow_overcast.jpg",
+   "caption": "Diffuse light: shadows almost vanish and are very blurry."
+  },
+  {
+   "label": "azimuth 0 deg",
+   "params": "sun_azimuth=0, sun_elevation=35",
+   "image": "images/v2/shadow_az_0.jpg",
+   "caption": "Shadows of mines and rocks all point away from the arrow; rock photos are also rotated so their baked-in bright side faces the sun."
+  },
+  {
+   "label": "azimuth 120 deg",
+   "params": "sun_azimuth=120, sun_elevation=35",
+   "image": "images/v2/shadow_az_120.jpg",
+   "caption": "Shadows of mines and rocks all point away from the arrow; rock photos are also rotated so their baked-in bright side faces the sun."
+  },
+  {
+   "label": "azimuth 240 deg",
+   "params": "sun_azimuth=240, sun_elevation=35",
+   "image": "images/v2/shadow_az_240.jpg",
+   "caption": "Shadows of mines and rocks all point away from the arrow; rock photos are also rotated so their baked-in bright side faces the sun."
+  },
+  {
+   "label": "strength 0.25",
+   "params": "shadow_strength=0.25, sun_elevation=35, azimuth=120",
+   "image": "images/v2/shadow_str_0_25.jpg",
+   "caption": "Fraction of light removed in shadow (sampled 0.25-0.65 per image)."
+  },
+  {
+   "label": "strength 0.45",
+   "params": "shadow_strength=0.45, sun_elevation=35, azimuth=120",
+   "image": "images/v2/shadow_str_0_45.jpg",
+   "caption": "Fraction of light removed in shadow (sampled 0.25-0.65 per image)."
+  },
+  {
+   "label": "strength 0.65",
+   "params": "shadow_strength=0.65, sun_elevation=35, azimuth=120",
+   "image": "images/v2/shadow_str_0_65.jpg",
+   "caption": "Fraction of light removed in shadow (sampled 0.25-0.65 per image)."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "Mines: shadows off / on",
+   "before": "images/v2/shadow_ba_mine_off.png",
+   "after": "images/v2/shadow_ba_mine_on.png",
+   "before_label": "SHADOWS off",
+   "after_label": "SHADOWS on",
+   "caption": "4x zoom on the middle mine. With shadows the mine sits on the ground, has a lit and a dark side and a soft shadow."
+  },
+  {
+   "label": "Whole region: mines and rocks",
+   "before": "images/v2/shadow_ba_rocks_off.jpg",
+   "after": "images/v2/shadow_ba_rocks_on.jpg",
+   "before_label": "SHADOWS off",
+   "after_label": "SHADOWS on",
+   "caption": "2x zoom. Rocks, leaf litter and the mines all gain shadows falling the same way (away from the arrow), so the debris is consistent with the sun that lights the mines."
+  },
+  {
+   "label": "A single rock: shadow off / on",
+   "before": "images/v2/shadow_ba_rock1_off.png",
+   "after": "images/v2/shadow_ba_rock1_on.png",
+   "before_label": "SHADOWS off",
+   "after_label": "SHADOWS on",
+   "caption": "6x zoom on a rock: the shadow is a swept, blurred copy of its outline, away from the sun."
+  }
+ ],
+ "notes": "No self-shadowing on the mine (wings do not shade the body). The background photos have their own baked-in shadows in arbitrary directions, which can contradict the synthetic sun. Mine shadows fall on a flat plane, not over rocks or grass relief. PFM-1 mines are thin, so their shadows are short (physically right). Rocks keep their rotation (rock_align_light=False) so only the shadows differ between off and on. Arrow overlay: points toward the sun; shadows fall the opposite way. Azimuth 0 = sun toward image right, 90 = toward image top."
+}

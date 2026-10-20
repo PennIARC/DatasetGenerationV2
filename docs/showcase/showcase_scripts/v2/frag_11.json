@@ -1,0 +1,53 @@
+{
+ "id": "flip",
+ "title": "Face-up and face-down mines",
+ "flag": "FLIP_PROB",
+ "summary": "A mine on the ground can lie on its bottom or on its back, showing its underside. v2 flips each mine (rotated 180 degrees about its long axis) with probability FLIP_PROB = 0.30, so the detector sees both the top and the different underside shape, with the same colour, shading, shadow and burial machinery. Without it every training mine would show only its upper surface.",
+ "how": "features/mesh.py: sample_pose returns (pitch, roll, yaw, face_down); a face-down mine starts from a rest attitude computed from the mesh's stable pose (about 1.5 deg off flat so a wing tip and the body touch the ground), and tilts of sigma 5 deg and the yaw are applied on top. MINE_POSE accepts a 4th value face_down; override {'flip': True/False} or FLIP_PROB.",
+ "code": "DatasetGenerator/features/mesh.py: sample_pose, face_down_base; objects.py: Mine._render_mesh; controlPanel: FLIP_PROB",
+ "options": [
+  {
+   "label": "FLIP_PROB = 0.0",
+   "params": "flip_prob=0.0, seed 5, 8 mines (0 face down here)",
+   "image": "images/v2/flip_prob_0_0.jpg",
+   "caption": "Same scene, same positions and sizes; only which mines are flipped changes."
+  },
+  {
+   "label": "FLIP_PROB = 0.3",
+   "params": "flip_prob=0.3, seed 5, 8 mines (4 face down here)",
+   "image": "images/v2/flip_prob_0_3.jpg",
+   "caption": "Same scene, same positions and sizes; only which mines are flipped changes."
+  },
+  {
+   "label": "FLIP_PROB = 1.0",
+   "params": "flip_prob=1.0, seed 5, 8 mines (8 face down here)",
+   "image": "images/v2/flip_prob_1_0.jpg",
+   "caption": "Same scene, same positions and sizes; only which mines are flipped changes."
+  },
+  {
+   "label": "yaw strip: face up (top) vs face down (bottom)",
+   "params": "mine_pose=(2, -2, yaw, face_down), yaw 0 / 60 / 120 / 200, seed 13, scale 0.35",
+   "image": "images/v2/flip_strip.png",
+   "caption": "Same mine and yaw in each column. Face down is a mirrored outline and shows the underside (flat base, different light and wing profile). 1.9x zoom."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "Face up vs face down (seed 13)",
+   "before": "images/v2/flip_ba_a_up.png",
+   "after": "images/v2/flip_ba_a_down.png",
+   "before_label": "face up",
+   "after_label": "face down",
+   "caption": "4x zoom, same mine, yaw and position. Shadow length 17 px up vs 18 px down (propped wing)."
+  },
+  {
+   "label": "Face up vs face down (seed 12)",
+   "before": "images/v2/flip_ba_b_up.png",
+   "after": "images/v2/flip_ba_b_down.png",
+   "before_label": "face up",
+   "after_label": "face down",
+   "caption": "4x zoom, same mine, yaw and position. Shadow length 61 px up vs 66 px down (propped wing)."
+  }
+ ],
+ "notes": "A face-down mine props one wing on the body, so its shadow is longer than a face-up mine's (physically plausible). The underside geometry is plausible but untextured (no moulding detail). The mirrored silhouette is what makes it recognisably different from face-up at the same yaw."
+}

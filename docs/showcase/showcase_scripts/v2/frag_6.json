@@ -1,0 +1,47 @@
+{
+ "id": "colour",
+ "title": "Colour palette",
+ "flag": "COLOUR_PALETTE",
+ "summary": "v1 painted every mine the same dark olive-teal with tiny jitter, so colour alone told a detector 'mine'. v2 draws each mine's colour from realistic military-plastic families (olive drab, dark green, khaki, brown, tan), then adds sun-bleaching, a dirt tint and a brightness factor, so hue and brightness cover the real range and no single colour is a shortcut. Colours outside realistic plastics (blue, red...) are deliberately excluded.",
+ "how": "features/colour.py: family by weight (olive 0.28, dark green 0.22, brown 0.20, khaki 0.15, tan 0.15), H, S, V uniform inside the family's range; with p=0.35 bleaching (S down, V up); with p=0.4 mix towards a dirt colour by up to 30%; brightness x U(0.85, 1.15). The result is the albedo that the scene lighting then shades.",
+ "code": "DatasetGenerator/features/colour.py: sample_colour_params, colour_from_params; controlPanel: PALETTE, BLEACH_*, DIRT_TINT_*, BRIGHTNESS_JITTER",
+ "options": [
+  {
+   "label": "60 sampled colours, same background",
+   "params": "mine_colour = colour_from_params(sample_colour_params(...)), 60 draws, seed 13, scale 0.28",
+   "image": "images/v2/colour_sheet_60.jpg",
+   "caption": "Tag: family; b = sun-bleached, d = dirt-tinted. Everything else (ground, position, pose, lighting) is identical, only the albedo changes."
+  },
+  {
+   "label": "by family (7 samples each)",
+   "params": "rows: olive_drab, dark_green, khaki, brown, tan",
+   "image": "images/v2/colour_families.jpg",
+   "caption": "Each row is one family, with its internal spread."
+  },
+  {
+   "label": "v1 colour for contrast (10 draws)",
+   "params": "v1 formula: base RGB (0.15, 0.38, 0.27) + common shift U(-0.3, 0.3) + per-channel U(-0.05, 0.05)",
+   "image": "images/v2/colour_v1_10.jpg",
+   "caption": "v1's colour formula: always the same teal-green hue, only lighter or darker."
+  }
+ ],
+ "before_after": [
+  {
+   "label": "v1 colour vs palette (seed 13)",
+   "before": "images/v2/colour_ba_a_v1.png",
+   "after": "images/v2/colour_ba_a_v2.png",
+   "before_label": "COLOUR_PALETTE off",
+   "after_label": "palette (olive_drab)",
+   "caption": "4x zoom. Same mine and scene, only the albedo is drawn differently."
+  },
+  {
+   "label": "v1 colour vs palette (seed 12)",
+   "before": "images/v2/colour_ba_b_v1.png",
+   "after": "images/v2/colour_ba_b_v2.png",
+   "before_label": "COLOUR_PALETTE off",
+   "after_label": "palette (tan)",
+   "caption": "4x zoom. Same mine and scene, only the albedo is drawn differently."
+  }
+ ],
+ "notes": "Whether this palette matches real PFM-1 / field colours should be checked against reference photos; the ranges are a judgement call (arbitrary hues were excluded by decision). Each swatch is the same background and position, with the lighting and shading of that scene."
+}
