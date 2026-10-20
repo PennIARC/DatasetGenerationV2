@@ -7,8 +7,10 @@ f12 = {"id": "rock_seating", "title": "Rock and debris seating (contact shadows)
        "notes": "On this busy grass background the shadow is hard to see at 35-65 deg elevation (best at 18 deg, where the dark side of the rock and the shadow edge show); on pale ground the effect is clearer. The shadows are 2D approximations (swept silhouettes) and the rock photos have their own baked-in lighting, so a rock can still look flat or lit from a different side, especially with rock_align_light off. Contact shadow is weaker in overcast images. Seed 30 with leaf clumps and blades off to keep the rock clear; azimuth 120 deg in every image (arrow overlay shows sun direction)."}
 S = dict(n_mines=0, overcast_prob=0, rocks_to_spawn_min=14, rocks_to_spawn_max=14, rock_align_light=False, sun_azimuth=120, shadow_strength=0.5, sun_elevation=35, bg_zoom=1.0, psf_sigma=0.3, motion_blur_prob=0, leaf_clumps_new=False, grass_blades=False)
 (rg, _, _), rk = render_rocks(30, **S)
+rk_all = sorted([r for r in rk if r[2] >= 80 and 200 < r[0] < 1700 and 150 < r[1] < 900], key=lambda r: -r[2])
 rk = sorted([r for r in rk if r[2] >= 80 and 200 < r[0] < 1700 and 150 < r[1] < 900], key=lambda r: -r[2])
 rk = [r for r in rk if r[:2] == (540, 690)] + [r for r in rk if r[:2] == (896, 428)]
+rk = rk or [r for r in rk_all[:2]]
 print(rk)
 cx0, cy0 = rk[0][0] + rk[0][2] // 2, rk[0][1] + rk[0][3] // 2
 V = [("shadows off", dict(shadows=False)), ("contact shadow only", dict(rock_cast_shadow=False)),

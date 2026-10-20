@@ -42,6 +42,7 @@ code,.mono{font-family:var(--mono);font-size:.88em}
   padding:5px 12px;border-radius:8px;cursor:pointer}
 .btn:hover{background:var(--surface2)}
 .btn[aria-pressed="true"]{background:var(--chip);color:var(--chipink);border-color:var(--accent)}
+main:has(.ggrid){max-width:none}
 main{max-width:1200px;margin:0 auto;padding:20px 16px 80px}
 .pagehead h1{margin:.2em 0 .3em;font-size:1.9rem;line-height:1.2}
 .pagehead p.intro{max-width:70ch;color:var(--muted);margin:0 0 14px}
@@ -141,16 +142,23 @@ details.glossary dd{margin:0;color:var(--muted)}
 .ggrid{display:grid;grid-template-columns:repeat(var(--cols,5),minmax(0,1fr));gap:12px}
 .gcard{background:var(--surface);border:2px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
 .gcard.flagged,tr.flagged{border-color:#d33;box-shadow:0 0 0 2px rgba(220,50,50,.35)}
-.gcard .thumb{all:unset;display:block;cursor:zoom-in;aspect-ratio:1;width:100%;background:#111;overflow:hidden}
+.gcard .thumb{all:unset;display:block;position:relative;cursor:zoom-in;aspect-ratio:16/9;width:100%;background:#111;overflow:hidden}
 .gcard .thumb:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
-.gcard img,.gcard .ph{width:100%;height:100%;object-fit:contain;display:block}
+.gcard img,.gcard .ph{width:100%;height:100%;object-fit:cover;display:block}
 .gcard .gb{padding:6px 8px 8px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .gcard .gid{font-weight:700}
-.gcard .gm{font:.75rem var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.bbox{display:none;position:absolute;border:2px solid #22e05a;box-shadow:0 0 0 1px #000;pointer-events:none}
+.gcard.showbox .bbox{display:block}
+.stage{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.72);color:#fff;font:600 .8rem var(--mono);padding:3px 8px;border-radius:4px;pointer-events:none}
+.flipbtn{font:inherit;font-size:1rem;font-weight:600;padding:8px;border:2px solid var(--accent);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer}
+.flipbtn:hover{background:var(--surface)}
+.gcard .gm{font:.62rem var(--mono);color:var(--muted);overflow-wrap:anywhere}
 .gcard.flagged .gid::after{content:" \2691";color:#d33}
-.flag{display:inline-flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer}
-.flag input{width:18px;height:18px}
-.note{font:inherit;font-size:.82rem;width:100%;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 6px}
+.flag{display:flex;align-items:center;justify-content:center;gap:8px;font-size:1rem;font-weight:600;cursor:pointer;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--bg)}
+.gcard.flagged .flag{background:rgba(220,50,50,.18);border-color:#d33}
+.flag input{width:22px;height:22px}
+.note{font:inherit;font-size:.85rem;width:100%;box-sizing:border-box;resize:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.btnrow{display:flex;gap:8px}.btnrow>*{flex:1;min-width:0}
 .twrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 table.gt{border-collapse:collapse;width:100%;font-size:.85rem}
 table.gt th,table.gt td{padding:4px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
@@ -401,7 +409,8 @@ function renderGrid(page){
   var items = arr(page.items).filter(function(x){ return x && typeof x === "object"; }).map(function(it, i){
     return {id: (it.id === undefined || it.id === null || String(it.id) === "") ? "item" + (i + 1) : String(it.id), idx: i,
       meta: (it.meta && typeof it.meta === "object" && !Array.isArray(it.meta)) ? it.meta : {},
-      tags: arr(it.tags).map(String), image: str(it.image), thumb: str(it.thumb), caption: str(it.caption)};
+      tags: arr(it.tags).map(String), image: str(it.image), thumb: str(it.thumb), caption: str(it.caption),
+      before: str(it.before), box: Array.isArray(it.box) && it.box.length === 4 ? it.box : null};
   });
   var present = {}, keys = [], seen = {};
   items.forEach(function(it){ Object.keys(it.meta).forEach(function(k){ present[k] = 1; }); });
@@ -428,10 +437,10 @@ function renderGrid(page){
   var io = null;
 
   var S = {view: store("showcase-view") === "table" ? "table" : "grid",
-    cols: parseInt(store("showcase-cols"), 10) || (window.innerWidth < 600 ? 2 : 5),
+    cols: parseInt(store("showcase-cols2"), 10) || (window.innerWidth < 600 ? 1 : 3),
     bg: "", sunMin: "", sunMax: "", burMin: "", burMax: "", face: "", blades: "", tag: "", fk: "", fq: "",
     sort: "id", dir: 1, only: false};
-  S.cols = Math.max(2, Math.min(10, S.cols));
+  S.cols = Math.max(1, Math.min(10, S.cols));
 
   function isFl(id){ var o = flags.get(id); return !!(o && o.f); }
   function noteOf(id){ var o = flags.get(id); return (o && o.n) || ""; }
@@ -505,11 +514,11 @@ function renderGrid(page){
   var copyBtn = btn("Copy flagged ids + notes", doCopy);
   var dlBtn = btn("Download flagged.json", doDownload);
   var clearBtn = btn("Clear flags", doClear);
-  var colsIn = el("input", {type: "range", min: "2", max: "10", step: "1", value: String(S.cols), "aria-label": "cards per row"});
+  var colsIn = el("input", {type: "range", min: "1", max: "10", step: "1", value: String(S.cols), "aria-label": "cards per row"});
   var colsOut = el("span", {text: String(S.cols)});
   var colsFld = el("label", {"class": "fld"}, [el("span", null, ["Cards per row: ", colsOut]), colsIn]);
   colsIn.addEventListener("input", function(){
-    S.cols = parseInt(colsIn.value, 10); colsOut.textContent = String(S.cols); store("showcase-cols", String(S.cols)); applyCols(); });
+    S.cols = parseInt(colsIn.value, 10); colsOut.textContent = String(S.cols); store("showcase-cols2", String(S.cols)); applyCols(); });
 
   var fields = el("div", {"class": "fields"});
   if (kBg) fields.appendChild(fld("Background family", sel([["", "all"]].concat(Object.keys(famSet).sort().map(function(f){ return [f, f]; })),
@@ -573,8 +582,11 @@ function renderGrid(page){
     return {cb: cb, label: el("label", {"class": "flag"}, [cb, "Flag"])};
   }
   function noteCtl(id){
-    var n = el("input", {type: "text", "class": "note", placeholder: "note…", "aria-label": "Note for " + id, value: noteOf(id), maxlength: "300"});
-    n.addEventListener("input", function(){ setNote(id, n.value); });
+    var n = el("textarea", {"class": "note", rows: "2", placeholder: "note…", "aria-label": "Note for " + id});
+    n.value = noteOf(id);
+    var fit = function(){ n.style.height = "auto"; n.style.height = n.scrollHeight + "px"; };
+    n.addEventListener("input", function(){ setNote(id, n.value); fit(); });
+    setTimeout(fit, 0);
     return n;
   }
   var CHUNK = 60, rs = null;
@@ -582,10 +594,25 @@ function renderGrid(page){
     var fc = flagCtl(v.id);
     var thumb = el("button", {"class": "thumb", type: "button", tabindex: "-1", "aria-label": "Enlarge " + v.id,
       onclick: function(ev){ openAt(i, ev.currentTarget.closest("[data-id]")); }}, [img(v.thumb || v.image, v.id, "")]);
+    var im = thumb.querySelector("img"), flip = null;
+    if (v.box) thumb.appendChild(el("div", {"class": "bbox", style: "left:" + (v.box[0] * 100) + "%;top:" + (v.box[1] * 100) + "%;width:" + (v.box[2] * 100) + "%;height:" + (v.box[3] * 100) + "%"}));
+    var boxb = null;
+    if (v.box){
+      boxb = el("button", {type: "button", "class": "flipbtn", "aria-pressed": "false", text: "Boxes: off", onclick: function(){
+        var on = card.classList.toggle("showbox"); boxb.textContent = on ? "Boxes: on" : "Boxes: off"; boxb.setAttribute("aria-pressed", String(on)); }});
+    }
+    if (v.before){
+      var badge = el("div", {"class": "stage", text: "AFTER (buried)"}); thumb.appendChild(badge);
+      var showAfter = true;
+      flip = el("button", {type: "button", "class": "flipbtn", text: "Flip: before", onclick: function(){
+        showAfter = !showAfter; im.src = showAfter ? (v.thumb || v.image) : v.before;
+        badge.textContent = showAfter ? "AFTER (buried)" : "BEFORE (no burial)";
+        flip.textContent = showAfter ? "Flip: before" : "Flip: after"; }});
+    }
     var kv = cardKeys.map(function(k){ return el("div", {text: k + ": " + fmt(v.meta[k])}); });
     var card = el("article", {"class": "gcard" + (isFl(v.id) ? " flagged" : ""), tabindex: "0", "data-id": v.id, role: "listitem",
       "aria-label": "Mine crop " + v.id}, [thumb,
-      el("div", {"class": "gb"}, [el("div", {"class": "gid", text: v.id}), el("div", {"class": "gm"}, kv), fc.label, noteCtl(v.id)])]);
+      el("div", {"class": "gb"}, [el("div", {"class": "gid", text: v.id}), el("div", {"class": "gm"}, kv)].concat([el("div", {"class": "btnrow"}, [flip, boxb, fc.label].filter(Boolean)), noteCtl(v.id)]))]);
     nodes.push({id: v.id, root: card, cb: fc.cb});
     return card;
   }

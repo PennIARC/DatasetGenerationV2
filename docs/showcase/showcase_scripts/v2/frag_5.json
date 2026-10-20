@@ -56,7 +56,7 @@
    "after": "images/v2/burial_ba_a_on.png",
    "before_label": "BURIAL off",
    "after_label": "40% buried",
-   "caption": "4x zoom, same mine, pose and position. The box shrinks to the visible part (green). Achieved hidden fraction 0.47."
+   "caption": "4x zoom, same mine, pose and position. The box shrinks to the visible part (green). Achieved hidden fraction 0.49."
   },
   {
    "label": "Not buried vs 40% buried (seed 12)",
@@ -64,7 +64,7 @@
    "after": "images/v2/burial_ba_b_on.png",
    "before_label": "BURIAL off",
    "after_label": "40% buried",
-   "caption": "4x zoom, same mine, pose and position. The box shrinks to the visible part (green). Achieved hidden fraction 0.42."
+   "caption": "4x zoom, same mine, pose and position. The box shrinks to the visible part (green). Achieved hidden fraction 0.44."
   }
  ],
  "notes": "The soil plane is a plane (no local relief) and no soil is spilled onto the wings away from the line. The soil lip lies only along the true soil line and is tinted like the local ground, so it is subtle: the main cue is the missing part of the mine and the shrunken box (the earlier 1-2 px leftover outline is fixed, and the mine no longer shifts between burial off and on). The hidden fraction is the target; the soil-line roughness can add a few percent (achieved is capped at 50%). Boxes are drawn in green on every image below."
