@@ -14,8 +14,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_TABS = ["v1: original generator", "v2: new realism features", "Review: buried mines",
-                "Dataset v2: parameters", "Dataset: live sample"]
-OPTIONAL_MANIFESTS = ["manifest_review.json", "manifest_params.json", "manifest_dataset.json"]
+                "Dataset v2: parameters", "Dataset: live sample", "Training: live"]
+OPTIONAL_MANIFESTS = ["manifest_review.json", "manifest_params.json", "manifest_dataset.json", "manifest_training.json"]
 
 
 def load_manifest(path, index):
@@ -102,7 +102,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--manifests", nargs="+", default=None,
                     help="manifest files, in tab order (relative to docs/showcase/ unless absolute/existing); "
-                         "default: manifest_v1.json manifest_v2.json (+ manifest_review/params/dataset.json if they exist)")
+                         "default: manifest_v1.json manifest_v2.json (+ manifest_review/params/dataset/training.json if they exist)")
     ap.add_argument("--out", default="showcase.html")
     ap.add_argument("--embed", action="store_true", help="inline images as base64 data URIs")
     args = ap.parse_args()

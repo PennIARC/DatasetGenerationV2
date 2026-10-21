@@ -1,8 +1,8 @@
 # Showcase builder
 
-Builds one offline HTML file with tabbed pages (v1, v2, review grid, dataset parameters, dataset live sample) from JSON manifests.
+Builds one offline HTML file with tabbed pages (v1, v2, review grid, dataset parameters, dataset live sample, training live) from JSON manifests.
 
-    python3 build_showcase.py                      # manifest_v1/v2.json (+ review/params/dataset manifests if present) -> showcase.html
+    python3 build_showcase.py                      # manifest_v1/v2.json (+ review/params/dataset/training manifests if present) -> showcase.html
     python3 build_showcase.py --manifests a.json b.json --out out.html
     python3 build_showcase.py --embed              # inline images as base64 (single sendable file)
 
@@ -83,6 +83,37 @@ with their YOLO boxes, and live render progress. A file:// page cannot read the 
 - Test: `python3 test_fixture/dataset_view_test.py WORK_DIR` builds a fake dataset (`make_fake_dataset.py`, incl. a
   half-written image and a truncated sidecar), an empty one, starts two servers on 8799/8800, checks the page in headless
   Chrome (desktop, empty, file://, narrow) and stops the servers.
+
+## Training live page (`"type": "training"`, sixth tab)
+
+`manifest_training.json` adds "Training: live": live progress of the YOLO11n runs in
+`kernelBashing/baselines/yolo11n/runs/<timestamp>_<name>/`, pushed by the same local server (needs a restart if it was
+started before this tab existed; the tab says so):
+
+    python3 scripts/serve_dataset_view.py            # then open http://127.0.0.1:8765/showcase.html#training
+    python3 scripts/serve_dataset_view.py --training-dir /other/runs --console-log /path/train_console.log
+
+- Endpoints (read-only, 127.0.0.1, Host checked): `/api/training/runs` (newest first, status), `/api/training/run?name=`
+  (config summary, timing, `ultra/results.csv` per epoch merged with `timing.json`, live progress, ETA, elapsed, latest /
+  best metrics, report links, notes, `train.log` tail), `/api/training/stream?name=` (Server-Sent Events: `run` on file
+  change, `runs` when folders change, heartbeat every 15 s; without `name` it follows the newest run), and
+  `/training-files/<run>/{report.png,report.html,report.md,report/<name>.png}` only.
+- Status: finished / failed from the final status train_yolo.py writes (timing.json, config.json); otherwise running
+  while a run file changed within max(90 s, 1.5 x median epoch time + 30 s), else failed ("probably crashed").
+- Within-epoch progress (iteration i/n, running-mean losses, GPU_mem, it/s) comes from the last tqdm line of
+  `<run>/train.log`, `<run>/console.log` or a `--console-log` file. `train_yolo.py`'s train.log has no progress bars, so
+  redirect the console (`... train_yolo.py ... > console.log 2>&1`) and pass it with `--console-log`; without it the
+  in-epoch fraction is estimated from time and labelled as such.
+- Page: run selector (default follows the newest), status badge, epoch k/N with overall + within-epoch bars, tiles
+  (elapsed, ETA, s/epoch, images/s, GPU memory, current losses, latest val metrics, best mAP50-95, setup), 8 inline-SVG
+  charts (box / cls / dfl losses train+val, precision/recall, mAP50/mAP50-95, learning rate, epoch time, throughput)
+  with hover values, per-epoch table, report gallery + report.html link after the run, configuration and notes,
+  glossary. Indicator live / polling / offline / paused; Pause closes the stream; without EventSource or after two
+  stream errors it polls every 5 s and retries the stream every 60 s.
+- Test: `python3 test_fixture/training_view_test.py WORK_DIR [--port 8821] [--live-run-dir RUNS --console-log FILE]`
+  makes fake runs (`make_fake_training.py`: finished with report, crashed, and a live 10-epoch run that writes tqdm
+  lines / results.csv / timing.json every few seconds), starts servers on PORT and PORT+1 (empty folder), checks the
+  API, SSE, 40 concurrent streams, and the page in headless Chromium (playwright), then stops everything.
 
 ## Tests
 

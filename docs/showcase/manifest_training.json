@@ -1,0 +1,33 @@
+{
+  "pages": [
+    {
+      "id": "training",
+      "tab": "Training: live",
+      "type": "training",
+      "title": "YOLO11n training: live progress",
+      "intro": "Live view of the YOLO11n baseline runs in kernelBashing/baselines/yolo11n/runs: epoch and within-epoch progress, elapsed time and ETA, losses and validation metrics per epoch, and the report figures once a run ends. Updates are pushed by the local server as the run's files change (Server-Sent Events, polling every 5 s as a fallback). Needs the local server: python3 scripts/serve_dataset_view.py, then open http://127.0.0.1:8765/showcase.html#training.",
+      "glossary": {
+        "epoch": "One full pass over the training split (2700 images). An epoch ends with validation on the 300 val images, which adds one row to ultra/results.csv.",
+        "iteration / batch": "One optimiser step on one batch (16 images by default): 2700 / 16 = 169 iterations per epoch.",
+        "box loss": "Bounding-box regression loss (CIoU, complete intersection over union): how far predicted boxes are from the labelled boxes in position, size and shape. Lower is better.",
+        "cls loss": "Classification loss (binary cross-entropy): how confident the model is that a box contains a mine (the only class, pfm1) versus background. Lower is better.",
+        "dfl loss": "Distribution Focal Loss: YOLO predicts each box edge as a probability distribution over offsets; DFL sharpens that distribution around the true edge. Lower is better.",
+        "train vs val loss": "Train losses are running means over the epoch's batches (with augmentation); val losses are computed on the val split after the epoch, without augmentation.",
+        "IoU": "Intersection over union: overlap area of a predicted and a true box divided by their combined area (1 = identical).",
+        "precision (P)": "Of the boxes the model predicted, the fraction that match a real mine (IoU >= 0.5).",
+        "recall (R)": "Of the real mines, the fraction the model found.",
+        "mAP50": "Mean average precision at IoU 0.5: area under the precision-recall curve when a prediction counts as correct at >= 50 % overlap (averaged over classes; here a single class). 0-1, higher is better.",
+        "mAP50-95": "mAP averaged over IoU thresholds 0.50, 0.55, ..., 0.95, so it also rewards tight boxes. The main COCO-style score; ultralytics keeps best.pt by it.",
+        "lr": "Learning rate: step size of the optimiser (AdamW here). Warm-up over the first 3 epochs, then a linear decay.",
+        "GPU memory": "Apple GPU (MPS, Metal Performance Shaders) memory: the GPU_mem column of the progress bar while training, otherwise torch.mps.driver_allocated_memory at the end of each epoch (timing.json).",
+        "images / s": "Training throughput: train images processed per second (iterations per second x batch size while live).",
+        "ETA": "Estimated time left: rest of the current epoch (from the progress bar, or from the median epoch time) plus the remaining epochs x the median epoch time. It excludes the final best.pt validation and the report (about 1-2 min).",
+        "status": "running = files changed recently (within 90 s, or 1.5 x the epoch time + 30 s, whichever is longer); finished / failed = the final status that train_yolo.py writes into timing.json and config.json; failed is also shown when nothing changed for that long and no final status was written (crashed or killed process).",
+        "SSE": "Server-Sent Events: one long-lived HTTP response through which the server pushes an update whenever the run's files change (and a heartbeat every 15 s). live / polling / offline shows which transport is in use.",
+        "tqdm progress bar": "The per-iteration progress line ultralytics prints to the console. train.log in the run folder does not contain it; start the server with --console-log FILE pointing at the redirected console output to get exact within-epoch progress, otherwise it is estimated from time."
+      },
+      "port": 8765,
+      "server_cmd": "python3 scripts/serve_dataset_view.py"
+    }
+  ]
+}

@@ -12,12 +12,22 @@ Binds 127.0.0.1 only and is read-only. Routes:
   /thumb/{train,val}/<name>.jpg -> 960 px wide JPEG, cached under output_dataset/.thumb_cache/ (gitignored)
   /api/dataset-info          -> counts, storage size, timestamps, rate / ETA, status, resolution, label counts, failures
   /api/sample?n=24&seed=S    -> random sample of finished images with YOLO boxes and key sidecar parameters
+  /api/training/runs         -> YOLO run folders in --training-dir, newest first, with status (training tab)
+  /api/training/run?name=R   -> one run: config summary, timing, results.csv per epoch, live progress, ETA, report links
+  /api/training/stream?name=R -> Server-Sent Events: "run" event whenever the run's files change, "runs" event when the
+                                run list changes, a heartbeat comment every 15 s
+  /training-files/<run>/{report.png,report.html,report.md,report/<name>.png} -> report artifacts (whitelist only)
 
 An image counts as finished only when its label file and its sidecar (meta/<name>.json, written last by
 scripts/generate_dataset.py) exist and the sidecar is complete JSON, so half-written renders are never shown.
 Works with 0 images and while files appear during a request (a file that vanishes or is incomplete is skipped).
+Training runs are folders written by kernelBashing/baselines/yolo11n/scripts/train_yolo.py (config.json, timing.json,
+train.log, ultra/results.csv, later report.*). Live within-epoch progress comes from the last tqdm progress line of
+train.log or of a console log passed with --console-log (train.log itself has no progress bars); without one it is
+estimated from the time since the last epoch ended.
 """
 import argparse
+import csv
 import io
 import json
 import os
@@ -46,6 +56,462 @@ STATIC_EXT = {".html": "text/html; charset=utf-8", ".json": "application/json", 
 THUMB_W = 960
 ACTIVE_S = 60          # newest finished file younger than this -> "generating"
 RATE_WINDOW_S = 600    # recent-rate window for the ETA
+
+# ---- training runs (tab "Training: live")
+TRAIN_DEFAULT = os.path.join(os.path.dirname(REPO), "kernelBashing", "baselines", "yolo11n", "runs")
+RUN_NAME = r"[A-Za-z0-9][A-Za-z0-9_.\-]{0,127}"
+RUN_RE = re.compile(r"^%s$" % RUN_NAME)
+TFILE_RE = re.compile(r"^/training-files/(%s)/(report\.png|report\.html|report\.md|report/[A-Za-z0-9][A-Za-z0-9_\-]{0,63}\.png)$"
+                      % RUN_NAME)
+RUN_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}_\d{6})_")
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+LOGTS_RE = re.compile(r"^\d\d:\d\d:\d\d ")
+TQDM_TRAIN_RE = re.compile(r"^\s*(\d+)/(\d+)\s+(\S+)\s+([\d.]+|nan)\s+([\d.]+|nan)\s+([\d.]+|nan)\s+(\d+)\s+(\d+):\s*(\d+)%(.*)$")
+TQDM_VAL_RE = re.compile(r"Class\s+Images\s+Instances.*?:\s*(\d+)%(.*)$")
+NIT_RE = re.compile(r"(\d+)/(\d+)")
+RATE_RE = re.compile(r"([\d.]+)\s*(it/s|s/it)")
+TIMES_RE = re.compile(r"([\d:.]+)s?<([\d:.]+)s?")
+ACTIVE_TRAIN_S = 90        # minimum "no file activity" window before a run without a final status counts as failed
+FIRST_EPOCH_S = 900        # window while no epoch has finished yet (startup + first epoch, no timing to scale by)
+STREAM_POLL_S = 1.0
+STREAM_MIN_GAP_S = 1.5     # at most one "run" event per 1.5 s per client
+HEARTBEAT_S = 15.0
+STREAM_MAX_S = 1800        # a stream ends after 30 min; EventSource reconnects by itself
+MAX_STREAMS = 64
+RESULT_COLS = {"epoch": "epoch", "time": "time", "train/box_loss": "train_box", "train/cls_loss": "train_cls",
+               "train/dfl_loss": "train_dfl", "metrics/precision(B)": "precision", "metrics/recall(B)": "recall",
+               "metrics/mAP50(B)": "map50", "metrics/mAP50-95(B)": "map50_95", "val/box_loss": "val_box",
+               "val/cls_loss": "val_cls", "val/dfl_loss": "val_dfl", "lr/pg0": "lr0", "lr/pg1": "lr1", "lr/pg2": "lr2"}
+REPORT_FIGS = [("report.png", "Training curves: losses, precision / recall, mAP, learning rate, epoch time, throughput"),
+               ("report/pr_f1.png", "Precision-recall and F1 curves on the val split, with the max-F1 confidence threshold"),
+               ("report/confusion.png", "Confusion matrix at the operating threshold (mine vs background), IoU of hits"),
+               ("report/factors.png", "Recall by generator factor (scale, box size, burial, face-down, sun, light, blur, background)"),
+               ("report/gallery.png", "Prediction gallery: fixed val images, predictions vs ground truth"),
+               ("report/failures.png", "The worst val images (most misses + false positives)")]
+
+
+def _st(path):
+    try:
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
+def _read_json(path):
+    try:
+        with open(path, "rb") as f:
+            v = json.loads(f.read())
+        return v if isinstance(v, dict) else None
+    except (OSError, ValueError):
+        return None      # missing, or caught mid-rewrite: treat as absent this round
+
+
+def _fnum(s):
+    try:
+        v = float(s)
+    except (TypeError, ValueError):
+        return None
+    return v if v == v and v not in (float("inf"), float("-inf")) else None
+
+
+def _secs(t):
+    """'1:17' / '26.9' / '1:02:03' -> seconds."""
+    try:
+        parts = [float(p) for p in t.strip().rstrip("s").split(":")]
+    except ValueError:
+        return None
+    s = 0.0
+    for p in parts:
+        s = s * 60 + p
+    return s
+
+
+def _iso_ts(s):
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(s).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def _mem_gb(s):
+    m = re.match(r"^([\d.]+)([KMGT]?)", s or "")
+    if not m:
+        return None
+    return float(m.group(1)) * {"": 1e-9, "K": 1e-6, "M": 1e-3, "G": 1.0, "T": 1e3}[m.group(2)]
+
+
+def parse_progress(text):
+    """Last tqdm state in a log tail -> dict (phase train / val / val_done / epoch_start / final) or None."""
+    lines = re.split(r"[\r\n]+", ANSI_RE.sub("", text))
+    for ln in reversed(lines[-400:]):
+        ln = LOGTS_RE.sub("", ln)
+        if not ln.strip():
+            continue
+        m = TQDM_TRAIN_RE.match(ln)
+        if m:
+            rest = m.group(10)
+            p = {"phase": "train", "epoch": int(m.group(1)), "epochs": int(m.group(2)), "gpu_mem_gb": _mem_gb(m.group(3)),
+                 "losses": {"box": _fnum(m.group(4)), "cls": _fnum(m.group(5)), "dfl": _fnum(m.group(6))},
+                 "instances": int(m.group(7)), "imgsz": int(m.group(8)), "pct": int(m.group(9))}
+            n = NIT_RE.search(rest)
+            if n:
+                p["iter"], p["iters"] = int(n.group(1)), int(n.group(2))
+            r = RATE_RE.search(rest)
+            if r:
+                v = float(r.group(1))
+                p["it_s"] = v if r.group(2) == "it/s" else (1.0 / v if v else None)
+            t = TIMES_RE.search(rest)
+            if t:
+                p["elapsed_s"], p["remaining_s"] = _secs(t.group(1)), _secs(t.group(2))
+            return p
+        m = TQDM_VAL_RE.search(ln)
+        if m:
+            p = {"phase": "val", "pct": int(m.group(1))}
+            n = NIT_RE.search(m.group(2))
+            if n:
+                p["iter"], p["iters"] = int(n.group(1)), int(n.group(2))
+            t = TIMES_RE.search(m.group(2))
+            if t:
+                p["elapsed_s"], p["remaining_s"] = _secs(t.group(1)), _secs(t.group(2))
+            return p
+        if re.match(r"^\s*all\s+\d+\s+\d+\s", ln):
+            return {"phase": "val_done"}
+        if re.match(r"^\s*Epoch\s+GPU_mem\s+box_loss", ln):
+            return {"phase": "epoch_start"}
+        if re.search(r"epochs completed in|Validating .*best\.pt", ln):
+            return {"phase": "final"}
+    return None
+
+
+class Training:
+    """Reads YOLO run folders on demand; per-run payloads cached ~1 s so many clients / streams share the work."""
+
+    def __init__(self, root, console_logs=()):
+        self.root = root
+        self.console_logs = [os.path.abspath(p) for p in console_logs]
+        self.lock = threading.Lock()
+        self.cache = {}          # run name -> (fingerprint, payload, computed_at)
+        self.tail_cache = {}     # log path -> ((mtime_ns, size), progress)
+        self.csv_cache = {}      # path -> ((mtime_ns, size), rows)
+        self.streams = 0
+
+    # ---- folders
+    def run_names(self):
+        try:
+            names = [e.name for e in os.scandir(self.root) if e.is_dir() and RUN_RE.match(e.name)]
+        except OSError:
+            return []
+        out = []
+        for n in names:
+            d = os.path.join(self.root, n)
+            if any(os.path.exists(os.path.join(d, f)) for f in ("config.json", "timing.json", "train.log", "ultra")):
+                out.append(n)
+        return out
+
+    def run_dir(self, name):
+        if not name or not RUN_RE.match(name):
+            return None
+        root = os.path.realpath(self.root)
+        d = os.path.realpath(os.path.join(root, name))
+        if os.path.dirname(d) != root or not os.path.isdir(d):
+            return None
+        return d
+
+    def start_ts(self, name, timing=None):
+        m = RUN_TS_RE.match(name)
+        if m:
+            try:
+                return time.mktime(time.strptime(m.group(1), "%Y-%m-%d_%H%M%S"))
+            except ValueError:
+                pass
+        sess = (timing or {}).get("sessions") or []
+        if sess and _iso_ts(sess[0].get("start")):
+            return _iso_ts(sess[0].get("start"))
+        try:
+            return os.stat(os.path.join(self.root, name)).st_mtime
+        except OSError:
+            return 0.0
+
+    def newest(self):
+        names = self.run_names()
+        return max(names, key=lambda n: (self.start_ts(n), n)) if names else None
+
+    def logs_for(self, name, d):
+        logs = [os.path.join(d, "train.log"), os.path.join(d, "console.log")]
+        if self.console_logs and name == self.newest():   # a console log belongs to the newest run only
+            st0 = self.start_ts(name)
+            for p in self.console_logs:
+                s = _st(p)
+                if s and s[0] / 1e9 >= st0 - 5:
+                    logs.append(p)
+        return logs
+
+    def fingerprint(self, name):
+        d = self.run_dir(name)
+        if d is None:
+            return None
+        files = ["config.json", "timing.json", "notes.md", "ultra/results.csv", "report.html", "report.png", "eval.json",
+                 "report"] + ["report/" + f.split("/")[-1] for f, _ in REPORT_FIGS[1:]]
+        return tuple(_st(os.path.join(d, f)) for f in files) + tuple(_st(p) for p in self.logs_for(name, d))
+
+    def runs_fingerprint(self):
+        return tuple(sorted(self.run_names()))
+
+    # ---- parsing
+    def results(self, d):
+        p = os.path.join(d, "ultra", "results.csv")
+        key = _st(p)
+        if key is None:
+            return []
+        with self.lock:
+            c = self.csv_cache.get(p)
+            if c and c[0] == key:
+                return c[1]
+        rows = {}
+        try:
+            with open(p, newline="") as f:
+                rd = csv.reader(f)
+                head = [h.strip() for h in next(rd, [])]
+                for r in rd:
+                    if len(r) != len(head):
+                        continue          # partial last line while the file is being written
+                    row = {RESULT_COLS.get(h, h): _fnum(v) for h, v in zip(head, r)}
+                    if row.get("epoch") is not None:
+                        rows[int(row["epoch"])] = row     # a resumed run may repeat an epoch: keep the last one
+        except (OSError, csv.Error, UnicodeDecodeError):
+            return []
+        out = [rows[k] for k in sorted(rows)]
+        with self.lock:
+            self.csv_cache[p] = (key, out)
+        return out
+
+    def progress_from(self, path):
+        key = _st(path)
+        if key is None:
+            return None
+        with self.lock:
+            c = self.tail_cache.get(path)
+            if c and c[0] == key:
+                return c[1]
+        try:
+            with open(path, "rb") as f:
+                f.seek(max(0, key[1] - 65536))
+                txt = f.read(65536).decode("utf-8", "replace")
+        except OSError:
+            return None
+        p = parse_progress(txt)
+        if p is not None:
+            p["source"] = os.path.basename(path)
+            p["mtime"] = key[0] / 1e9
+        with self.lock:
+            self.tail_cache[path] = (key, p)
+        return p
+
+    def log_tail(self, d, n=8):
+        p = os.path.join(d, "train.log")
+        try:
+            with open(p, "rb") as f:
+                f.seek(max(0, os.path.getsize(p) - 8000))
+                lines = ANSI_RE.sub("", f.read().decode("utf-8", "replace")).splitlines()
+        except OSError:
+            return []
+        return [ln.rstrip() for ln in lines if ln.strip()][-n:]
+
+    # ---- API
+    def run_list(self):
+        out = []
+        now = time.time()
+        for n in self.run_names():
+            info = self.run(n, light=True)
+            if info:
+                out.append(info)
+        out.sort(key=lambda r: (r["start"] or 0, r["name"]), reverse=True)
+        return {"training_dir": self.root, "exists": os.path.isdir(self.root), "server_time": now, "runs": out}
+
+    def run(self, name, light=False):
+        fp = self.fingerprint(name)
+        if fp is None:
+            return None
+        now = time.time()
+        ck = (name, light)
+        with self.lock:
+            c = self.cache.get(ck)
+            if c and c[0] == fp and now - c[2] < 1.0:
+                return c[1]
+        info = self._build(name, light, now)
+        with self.lock:
+            self.cache[ck] = (fp, info, now)
+        return info
+
+    def _build(self, name, light, now):
+        d = self.run_dir(name)
+        if d is None:
+            return None
+        cfg = _read_json(os.path.join(d, "config.json")) or {}
+        timing = _read_json(os.path.join(d, "timing.json")) or {}
+        rows = self.results(d)
+        sess = [s for s in timing.get("sessions") or [] if isinstance(s, dict)]
+        tep = [e for e in timing.get("epochs") or [] if isinstance(e, dict)]
+        summ = timing.get("summary") if isinstance(timing.get("summary"), dict) else {}
+        args = cfg.get("args") if isinstance(cfg.get("args"), dict) else {}
+        kw = cfg.get("ultralytics_train_kwargs") if isinstance(cfg.get("ultralytics_train_kwargs"), dict) else {}
+        start = self.start_ts(name, timing)
+
+        # progress from the freshest log that has a tqdm line
+        logs = self.logs_for(name, d)
+        prog = None
+        for p in logs:
+            q = self.progress_from(p)
+            if q and (prog is None or q["mtime"] > prog["mtime"]):
+                prog = q
+        mt = [s[0] / 1e9 for s in (_st(os.path.join(d, f)) for f in
+              ("config.json", "timing.json", "train.log", "ultra/results.csv", "report.png", "report.html", "report"))
+              if s] + [s[0] / 1e9 for s in (_st(p) for p in logs[2:]) if s]
+        last_act = max(mt) if mt else None
+        age = now - last_act if last_act else None
+
+        epochs_total = kw.get("epochs") or args.get("epochs") or (prog or {}).get("epochs")
+        done = max(len(rows), len(tep))
+        med = summ.get("median_epoch_seconds")
+        med_val = summ.get("median_val_seconds")
+        med_tr = summ.get("median_train_seconds")
+
+        # status
+        last_s = sess[-1] if sess else {}
+        final = last_s.get("status") if sess else cfg.get("status")
+        has_html = os.path.isfile(os.path.join(d, "report.html"))
+        window = max(ACTIVE_TRAIN_S, 1.5 * med + 30) if med else (FIRST_EPOCH_S if not done else ACTIVE_TRAIN_S)
+        if final == "finished":
+            status, detail = "finished", ("report written" if has_html else
+                                          "making the report" if age is not None and age < 900 else "finished, no report")
+        elif final in ("error", "interrupted"):
+            status, detail = "failed", "interrupted (Ctrl-C)" if final == "interrupted" else "training raised an error (see train.log)"
+        elif final:
+            status, detail = "failed", str(final)
+        elif age is not None and age < window:
+            status, detail = "running", "training"
+        else:
+            status = "failed"
+            detail = ("no file activity for %s and no final status: the process probably crashed or was killed"
+                      % (("%d min" % round(age / 60)) if age else "a while"))
+        active = status == "running" or (status == "finished" and not has_html and age is not None and age < 900)
+
+        base = {"name": name, "start": start, "status": status, "status_detail": detail, "active": active,
+                "last_activity": last_act, "age_s": age, "epochs_total": epochs_total, "epochs_done": done,
+                "latest_map50_95": rows[-1].get("map50_95") if rows else None, "has_report": has_html,
+                "notes": (args.get("notes") or "")[:200]}
+        if light:
+            return base
+
+        # live progress + ETA
+        since_epoch = None
+        tst = _st(os.path.join(d, "timing.json"))
+        if tep and tst:
+            since_epoch = now - tst[0] / 1e9        # timing.json is rewritten when an epoch ends
+        elif sess and _iso_ts(sess[-1].get("start")):
+            since_epoch = now - _iso_ts(sess[-1].get("start"))
+        train_share = (med_tr / med) if med and med_tr else 0.95
+        P = {"epochs_total": epochs_total, "epochs_done": done, "epoch": None, "phase": None, "iter": None, "iters": None,
+             "frac_epoch": None, "frac_total": (done / epochs_total) if epochs_total else None, "it_s": None,
+             "images_per_s": summ.get("train_images_per_s"), "gpu_mem_gb": (tep[-1].get("mps_driver_allocated_gb") if tep else None),
+             "gpu_mem_source": "timing.json (MPS driver memory at epoch end)" if tep else None,
+             "losses": None, "instances": None, "source": None, "estimated": False, "line_age_s": None}
+        eta = None
+        batch = (sess[-1].get("batch") if sess else None) or args.get("batch") or kw.get("batch")
+        if status == "running" and epochs_total and done < epochs_total:
+            cur = done + 1
+            P["epoch"] = cur
+            fresh = prog is not None and now - prog["mtime"] < max(60, window) and prog.get("epoch", cur) == cur
+            cur_rem = None
+            if fresh and prog["phase"] == "train" and prog.get("iters"):
+                f_tr = prog["iter"] / prog["iters"]
+                P.update(phase="train", iter=prog["iter"], iters=prog["iters"], frac_epoch=f_tr * train_share,
+                         it_s=prog.get("it_s"), losses=prog["losses"], instances=prog["instances"], source=prog["source"],
+                         line_age_s=now - prog["mtime"])
+                if prog.get("gpu_mem_gb") is not None:
+                    P.update(gpu_mem_gb=prog["gpu_mem_gb"], gpu_mem_source="tqdm GPU_mem column")
+                if prog.get("it_s") and batch:
+                    P["images_per_s"] = prog["it_s"] * batch
+                rem = prog.get("remaining_s")
+                if rem is None and prog.get("it_s"):
+                    rem = (prog["iters"] - prog["iter"]) / prog["it_s"]
+                vs = med_val if med_val is not None else (0.05 * med if med else 0.0)
+                cur_rem = (rem or 0.0) + vs
+                if med is None and prog.get("it_s"):
+                    med = prog["iters"] / prog["it_s"] + vs
+            elif fresh and prog["phase"] == "val" and prog.get("iters"):
+                f_v = prog["iter"] / prog["iters"]
+                P.update(phase="val", iter=prog["iter"], iters=prog["iters"], frac_epoch=train_share + (1 - train_share) * f_v,
+                         source=prog["source"], line_age_s=now - prog["mtime"])
+                cur_rem = prog.get("remaining_s") or ((1 - f_v) * med_val if med_val else 0.0)
+            elif med and since_epoch is not None:
+                f = min(0.99, max(0.0, since_epoch / med))
+                P.update(phase="estimated", frac_epoch=f, estimated=True)
+                cur_rem = max(0.0, med - since_epoch)
+            else:
+                P.update(phase="starting" if not done else "estimated", estimated=True)
+            if P["frac_epoch"] is not None:
+                P["frac_total"] = (done + P["frac_epoch"]) / epochs_total
+            if med is not None and cur_rem is not None:
+                eta = cur_rem + max(0, epochs_total - cur) * med
+        elif status == "finished" or (epochs_total and done >= epochs_total):
+            P.update(phase="done", frac_total=1.0 if status == "finished" else P["frac_total"])
+
+        # elapsed (all sessions; the open one counts up to now)
+        elapsed = 0.0
+        for i, s in enumerate(sess):
+            if s.get("wall_seconds") is not None:
+                elapsed += float(s["wall_seconds"])
+            elif i == len(sess) - 1 and _iso_ts(s.get("start")):
+                elapsed += (now if status == "running" else (last_act or now)) - _iso_ts(s.get("start"))
+        if not sess and start:
+            elapsed = (now if status == "running" else (last_act or now)) - start
+
+        # per-epoch table (results.csv + timing.json)
+        tmap = {int(e["epoch"]): e for e in tep if isinstance(e.get("epoch"), (int, float))}
+        epochs = []
+        for r in rows:
+            e = tmap.get(int(r["epoch"]), {})
+            r = dict(r)
+            r.update(epoch_s=e.get("epoch_seconds"), train_s=e.get("train_seconds"), val_s=e.get("val_seconds"),
+                     images_per_s=e.get("train_images_per_s"), gpu_gb=e.get("mps_driver_allocated_gb"))
+            epochs.append(r)
+        best = max((r for r in epochs if r.get("map50_95") is not None), key=lambda r: r["map50_95"], default=None)
+
+        u = "/training-files/%s/" % name
+        figs = [{"name": f, "url": u + f + "?v=%d" % (s[0] // 1_000_000), "caption": cap}
+                for f, cap in REPORT_FIGS for s in [_st(os.path.join(d, f))] if s]
+        notes = ""
+        try:
+            with open(os.path.join(d, "notes.md"), encoding="utf-8", errors="replace") as f:
+                notes = f.read(6000)
+        except OSError:
+            pass
+        env = cfg.get("env") if isinstance(cfg.get("env"), dict) else {}
+        ds = cfg.get("dataset") if isinstance(cfg.get("dataset"), dict) else {}
+        config = {"epochs": epochs_total, "batch": batch, "imgsz": kw.get("imgsz") or args.get("imgsz"),
+                  "device": kw.get("device") or args.get("device"), "fraction": kw.get("fraction", args.get("fraction")),
+                  "init": "from scratch (random init)" if args.get("scratch") or kw.get("pretrained") is False else "COCO-pretrained yolo11n.pt",
+                  "patience": kw.get("patience", args.get("patience")), "close_mosaic": kw.get("close_mosaic"),
+                  "flipud": kw.get("flipud", args.get("flipud")), "seed": kw.get("seed", args.get("seed")),
+                  "workers": (sess[-1].get("workers_effective") if sess else None) if sess else kw.get("workers"),
+                  "amp": sess[-1].get("amp") if sess else None, "notes": args.get("notes"),
+                  "n_train": ds.get("n_train_images"), "n_val": ds.get("n_val_images"),
+                  "dataset": ds.get("root"), "classes": list((ds.get("names") or {}).values()) if isinstance(ds.get("names"), dict) else ds.get("names"),
+                  "ultralytics": env.get("ultralytics"), "torch": env.get("torch"), "python": env.get("python"),
+                  "resumes": len(cfg.get("resumes") or []), "argv": " ".join(map(str, cfg.get("argv") or []))}
+        base.update({"server_time": now, "config": config,
+                     "timing": {"sessions": sess, "summary": summ}, "epochs": epochs,
+                     "progress": P, "eta_s": eta, "eta_at": (now + eta) if eta is not None else None,
+                     "elapsed_s": elapsed, "sec_per_epoch": med,
+                     "latest": epochs[-1] if epochs else None, "best": best,
+                     "report": {"html": u + "report.html" if has_html else None,
+                                "md": u + "report.md" if os.path.isfile(os.path.join(d, "report.md")) else None,
+                                "figures": figs},
+                     "notes_md": notes, "log_tail": self.log_tail(d), "logs": [os.path.basename(p) for p in logs if _st(p)]})
+        return base
 
 
 class Dataset:
@@ -363,6 +829,7 @@ def make_thumb(src, dst, width):
 class Handler(BaseHTTPRequestHandler):
     server_version = "DatasetView/1"
     ds = None
+    tr = None
     verbose = False
     port = 8765
 
@@ -436,6 +903,8 @@ class Handler(BaseHTTPRequestHandler):
             m = THUMB_RE.match(path)
             if m:
                 return self._thumb(m.group(1), m.group(2))
+            if path.startswith("/api/training/") or path.startswith("/training-files/"):
+                return self._training(path, q)
             return self._static(path)
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -461,6 +930,111 @@ class Handler(BaseHTTPRequestHandler):
             return self._err(503, "thumbnail not ready")
         self._send(200, body, "image/jpeg", "max-age=300")
 
+    # ---- training tab
+    def _run_name(self, q):
+        """?name=<run> (validated) or the newest run when absent; (name, error)."""
+        tr = self.tr
+        name = q.get("name", [""])[0]
+        if not name:
+            return tr.newest(), None
+        if not RUN_RE.match(name) or tr.run_dir(name) is None:
+            return None, "unknown run"
+        return name, None
+
+    def _training(self, path, q):
+        tr = self.tr
+        if path == "/api/training/runs":
+            return self._json(tr.run_list())
+        if path == "/api/training/run":
+            name, err = self._run_name(q)
+            if err:
+                return self._json({"error": err}, 404)
+            info = tr.run(name) if name else None
+            return self._json({"run": info, "server_time": time.time()})
+        if path == "/api/training/stream":
+            name, err = self._run_name(q)
+            if err:
+                return self._json({"error": err}, 404)
+            return self._stream(name, bool(q.get("name", [""])[0]))
+        m = TFILE_RE.match(path)
+        if m:
+            d = tr.run_dir(m.group(1))
+            if d is None:
+                return self._err(404, "not found")
+            rel = m.group(2)
+            full = os.path.realpath(os.path.join(d, *rel.split("/")))
+            if not full.startswith(d + os.sep) or not os.path.isfile(full):
+                return self._err(404, "not found")
+            ext = os.path.splitext(rel)[1]
+            ctype = {".png": "image/png", ".html": "text/html; charset=utf-8", ".md": "text/plain; charset=utf-8"}[ext]
+            extra = {"Content-Security-Policy": "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'"} \
+                if ext == ".html" else None
+            try:
+                with open(full, "rb") as f:
+                    body = f.read()
+            except OSError:
+                return self._err(404, "not found")
+            return self._send(200, body, ctype, "no-cache", extra)
+        return self._err(404, "not found")
+
+    def _stream(self, name, pinned):
+        """Server-Sent Events. 'run' = full run payload (on file change, and when the status flips by time alone),
+        'runs' = run list (when folders appear / vanish), heartbeat comment + 'heartbeat' event every 15 s.
+        Unpinned streams (no ?name=) follow the newest run."""
+        tr = self.tr
+        with tr.lock:
+            if tr.streams >= MAX_STREAMS:
+                busy = True
+            else:
+                busy = False
+                tr.streams += 1
+        if busy:
+            return self._err(503, "too many streams; poll /api/training/run instead")
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            if self.command == "HEAD":
+                return
+
+            def send(event, obj):
+                data = json.dumps(obj, default=str, separators=(",", ":"))
+                self.wfile.write(("event: %s\ndata: %s\n\n" % (event, data)).encode())
+                self.wfile.flush()
+
+            self.wfile.write(b"retry: 3000\n\n")
+            t0 = last_beat = last_sent = time.time()
+            last_fp = last_runs = last_state = None
+            while time.time() - t0 < STREAM_MAX_S:
+                now = time.time()
+                runs_fp = tr.runs_fingerprint()
+                if runs_fp != last_runs:
+                    last_runs = runs_fp
+                    send("runs", tr.run_list())
+                    if not pinned:
+                        name = tr.newest()
+                fp = tr.fingerprint(name) if name else None
+                beat = now - last_beat >= HEARTBEAT_S
+                if (fp != last_fp and now - last_sent >= STREAM_MIN_GAP_S) or last_state is None or beat:
+                    info = tr.run(name) if name else None
+                    state = (fp, info and info["status"], info and info["active"])
+                    if state != last_state or beat:
+                        send("run", {"run": info, "server_time": now})
+                        last_fp, last_state, last_sent = fp, state, now
+                if beat:
+                    self.wfile.write((": heartbeat %d\n\n" % now).encode())
+                    send("heartbeat", {"server_time": now})
+                    last_beat = now
+                time.sleep(STREAM_POLL_S)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass
+        finally:
+            with tr.lock:
+                tr.streams -= 1
+
     def _static(self, path):
         rel = path.lstrip("/")
         parts = rel.split("/")
@@ -475,20 +1049,30 @@ class Handler(BaseHTTPRequestHandler):
         self._file(full, STATIC_EXT[ext])
 
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True          # open event streams never block Ctrl-C
+    request_queue_size = 128       # many tabs / clients connecting at once
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--dataset-dir", default=DATASET_DEFAULT, help="dataset root (default output_dataset/v2_3000)")
     ap.add_argument("--cache-dir", default=CACHE_DEFAULT, help="thumbnail cache (default output_dataset/.thumb_cache)")
     ap.add_argument("--target", type=int, default=None, help="planned image count (default: plan/plan.json n_images)")
+    ap.add_argument("--training-dir", default=TRAIN_DEFAULT,
+                    help="folder of YOLO run folders (default ../kernelBashing/baselines/yolo11n/runs)")
+    ap.add_argument("--console-log", action="append", default=[], metavar="FILE",
+                    help="console output of a running train_yolo.py (tqdm progress bars), attached to the newest run; "
+                         "repeatable")
     ap.add_argument("--verbose", action="store_true", help="log every request")
     args = ap.parse_args()
     Handler.ds = Dataset(os.path.abspath(args.dataset_dir), os.path.abspath(args.cache_dir), args.target)
+    Handler.tr = Training(os.path.abspath(args.training_dir), args.console_log)
     Handler.verbose, Handler.port = args.verbose, args.port
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    srv.daemon_threads = True
-    print("serving docs/showcase + %s\n  open http://127.0.0.1:%d/showcase.html#dataset   (Ctrl-C to stop)"
-          % (Handler.ds.root, args.port), flush=True)
+    srv = Server(("127.0.0.1", args.port), Handler)
+    print("serving docs/showcase + %s + %s\n  open http://127.0.0.1:%d/showcase.html#dataset   (training: #training;"
+          " Ctrl-C to stop)" % (Handler.ds.root, Handler.tr.root, args.port), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

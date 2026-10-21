@@ -211,6 +211,49 @@ main:has(.dsview){max-width:none}
 .lbwrap{position:relative;display:inline-block;line-height:0}
 .dsview .empty code{background:var(--surface);padding:2px 6px;border-radius:4px}
 @media (max-width:600px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* training live view (page type "training", needs scripts/serve_dataset_view.py) */
+main:has(.trview){max-width:1600px}
+.trview{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--bad:#c62f2f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .trview{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--bad:#e66767}}
+:root[data-theme="dark"] .trview{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--bad:#e66767}
+.trview .fld select{max-width:min(420px,80vw)}
+.badge.running{background:#1f8f4e;border-color:#1f8f4e;color:#fff}
+.badge.finished{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.badge.failed{background:var(--bad);border-color:var(--bad);color:#fff}
+.badge.none,.badge.loading{background:var(--warn-bg);border-color:var(--warn-bd)}
+.conn{font-size:.85rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.conn::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.conn.live::before{background:#1f8f4e;box-shadow:0 0 0 3px rgba(31,143,78,.25)}
+.conn.polling::before{background:#d49a00}
+.conn.offline::before{background:var(--bad)}
+.tbar{position:relative;height:18px;border-radius:99px;background:var(--surface2);overflow:hidden;border:1px solid var(--border);margin:4px 0 4px}
+.tbar>div{position:absolute;top:0;bottom:0;left:0;transition:width .5s}
+.tbar .done{background:var(--accent)}
+.tbar .cur{background:repeating-linear-gradient(45deg,var(--accent),var(--accent) 6px,transparent 6px,transparent 12px);opacity:.55}
+.tbar.small{height:8px}
+.plabel{font-size:.9rem;color:var(--muted);margin:0 0 10px}
+.charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:12px;margin:0 0 16px}
+.chart{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px 8px;box-shadow:var(--shadow);min-width:0;position:relative;margin:0}
+.chart h3{margin:0;font-size:1rem}
+.chart .sub{font-size:.78rem;color:var(--muted);margin:0 0 4px}
+.chart .legend{display:flex;gap:4px 14px;flex-wrap:wrap;font-size:.8rem;color:var(--text);margin:2px 0 2px}
+.chart .sw{display:inline-block;width:20px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.chart .sw.dot{width:9px;height:9px;border:2px solid;border-radius:50%;background:var(--surface)}
+.chart svg{width:100%;height:auto;display:block;touch-action:pan-y}
+.chart svg text{fill:var(--muted);font:11px var(--sans)}
+.chart svg .ax{stroke:var(--muted);stroke-width:1}
+.chart svg .gl{stroke:var(--border);stroke-width:1}
+.chart svg .cross{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.chart .tip{position:absolute;z-index:5;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:5px 8px;font-size:.78rem;box-shadow:var(--shadow);white-space:nowrap}
+.chart .tip b{display:block}
+.chart .nodata{font-size:.85rem;color:var(--muted);padding:30px 0;text-align:center}
+.trview h2.sec{font-size:1.15rem;margin:18px 0 8px}
+.trview tr.best td{font-weight:700}
+.trview table.gt td.num{text-align:right;font-variant-numeric:tabular-nums}
+.rgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:14px}
+.trview pre.log{font:.78rem var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);padding:8px;border-radius:8px;margin:6px 0}
+.trview .empty code{background:var(--surface);padding:2px 6px;border-radius:4px}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
@@ -1009,6 +1052,424 @@ function renderDataset(page){
   loadInfo().then(function(){ if (S.alive && S.info && S.info.count > 0 && !S.items.length) loadSample(); });
 }
 
+/* ---------- training live view (page.type "training", served by scripts/serve_dataset_view.py) ---------- */
+var trCleanup = null;
+var SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, kids){
+  var e = document.createElementNS(SVGNS, tag);
+  for (var k in (attrs || {})) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  (kids || []).forEach(function(c){ if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return e;
+}
+function niceTicks(lo, hi, n){
+  if (!(hi > lo)) { var p = Math.abs(lo) * 0.1 || 1; lo -= p; hi += p; }
+  var span = hi - lo, step = Math.pow(10, Math.floor(Math.log10(span / n))), err = span / n / step;
+  step *= err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+  var t = [], s = Math.ceil(lo / step - 1e-9) * step;
+  for (var v = s; v <= hi + step * 1e-9; v += step) t.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  return {lo: Math.floor(lo / step + 1e-9) * step, hi: Math.ceil(hi / step - 1e-9) * step, step: step, ticks: t};
+}
+/* line chart: spec {title, sub, yLabel, fmt, clamp:[lo,hi], series:[{key,name,color,dash}]}; update(rows, xMax, live) */
+function lineChart(spec){
+  var W = 480, H = 250, M = {l: 58, r: 14, t: 10, b: 40};
+  var svg = sv("svg", {viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": spec.title + " by epoch"});
+  var tip = el("div", {"class": "tip", hidden: "hidden"});
+  var legend = el("div", {"class": "legend"});
+  spec.series.forEach(function(s){
+    legend.appendChild(el("span", null, [el("span", {"class": "sw", style: "border-top-color:" + s.color + ";border-top-style:" + (s.dash ? (s.dash === "2 3" ? "dotted" : "dashed") : "solid")}), s.name]));
+  });
+  var liveLeg = el("span", {hidden: "hidden"}, [el("span", {"class": "sw dot", style: "border-color:" + spec.series[0].color}), "current epoch (running mean)"]);
+  legend.appendChild(liveLeg);
+  var box = el("figure", {"class": "chart"}, [el("h3", {text: spec.title}), spec.sub ? el("p", {"class": "sub", text: spec.sub}) : null, legend, svg, tip]);
+  var st = {rows: [], xMax: 1, live: null, hover: null, geo: null};
+  function draw(){
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var rows = st.rows, pts = [];
+    spec.series.forEach(function(s){ rows.forEach(function(r){ var v = r[s.key]; if (typeof v === "number" && isFinite(v)) pts.push(v); }); });
+    if (st.live) spec.series.forEach(function(s){ var v = st.live[s.key]; if (typeof v === "number") pts.push(v); });
+    var pw = W - M.l - M.r, ph = H - M.t - M.b;
+    var xlo = 1, xhi = Math.max(st.xMax || 1, rows.length ? rows[rows.length - 1].epoch : 1, st.live ? Math.ceil(st.live.x) : 1);
+    if (xhi <= xlo) { xlo = 0; xhi = Math.max(1, xhi); }
+    var xs = function(x){ return M.l + (x - xlo) / (xhi - xlo) * pw; };
+    /* axes */
+    svg.appendChild(sv("line", {"class": "ax", x1: M.l, y1: M.t + ph, x2: M.l + pw, y2: M.t + ph}));
+    svg.appendChild(sv("line", {"class": "ax", x1: M.l, y1: M.t, x2: M.l, y2: M.t + ph}));
+    svg.appendChild(sv("text", {x: M.l + pw / 2, y: H - 4, "text-anchor": "middle"}, ["epoch (1 = first pass over the train split)"]));
+    svg.appendChild(sv("text", {x: 12, y: M.t + ph / 2, "text-anchor": "middle", transform: "rotate(-90 12 " + (M.t + ph / 2) + ")"}, [spec.yLabel]));
+    var xt = niceTicks(xlo, xhi, Math.min(10, Math.max(2, xhi - xlo))).ticks.filter(function(v){ return v >= xlo && v <= xhi && Math.abs(v - Math.round(v)) < 1e-9; });
+    xt.forEach(function(v){
+      svg.appendChild(sv("line", {"class": "ax", x1: xs(v), y1: M.t + ph, x2: xs(v), y2: M.t + ph + 4}));
+      svg.appendChild(sv("text", {x: xs(v), y: M.t + ph + 16, "text-anchor": "middle"}, [String(v)]));
+    });
+    if (!pts.length){
+      svg.appendChild(sv("text", {x: M.l + pw / 2, y: M.t + ph / 2, "text-anchor": "middle"}, ["no finished epoch yet"]));
+      st.geo = null; return;
+    }
+    var lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts), pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.05 || 0.01;
+    lo -= pad; hi += pad;
+    if (spec.clamp){ lo = Math.max(spec.clamp[0], lo); hi = Math.min(spec.clamp[1], hi); }
+    var yt = niceTicks(lo, hi, 5);
+    lo = Math.min(lo, yt.lo); hi = Math.max(hi, yt.hi);
+    if (spec.clamp){ lo = Math.max(spec.clamp[0], lo); hi = Math.min(spec.clamp[1], hi); }
+    var ys = function(y){ return M.t + ph - (y - lo) / (hi - lo) * ph; };
+    yt.ticks.filter(function(v){ return v >= lo - 1e-12 && v <= hi + 1e-12; }).forEach(function(v){
+      svg.appendChild(sv("line", {"class": "gl", x1: M.l, y1: ys(v), x2: M.l + pw, y2: ys(v)}));
+      svg.appendChild(sv("text", {x: M.l - 6, y: ys(v) + 4, "text-anchor": "end"}, [spec.fmt(v, yt.step)]));
+    });
+    var marks = rows.length <= 40;
+    spec.series.forEach(function(s){
+      var d = "", pen = false;
+      rows.forEach(function(r){
+        var v = r[s.key];
+        if (typeof v !== "number" || !isFinite(v)) { pen = false; return; }
+        d += (pen ? "L" : "M") + xs(r.epoch).toFixed(1) + "," + ys(v).toFixed(1); pen = true;
+      });
+      if (d) svg.appendChild(sv("path", {d: d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-dasharray": s.dash || null, "stroke-linejoin": "round", "stroke-linecap": "round"}));
+      if (marks) rows.forEach(function(r){
+        var v = r[s.key]; if (typeof v !== "number" || !isFinite(v)) return;
+        svg.appendChild(sv("circle", {cx: xs(r.epoch), cy: ys(v), r: 3.5, fill: s.color, stroke: "var(--surface)", "stroke-width": 1.5}));
+      });
+      if (st.live && typeof st.live[s.key] === "number"){
+        svg.appendChild(sv("circle", {cx: xs(st.live.x), cy: ys(st.live[s.key]), r: 4.5, fill: "var(--surface)", stroke: s.color, "stroke-width": 2},
+          [sv("title", null, [s.name + " (current epoch, running mean): " + spec.fmt(st.live[s.key])])]));
+      }
+    });
+    st.geo = {xs: xs, ys: ys, xlo: xlo, xhi: xhi, pw: pw, ph: ph};
+    if (st.hover !== null) showTip(st.hover);
+    var hit = sv("rect", {x: M.l, y: M.t, width: pw, height: ph, fill: "transparent"});
+    hit.addEventListener("pointermove", onMove);
+    hit.addEventListener("pointerleave", function(){ st.hover = null; tip.hidden = true; var c = svg.querySelector(".cross"); if (c) c.remove(); });
+    svg.appendChild(hit);
+  }
+  function onMove(e){
+    if (!st.geo || !st.rows.length) return;
+    var r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W;
+    var ep = st.geo.xlo + (x - M.l) / st.geo.pw * (st.geo.xhi - st.geo.xlo), best = 0;
+    st.rows.forEach(function(row, i){ if (Math.abs(row.epoch - ep) < Math.abs(st.rows[best].epoch - ep)) best = i; });
+    st.hover = best; showTip(best);
+  }
+  function showTip(i){
+    var row = st.rows[i]; if (!row || !st.geo) { tip.hidden = true; return; }
+    var c = svg.querySelector(".cross"); if (c) c.remove();
+    var x = st.geo.xs(row.epoch);
+    svg.insertBefore(sv("line", {"class": "cross", x1: x, y1: M.t, x2: x, y2: M.t + st.geo.ph}), svg.lastChild);
+    tip.textContent = "";
+    tip.appendChild(el("b", {text: "epoch " + row.epoch}));
+    spec.series.forEach(function(s){ tip.appendChild(el("div", {text: s.name + ": " + (typeof row[s.key] === "number" ? spec.fmt(row[s.key]) : "–")})); });
+    tip.hidden = false;
+    var bw = box.clientWidth, px = x / W * svg.clientWidth + svg.offsetLeft;
+    tip.style.top = (svg.offsetTop + 8) + "px";
+    tip.style.left = Math.max(4, Math.min(bw - tip.offsetWidth - 4, px + 12)) + "px";
+  }
+  return {el: box, update: function(rows, xMax, live){
+    st.rows = rows; st.xMax = xMax; st.live = live; liveLeg.hidden = !live;
+    if (st.hover !== null && st.hover >= rows.length) st.hover = null;
+    draw();
+  }};
+}
+function renderTraining(page){
+  var port = page.port || 8765, cmd = str(page.server_cmd) || "python3 scripts/serve_dataset_view.py";
+  var url = "http://127.0.0.1:" + port + "/showcase.html#" + page.id;
+  var root = el("div", {"class": "trview"});
+  main.appendChild(root);
+  function offlineBox(why){
+    return el("div", {"class": "empty", role: "status"}, [
+      el("b", {text: "This tab needs the local server. "}), why, el("br"), el("br"),
+      "Start it from the IARCdatasetGenerationV2 folder: ", el("code", {text: cmd}), el("br"),
+      "then open ", el("a", {href: url, text: url}), " (Ctrl-C in the terminal stops it). The other tabs work without it."]);
+  }
+  if (location.protocol === "file:"){
+    root.appendChild(offlineBox("This page was opened as a file (file://), and a file page cannot read the training run folders or receive live updates."));
+    return;
+  }
+  var S = {alive: true, follow: true, name: null, run: null, runs: null, es: null, errs: 0, mode: "connecting", paused: false,
+    pollT: null, retryT: null, tickT: null, got: 0, everOk: false, figKey: ""};
+  function getJSON(u){
+    return fetch(u, {cache: "no-store"}).then(function(r){
+      if (!r.ok){ var e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+      return r.json();
+    });
+  }
+  function f3(v){ return typeof v === "number" ? v.toFixed(3) : "–"; }
+  function fx(v, d){ return typeof v === "number" ? v.toFixed(d) : "–"; }
+  function fexp(v){ return typeof v === "number" ? v.toExponential(2) : "–"; }
+  function pct(v){ return typeof v === "number" ? (v * 100).toFixed(1) + " %" : "–"; }
+  function stat(k, v, s){ return el("div", {"class": "stat"}, [el("div", {"class": "k", text: k}), el("div", {"class": "v", text: v}), s ? el("div", {"class": "s", text: s}) : null]); }
+
+  /* header + controls */
+  var sel = el("select", {"aria-label": "training run"});
+  sel.addEventListener("change", function(){
+    S.follow = sel.value === ""; S.name = S.follow ? null : sel.value; S.run = null; S.figKey = "";
+    showRun(null); reconnect();
+  });
+  var pauseBtn = el("button", {"class": "btn", type: "button", "aria-pressed": "false", text: "Pause updates"});
+  pauseBtn.addEventListener("click", function(){
+    S.paused = !S.paused; pauseBtn.setAttribute("aria-pressed", String(S.paused));
+    pauseBtn.textContent = S.paused ? "Resume updates" : "Pause updates";
+    if (S.paused){ stopAll(); setMode("paused"); } else reconnect();
+  });
+  var conn = el("span", {"class": "conn", role: "status", "aria-live": "polite", text: "connecting…"});
+  var big = el("span", {"class": "big", text: "…"}), badge = el("span", {"class": "badge loading", text: "loading"});
+  var upd = el("span", {"class": "gstatus"});
+  var bar = el("div", {"class": "tbar", role: "progressbar", "aria-label": "training progress", "aria-valuemin": "0", "aria-valuemax": "100"},
+    [el("div", {"class": "done"}), el("div", {"class": "cur"})]);
+  var ebar = el("div", {"class": "tbar small", "aria-hidden": "true"}, [el("div", {"class": "done"})]);
+  var plabel = el("p", {"class": "plabel"}), elabel = el("p", {"class": "plabel"});
+  var stats = el("div", {"class": "stats"}), detail = el("div", {"class": "dfail"});
+  var warn = el("div", {"class": "empty", role: "alert", hidden: "hidden", style: "margin-bottom:10px"});
+  var info = el("section", {"class": "dinfo", "aria-label": "Training progress"}, [
+    el("div", {"class": "dhead"}, [big, badge, conn, upd]), bar, plabel, ebar, elabel, stats, detail]);
+  var tools = el("div", {"class": "gbar", role: "region", "aria-label": "Training toolbar"}, [
+    el("div", {"class": "grow"}, [el("label", {"class": "fld"}, ["Run", sel]), pauseBtn,
+      el("span", {"class": "gstatus", text: "Live via Server-Sent Events; falls back to polling every 5 s."})])]);
+  var body = el("div");
+  root.appendChild(warn); root.appendChild(tools); root.appendChild(info); root.appendChild(body);
+
+  /* charts */
+  var C = {s1: "var(--s1)", s2: "var(--s2)", s3: "var(--s3)"};
+  var lossSub = "solid = train (running mean over the epoch), dashed = val (after the epoch)";
+  var charts = [
+    lineChart({title: "Box loss", sub: lossSub, yLabel: "box loss (unitless)", fmt: function(v){ return v.toFixed(3); },
+      series: [{key: "train_box", name: "train", color: C.s1}, {key: "val_box", name: "val", color: C.s2, dash: "6 4"}], live: "box"}),
+    lineChart({title: "Classification (cls) loss", sub: lossSub, yLabel: "cls loss (unitless)", fmt: function(v){ return v.toFixed(3); },
+      series: [{key: "train_cls", name: "train", color: C.s1}, {key: "val_cls", name: "val", color: C.s2, dash: "6 4"}], live: "cls"}),
+    lineChart({title: "Distribution focal (dfl) loss", sub: lossSub, yLabel: "dfl loss (unitless)", fmt: function(v){ return v.toFixed(3); },
+      series: [{key: "train_dfl", name: "train", color: C.s1}, {key: "val_dfl", name: "val", color: C.s2, dash: "6 4"}], live: "dfl"}),
+    lineChart({title: "Precision and recall (val)", sub: "at ultralytics' validation confidence threshold", yLabel: "fraction (0-1)", clamp: [0, 1],
+      fmt: function(v){ return v.toFixed(3); },
+      series: [{key: "precision", name: "precision", color: C.s1}, {key: "recall", name: "recall", color: C.s2, dash: "6 4"}]}),
+    lineChart({title: "mAP50 and mAP50-95 (val)", sub: "mean average precision at IoU 0.5, and averaged over IoU 0.5-0.95", yLabel: "mAP (0-1)", clamp: [0, 1],
+      fmt: function(v){ return v.toFixed(3); },
+      series: [{key: "map50", name: "mAP50", color: C.s1}, {key: "map50_95", name: "mAP50-95", color: C.s2, dash: "6 4"}]}),
+    lineChart({title: "Learning rate", sub: "value at the end of the epoch (param group 0; warm-up then linear decay)", yLabel: "learning rate (per step)",
+      fmt: function(v, step){ return v.toExponential(step !== undefined ? 1 : 2); },
+      series: [{key: "lr0", name: "lr (pg0)", color: C.s1}]}),
+    lineChart({title: "Epoch time", sub: "wall-clock seconds per epoch (epoch 1 includes warm-up)", yLabel: "seconds", fmt: function(v){ return v.toFixed(v < 10 ? 1 : 0) + " s"; },
+      series: [{key: "epoch_s", name: "epoch total", color: C.s1}, {key: "train_s", name: "train", color: C.s2, dash: "6 4"}, {key: "val_s", name: "val", color: C.s3, dash: "2 3"}]}),
+    lineChart({title: "Train throughput", sub: "train images per second (timing.json)", yLabel: "images / s", fmt: function(v){ return v.toFixed(1); },
+      series: [{key: "images_per_s", name: "images/s", color: C.s1}]})
+  ];
+  var liveKey = ["box", "cls", "dfl"];
+  var chartsSec = el("div", {"class": "charts"}, charts.map(function(c){ return c.el; }));
+  var tableSec = el("div"), gallerySec = el("div"), cfgSec = el("div");
+  body.appendChild(el("h2", {"class": "sec", text: "Curves"})); body.appendChild(chartsSec);
+  body.appendChild(el("p", {"class": "meta", text: "Hover a chart for exact values. Hollow circle = the epoch in progress (train loss running mean from the progress bar). The x axis spans the planned epochs, so the curves fill in as training runs."}));
+  body.appendChild(gallerySec);
+  body.appendChild(el("h2", {"class": "sec", text: "Per-epoch metrics"})); body.appendChild(tableSec);
+  body.appendChild(cfgSec);
+
+  function setMode(m){
+    S.mode = m;
+    conn.className = "conn " + m;
+    conn.textContent = {live: "live (stream)", polling: "polling every 5 s", offline: "offline", paused: "paused", connecting: "connecting…"}[m] || m;
+  }
+  function showRuns(d){
+    S.runs = d; S.everOk = true;
+    var runs = d.runs || [], keep = sel.value;
+    sel.textContent = "";
+    sel.appendChild(el("option", {value: "", text: "Newest run (follow)" + (runs[0] ? ": " + runs[0].name : "")}));
+    runs.forEach(function(r){ sel.appendChild(el("option", {value: r.name, text: r.name + " · " + r.status + (r.epochs_total ? " · " + r.epochs_done + "/" + r.epochs_total + " ep" : "")})); });
+    sel.value = runs.some(function(r){ return r.name === keep; }) ? keep : "";
+    if (!S.follow && sel.value === "") { S.follow = true; S.name = null; }
+    if (!runs.length) showRun(null);
+  }
+  function fmtAgo(s){ return typeof s === "number" ? fmtDur(s) + " ago" : "–"; }
+  function tick(){   /* elapsed / ETA count between server messages */
+    var r = S.run; if (!r) return;
+    var dt = (Date.now() - S.got) / 1000, run = r.status === "running";
+    var el1 = stats.querySelector("[data-k=elapsed] .v"), el2 = stats.querySelector("[data-k=eta] .v");
+    if (el1) el1.textContent = fmtDur(r.elapsed_s + (run ? dt : 0));
+    if (el2 && typeof r.eta_s === "number") el2.textContent = run ? fmtDur(Math.max(0, r.eta_s - dt)) : "–";
+    upd.textContent = "server data " + fmtDur(dt) + " old · last file change " + fmtAgo(typeof r.age_s === "number" ? r.age_s + dt : null);
+  }
+  function showRun(r){
+    S.run = r; S.got = Date.now();
+    var runs = S.runs ? S.runs.runs || [] : [];
+    if (!r){
+      big.textContent = runs.length ? "…" : "No runs yet";
+      badge.textContent = runs.length ? "loading" : "no runs yet"; badge.className = "badge " + (runs.length ? "loading" : "none");
+      bar.children[0].style.width = bar.children[1].style.width = "0"; ebar.children[0].style.width = "0";
+      plabel.textContent = elabel.textContent = ""; stats.textContent = ""; detail.textContent = "";
+      if (S.runs && !runs.length){
+        detail.appendChild(el("div", {"class": "empty", role: "status"}, [el("b", {text: "No training runs yet. "}),
+          "No run folders in " + (S.runs.training_dir || "the training folder") + (S.runs.exists ? "" : " (the folder does not exist yet)") + ". Start one with ",
+          el("code", {text: "cd kernelBashing/baselines/yolo11n && .venv/bin/python scripts/train_yolo.py --epochs 10 --name NAME"}),
+          ". This page picks it up by itself."]));
+      }
+      charts.forEach(function(c){ c.update([], 1, null); });
+      tableSec.textContent = ""; gallerySec.textContent = ""; cfgSec.textContent = ""; S.figKey = "";
+      return;
+    }
+    var P = r.progress || {}, N = r.epochs_total, done = r.epochs_done || 0;
+    big.textContent = r.status === "running" && P.epoch ? "Epoch " + P.epoch + " / " + N : (N ? done + " / " + N + " epochs" : done + " epochs");
+    badge.textContent = {running: "running", finished: r.active ? "finished · making report" : "finished", failed: "failed"}[r.status] || r.status;
+    badge.className = "badge " + r.status;
+    var ft = typeof P.frac_total === "number" ? P.frac_total : (N ? done / N : 0);
+    bar.children[0].style.width = (N ? done / N * 100 : 0) + "%";
+    bar.children[1].style.width = (ft * 100) + "%";
+    bar.setAttribute("aria-valuenow", (ft * 100).toFixed(1));
+    plabel.textContent = (ft * 100).toFixed(1) + " % of " + (N || "?") + " epochs · " + done + " finished" +
+      (r.status === "running" && P.epoch ? " · epoch " + P.epoch + " in progress (striped)" : "");
+    var fe = typeof P.frac_epoch === "number" ? P.frac_epoch : (r.status === "running" ? 0 : 1);
+    ebar.children[0].style.width = (fe * 100) + "%";
+    elabel.textContent = r.status !== "running" ? "" :
+      P.phase === "train" ? "Within epoch " + P.epoch + ": training, iteration " + P.iter + " / " + P.iters + " (batches of " + (r.config && r.config.batch || "?") + " images) · from " + P.source :
+      P.phase === "val" ? "Within epoch " + P.epoch + ": validating, batch " + P.iter + " / " + P.iters + " · from " + P.source :
+      P.phase === "starting" ? "Starting (dataset scan, first epoch warm-up); no progress-bar output found" :
+      "Within epoch " + P.epoch + ": ≈ " + (fe * 100).toFixed(0) + " % (estimated from the time since the last epoch ended; no progress-bar log attached)";
+    var L = r.latest || {}, B = r.best || {}, cfg = r.config || {}, ls = P.losses || {};
+    stats.textContent = "";
+    var tiles = [
+      ["elapsed", "Elapsed", fmtDur(r.elapsed_s), "started " + fmtClock(r.start)],
+      ["eta", "ETA", r.status === "running" && typeof r.eta_s === "number" ? fmtDur(r.eta_s) : (r.status === "finished" ? "done" : "–"),
+        r.status === "running" && r.eta_at ? "≈ " + fmtClock(r.eta_at) + " (training only; report adds ~1-2 min)" : (r.status === "running" ? "after the first epoch" : "")],
+      ["spe", "Seconds / epoch", typeof r.sec_per_epoch === "number" ? r.sec_per_epoch.toFixed(1) + " s" : "–", "median (later epochs)"],
+      ["ips", "Images / s", fx(P.images_per_s, 1), P.it_s ? P.it_s.toFixed(2) + " it/s × batch " + cfg.batch : "train split, median epoch"],
+      ["gpu", "GPU memory", typeof P.gpu_mem_gb === "number" ? P.gpu_mem_gb.toFixed(2) + " GB" : "–", P.gpu_mem_source || "not logged yet"],
+      ["loss", "Current train losses", P.losses ? "box " + fx(ls.box, 3) + " · cls " + fx(ls.cls, 3) + " · dfl " + fx(ls.dfl, 3) : (L.train_box !== undefined ? "box " + f3(L.train_box) + " · cls " + f3(L.train_cls) + " · dfl " + f3(L.train_dfl) : "–"),
+        P.losses ? "running mean, epoch " + P.epoch + (P.instances !== null ? " · " + P.instances + " boxes in last batch" : "") : (L.epoch ? "epoch " + L.epoch + " (finished)" : "")],
+      ["val", "Latest val metrics", L.epoch ? "P " + f3(L.precision) + " · R " + f3(L.recall) : "–", L.epoch ? "mAP50 " + f3(L.map50) + " · mAP50-95 " + f3(L.map50_95) + " (epoch " + L.epoch + ")" : "after the first epoch"],
+      ["best", "Best mAP50-95", B.epoch ? f3(B.map50_95) : "–", B.epoch ? "epoch " + B.epoch + " · mAP50 " + f3(B.map50) : ""],
+      ["cfg", "Setup", (cfg.batch || "?") + " × " + (cfg.imgsz || "?") + " px · " + (cfg.device || "?"), (cfg.init || "") + (cfg.n_train ? " · " + cfg.n_train + " train / " + cfg.n_val + " val" : "")]
+    ];
+    tiles.forEach(function(t){ var s = stat(t[1], t[2], t[3]); s.setAttribute("data-k", t[0]); stats.appendChild(s); });
+    detail.textContent = "";
+    detail.appendChild(el("div", {text: "Status: " + r.status_detail + (r.logs && r.logs.length ? " · logs read: " + r.logs.join(", ") : "")}));
+    if (r.status === "failed" && r.log_tail && r.log_tail.length){
+      detail.appendChild(el("div", {text: "train.log (last lines):"})); detail.appendChild(el("pre", {"class": "log", text: r.log_tail.join("\n")}));
+    }
+    /* charts */
+    var rows = r.epochs || [];
+    charts.forEach(function(c, i){
+      var live = null;
+      if (i < 3 && r.status === "running" && P.losses && typeof P.frac_epoch === "number"){
+        live = {x: done + Math.max(0.02, P.frac_epoch)}; live["train_" + liveKey[i]] = ls[liveKey[i]];
+      }
+      c.update(rows, N || 1, live);
+    });
+    renderTable(rows, B.epoch);
+    renderGallery(r);
+    renderCfg(r);
+    tick();
+  }
+  function renderTable(rows, bestEp){
+    tableSec.textContent = "";
+    if (!rows.length){ tableSec.appendChild(el("p", {"class": "meta", text: "No finished epoch yet (ultra/results.csv gets a row after each epoch's validation)."})); return; }
+    var cols = [["epoch", "epoch", String], ["precision", "P", f3], ["recall", "R", f3], ["map50", "mAP50", f3], ["map50_95", "mAP50-95", f3],
+      ["train_box", "train box", f3], ["train_cls", "train cls", f3], ["train_dfl", "train dfl", f3],
+      ["val_box", "val box", f3], ["val_cls", "val cls", f3], ["val_dfl", "val dfl", f3], ["lr0", "lr", fexp],
+      ["epoch_s", "epoch s", function(v){ return fx(v, 1); }], ["images_per_s", "img/s", function(v){ return fx(v, 1); }], ["gpu_gb", "GPU GB", function(v){ return fx(v, 2); }]];
+    var head = el("tr", null, cols.map(function(c){ return el("th", {scope: "col", text: c[1]}); }));
+    var tb = el("tbody");
+    rows.slice().reverse().forEach(function(r){
+      tb.appendChild(el("tr", {"class": r.epoch === bestEp ? "best" : null, title: r.epoch === bestEp ? "best mAP50-95" : null},
+        cols.map(function(c){ var v = r[c[0]]; return el("td", {"class": "num", text: v === null || v === undefined ? "–" : c[2](v)}); })));
+    });
+    tableSec.appendChild(el("div", {"class": "twrap"}, [el("table", {"class": "gt"}, [el("thead", null, [head]), tb])]));
+    tableSec.appendChild(el("p", {"class": "meta", text: "Newest first; bold = best mAP50-95. P/R/mAP and val losses are on the 300-image val split after each epoch; train losses are the epoch's running means; lr = learning rate of param group 0."}));
+  }
+  function renderGallery(r){
+    var rep = r.report || {}, figs = rep.figures || [];
+    var key = r.name + "|" + r.status + "|" + figs.map(function(f){ return f.url; }).join(",") + "|" + rep.html;
+    if (key === S.figKey) return;
+    S.figKey = key; gallerySec.textContent = "";
+    gallerySec.appendChild(el("h2", {"class": "sec", text: "Report"}));
+    if (!figs.length){
+      gallerySec.appendChild(el("p", {"class": "meta", text: r.status === "running" ? "The report (curves, PR/F1, confusion matrix, recall by factor, prediction gallery, worst failures) is made by make_report.py when training finishes; it appears here by itself." :
+        r.active ? "Training finished; make_report.py is writing the report…" : "No report in this run folder (make it with: .venv/bin/python scripts/make_report.py runs/" + r.name + ")."}));
+      return;
+    }
+    if (rep.html) gallerySec.appendChild(el("p", null, [el("a", {href: rep.html, target: "_blank", rel: "noopener", text: "Open report.html (full report with tables and glossary)"}),
+      rep.md ? " · " : null, rep.md ? el("a", {href: rep.md, target: "_blank", rel: "noopener", text: "report.md"}) : null]));
+    var items = figs.map(function(f){ return {label: f.name, caption: f.caption, image: f.url}; });
+    var g = el("div", {"class": "rgal"});
+    items.forEach(function(it, i){
+      var b = el("button", {type: "button", "aria-label": "Enlarge: " + it.label, onclick: function(ev){ lbOpen(items, i, ev.currentTarget); }}, [img(it.image, it.label, "")]);
+      g.appendChild(el("figure", {"class": "figure"}, [b, el("figcaption", null, [el("b", {text: it.label + ": "}), it.caption])]));
+    });
+    gallerySec.appendChild(g);
+  }
+  function renderCfg(r){
+    var c = r.config || {};
+    var facts = [["run folder", r.name], ["started", fmtClock(r.start)], ["epochs planned", c.epochs], ["batch / image size", c.batch + " / " + c.imgsz + " px"],
+      ["device", c.device + (c.amp === false ? " (AMP off, float32)" : c.amp ? " (AMP on)" : "")], ["initial weights", c.init],
+      ["train fraction", c.fraction], ["patience (early stop)", c.patience], ["close_mosaic (last N epochs without mosaic)", c.close_mosaic],
+      ["flipud / seed / workers", c.flipud + " / " + c.seed + " / " + c.workers], ["dataset", (c.dataset || "") + (c.n_train ? " (" + c.n_train + " train, " + c.n_val + " val)" : "")],
+      ["classes", fmt(c.classes)], ["versions", "ultralytics " + c.ultralytics + " · torch " + c.torch + " · python " + c.python],
+      ["resumes", c.resumes], ["command args", c.argv], ["notes", c.notes]];
+    cfgSec.textContent = "";
+    var det = el("details", {"class": "glossary"}, [el("summary", {text: "Run configuration and notes"}), factsTable(facts.map(function(f){ return [f[0], f[1] === undefined || f[1] === null ? "–" : f[1]]; }))]);
+    if (str(r.notes_md)) det.appendChild(el("pre", {"class": "log", text: r.notes_md}));
+    cfgSec.appendChild(det);
+  }
+
+  /* transport: SSE stream, polling fallback */
+  function qs(){ return S.follow || !S.name ? "" : "?name=" + encodeURIComponent(S.name); }
+  function stopAll(){
+    if (S.es){ S.es.close(); S.es = null; }
+    if (S.pollT){ clearInterval(S.pollT); S.pollT = null; }
+    if (S.retryT){ clearTimeout(S.retryT); S.retryT = null; }
+  }
+  function onData(d){ if (!S.alive || S.paused) return; warn.hidden = true; if (d.run !== undefined) showRun(d.run); }
+  function fail(e){
+    if (!S.alive) return;
+    if (!S.everOk){
+      root.textContent = "";
+      root.appendChild(offlineBox(e && e.status === 404 ? "The server answering on this port has no training endpoints: it is an older version. Stop it (Ctrl-C) and start it again." :
+        "Could not reach /api/training/runs (" + (e ? e.message : "error") + "): the server is not running or this page is served by something else."));
+      cleanup(); return;
+    }
+    setMode("offline");
+    warn.hidden = false; warn.textContent = "Lost contact with the server. Showing the last data; it reconnects by itself (or restart it with: " + cmd + ").";
+  }
+  function poll(){
+    if (!S.alive || S.paused) return;
+    getJSON("/api/training/runs").then(function(d){
+      if (!S.alive || S.paused) return;
+      showRuns(d);
+      return getJSON("/api/training/run" + qs()).then(function(x){ if (S.mode !== "live") setMode("polling"); onData(x); });
+    }).catch(fail);
+  }
+  function startPolling(){
+    if (S.es){ S.es.close(); S.es = null; }
+    if (!S.pollT){ S.pollT = setInterval(function(){ if (!document.hidden) poll(); }, 5000); }
+    if (S.mode !== "offline") setMode("polling");
+    poll();
+    if (window.EventSource && !S.retryT) S.retryT = setTimeout(function(){ S.retryT = null; if (S.alive && !S.paused) connect(); }, 60000);
+  }
+  function connect(){
+    if (!S.alive || S.paused) return;
+    if (!window.EventSource) return startPolling();
+    if (S.es) S.es.close();
+    var es = S.es = new EventSource("/api/training/stream" + qs()), opened = false;
+    S.errs = 0;
+    es.onopen = function(){ opened = true; };
+    es.addEventListener("runs", function(e){ if (S.paused) return; try { showRuns(JSON.parse(e.data)); } catch(x){} });
+    es.addEventListener("run", function(e){
+      if (S.pollT){ clearInterval(S.pollT); S.pollT = null; }
+      S.errs = 0; setMode("live");
+      try { onData(JSON.parse(e.data)); } catch(x){}
+    });
+    es.addEventListener("heartbeat", function(){ S.errs = 0; setMode("live"); });
+    es.onerror = function(){
+      if (S.es !== es) return;
+      S.errs++;
+      if (es.readyState === 2 || S.errs >= 2 || !opened){ es.close(); S.es = null; startPolling(); }
+      else setMode("connecting");
+    };
+  }
+  function reconnect(){ stopAll(); setMode("connecting"); connect(); }
+  function cleanup(){ S.alive = false; stopAll(); if (S.tickT) clearInterval(S.tickT); S.tickT = null; }
+  trCleanup = cleanup;
+  S.tickT = setInterval(function(){ if (S.alive && !S.paused) tick(); }, 1000);
+  /* first load: one plain request decides between "server ok" and the offline/old-server message, then stream */
+  getJSON("/api/training/runs").then(function(d){
+    if (!S.alive) return;
+    showRuns(d);
+    return getJSON("/api/training/run").then(function(x){ onData(x); connect(); });
+  }).catch(fail);
+}
+
 /* ---------- tables / figures (optional: page.tables, feature.facts, feature.figure) ---------- */
 function dataTable(cols, rows){
   var t = el("table");
@@ -1074,6 +1535,7 @@ function renderPage(page, featureId){
   if (spy) { spy.disconnect(); spy = null; }
   if (gridCleanup) { gridCleanup(); gridCleanup = null; }
   if (dsCleanup) { dsCleanup(); dsCleanup = null; }
+  if (trCleanup) { trCleanup(); trCleanup = null; }
   gridResize = null;
   main.textContent = "";
   main.setAttribute("aria-labelledby", "pageTitle");
@@ -1095,6 +1557,7 @@ function renderPage(page, featureId){
   }
   if (page.type === "grid"){ renderGrid(page); return; }
   if (page.type === "dataset"){ renderDataset(page); return; }
+  if (page.type === "training"){ renderTraining(page); return; }
   arr(page.tables).forEach(function(t){ main.appendChild(pageTable(t)); });
   if (!feats.length){
     main.appendChild(el("div", {"class": "empty", role: "status", text: "No features listed for this page yet."}));
@@ -1181,8 +1644,9 @@ function apply(){
   }
 }
 window.addEventListener("hashchange", apply);
-window.addEventListener("pagehide", function(){ if (gridCleanup) gridCleanup(); });
+window.addEventListener("pagehide", function(){ if (gridCleanup) gridCleanup(); if (trCleanup) { trCleanup(); trCleanup = null; } });
 document.addEventListener("visibilitychange", function(){ if (document.hidden && gridCleanup) gridCleanup(); });
+window.addEventListener("pageshow", function(e){ if (e.persisted && current && current.type === "training"){ current = null; apply(); } });
 function setTb(){ var h = document.querySelector(".topbar"); if (h) document.documentElement.style.setProperty("--tb", h.offsetHeight + "px"); }
 window.addEventListener("resize", function(){ setTb(); if (gridResize) gridResize(); });
 
