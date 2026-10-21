@@ -210,6 +210,9 @@ main:has(.dsview){max-width:none}
 .dgrid.nopar .gpar{display:none}
 .lbwrap{position:relative;display:inline-block;line-height:0}
 .dsview .empty code{background:var(--surface);padding:2px 6px;border-radius:4px}
+.dspick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;font-size:.9rem}
+.dspick select{font:inherit;max-width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.dspick .s{color:var(--muted);font-size:.82rem;overflow-wrap:anywhere}
 @media (max-width:600px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* training live view (page type "training", needs scripts/serve_dataset_view.py) */
 main:has(.trview){max-width:1600px}
@@ -894,7 +897,8 @@ function renderDataset(page){
   }
   var S = {boxes: store("showcase-dsbox") !== "0", par: store("showcase-dspar") !== "0", auto: store("showcase-dsauto") !== "0",
     cols: parseInt(store("showcase-dscols"), 10) || (window.innerWidth < 600 ? 1 : 4),
-    items: [], seed: null, available: 0, info: null, timer: null, alive: true, loading: false, everOk: false};
+    items: [], seed: null, available: 0, info: null, timer: null, alive: true, loading: false, everOk: false,
+    dsid: store("showcase-dsid") || "", dsList: null, dsKey: ""};
   S.cols = Math.max(1, Math.min(8, S.cols));
   function getJSON(u){
     return fetch(u, {cache: "no-store"}).then(function(r){
@@ -902,6 +906,49 @@ function renderDataset(page){
       return r.json();
     });
   }
+
+  /* dataset selector (server registry /api/datasets; an older server without it serves its one dataset) */
+  function dq(sep){ return S.dsid ? sep + "ds=" + encodeURIComponent(S.dsid) : ""; }
+  var dsSel = el("select", {"aria-label": "dataset"}), dsNote = el("span", {"class": "s"});
+  var dsPick = el("div", {"class": "dspick", hidden: "hidden"}, [el("label", null, [el("b", {text: "Dataset: "}), dsSel]), dsNote]);
+  function dsLabel(d){
+    var bits = [d.id];
+    if (d.variant) bits.push(d.variant);
+    if (d.crop) bits.push(d.crop[0] + "×" + d.crop[1]);
+    return bits.join(" · ") + (d.has_images ? "" : " (no images yet)") + (d.default ? " (newest)" : "");
+  }
+  function dsDesc(d){
+    if (!d) return "";
+    var b = [];
+    if (d.scale_range) b.push("mine scale " + d.scale_range[0].toFixed(2) + "-" + d.scale_range[1].toFixed(2) + " in " + d.scale_bins + " bins");
+    if (d.mines_per_image) b.push(d.mines_per_image[0] + "-" + d.mines_per_image[1] + " mines / image");
+    if (d.zoom_coupling !== null && d.zoom_coupling !== undefined) b.push("zoom coupling " + (d.zoom_coupling ? "on" : "off"));
+    return b.join(" · ");
+  }
+  function loadDatasets(){
+    return getJSON("/api/datasets").then(function(d){
+      if (!S.alive) return;
+      var list = d.datasets || [], ids = list.map(function(x){ return x.id; });
+      if (S.dsid && ids.indexOf(S.dsid) < 0) S.dsid = "";
+      if (!S.dsid && d.default) S.dsid = d.default;
+      var key = JSON.stringify(list.map(function(x){ return [x.id, x.has_images, x.default, x.variant]; }));
+      S.dsList = list;
+      if (key !== S.dsKey){
+        S.dsKey = key; dsSel.textContent = "";
+        list.forEach(function(x){ dsSel.appendChild(el("option", {value: x.id, text: dsLabel(x)})); });
+      }
+      dsSel.value = S.dsid;
+      dsNote.textContent = dsDesc(list.filter(function(x){ return x.id === S.dsid; })[0]);
+      dsPick.hidden = list.length < 1;
+    }, function(){ S.dsList = null; S.dsid = ""; dsPick.hidden = true; });   /* old server: no registry */
+  }
+  dsSel.addEventListener("change", function(){
+    S.dsid = dsSel.value; store("showcase-dsid", S.dsid);
+    dsNote.textContent = dsDesc((S.dsList || []).filter(function(x){ return x.id === S.dsid; })[0]);
+    S.items = []; S.seed = null; S.available = 0; S.info = null; S.loading = false;
+    gridWrap.textContent = ""; grid = null; stats.textContent = ""; big.textContent = "…"; say("");
+    loadInfo().then(function(){ if (S.alive && S.info && S.info.count > 0 && !S.items.length) loadSample(); });
+  });
 
   /* info panel */
   var big = el("span", {"class": "big", text: "…"}), badge = el("span", {"class": "badge", text: "loading"});
@@ -936,7 +983,7 @@ function renderDataset(page){
     el("div", {"class": "grow"}, [counts, status]),
     el("div", {"class": "grow"}, [boxBtn, resBtn, autoBtn, parBtn, nowBtn, colsFld])]);
   var gridWrap = el("div");
-  root.appendChild(warn); root.appendChild(info); root.appendChild(tools); root.appendChild(gridWrap);
+  root.appendChild(warn); root.appendChild(dsPick); root.appendChild(info); root.appendChild(tools); root.appendChild(gridWrap);
   root.appendChild(el("p", {"class": "meta", text: "Click an image to enlarge it (full resolution; b toggles boxes, arrows step). " +
     "Boxes are the YOLO labels (labels/*.txt). Only images whose label and sidecar are fully written are counted or sampled."}));
 
@@ -992,8 +1039,9 @@ function renderDataset(page){
       (fresh > 0 ? " · " + fresh + " new since this sample (Resample to include them)" : "") : "Sample: none";
   }
   function loadInfo(){
-    return getJSON("/api/dataset-info").then(function(d){
-      if (!S.alive) return;
+    var want = S.dsid;
+    return getJSON("/api/dataset-info" + dq("?")).then(function(d){
+      if (!S.alive || want !== S.dsid) return;      /* the dataset was switched meanwhile */
       S.everOk = true; warn.hidden = true; showInfo(d);
       if (!S.items.length && d.count > 0 && !S.loading) loadSample();   /* first images appeared */
       else if (!S.items.length && !S.loading) showGrid();
@@ -1007,8 +1055,9 @@ function renderDataset(page){
   function loadSample(){
     if (S.loading) return;
     S.loading = true; say("Sampling…");
-    getJSON("/api/sample?n=" + N).then(function(d){
-      S.loading = false; if (!S.alive) return;
+    var want = S.dsid;
+    getJSON("/api/sample?n=" + N + dq("&")).then(function(d){
+      S.loading = false; if (!S.alive || want !== S.dsid) return;
       S.items = d.items || []; S.seed = d.seed; S.available = d.available;
       say(""); showGrid(); updateCounts();
     }, function(e){ S.loading = false; if (S.alive) say("Sampling failed: " + e.message); });
@@ -1045,11 +1094,12 @@ function renderDataset(page){
   }
   function schedule(){
     if (S.timer) { clearInterval(S.timer); S.timer = null; }
-    if (S.auto) S.timer = setInterval(function(){ if (!document.hidden) loadInfo(); }, 10000);
+    if (S.auto) S.timer = setInterval(function(){ if (!document.hidden) { if (S.dsList) loadDatasets(); loadInfo(); } }, 10000);
   }
   dsCleanup = function(){ S.alive = false; if (S.timer) clearInterval(S.timer); S.timer = null; };
   schedule();
-  loadInfo().then(function(){ if (S.alive && S.info && S.info.count > 0 && !S.items.length) loadSample(); });
+  loadDatasets().then(function(){ return loadInfo(); })
+    .then(function(){ if (S.alive && S.info && S.info.count > 0 && !S.items.length) loadSample(); });
 }
 
 /* ---------- training live view (page.type "training", served by scripts/serve_dataset_view.py) ---------- */

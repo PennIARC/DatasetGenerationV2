@@ -438,3 +438,16 @@ images, labels and sidecars; own random streams R(11) crop window, R(12) / R(13)
 - The v2 dataset (`scripts/generate_dataset.py`) turns both on: 640x640 native crops, mine scale 0.25-0.40 in 4
   linear bins, 0-4 mines per image. Review sheet: `docs/zoomed_look.png` (`scripts/zoomed_look_sheet.py`).
   Test: `tests/test_zoom_crop.py`.
+
+## 11. Second dataset: `--variant wide` (960x960, original zoomed-out plan)
+ADR `docs/history/0018-wide-dataset.md` (request: `feedback/0106`). Generator unchanged; driver only.
+- `scripts/generate_dataset.py --variant wide` -> `output_dataset/v2_3000_wide`: mine scale 0.1-0.4 in 5 LOG bins,
+  0-8 mines (600 empty, 300 each 1-8), `SCENE_ZOOM_COUPLING` off, `OUTPUT_CROP` (960, 960) baked (uniform window
+  containing every mine, 8 px margin), seed 2027, files `v2w_NNNNN`; everything else as the zoom640 plan. The default
+  `--variant zoom640` (`output_dataset/v2_3000`) regenerates the existing plan byte for byte.
+- `--placement-check`: exact replication of mine placement (no rendering) -> `plan/placement_check.json`; wide plan:
+  0 of 10500 mines dropped, boxes never overlap (max 12.7 % of the crop covered). `--verify-plan` now also checks the
+  placement and the crop size. Review sheet `docs/wide_look.png` (`scripts/wide_look_sheet.py`).
+- Live view: `serve_dataset_view.py` dataset registry (`--datasets-root`, default `output_dataset/`; `/api/datasets`;
+  `?ds=<id>` on every dataset route; default = newest plan); the dataset tab gained a dropdown. Params tab: a
+  zoom640 vs wide comparison table. Test: `docs/showcase/test_fixture/dataset_switch_test.py`.

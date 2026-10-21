@@ -7,6 +7,14 @@ per-image choice is passed to DatasetGenerator/scene.render_scene as controlPane
     python3 scripts/generate_dataset.py --render --workers 4        # full dataset (NOT run yet: awaiting confirmation)
     python3 scripts/generate_dataset.py --render --limit 8 --out /tmp/x   # small trial render elsewhere
 
+    # second dataset, "wide" variant (ADR 0018) -> output_dataset/v2_3000_wide (the default zoom640 set is untouched)
+    python3 scripts/generate_dataset.py --variant wide --plan-only --placement-check   # plan + exact placement replication
+    python3 scripts/generate_dataset.py --variant wide --verify-plan 6
+    python3 scripts/generate_dataset.py --variant wide --render --workers 4
+
+Variants (VARIANTS): zoom640 (default) = output_dataset/v2_3000 as described below; wide = the original 0013 plan
+(scale 0.1-0.4 in 5 LOG bins, 0-8 mines, no zoom coupling) as a 960x960 native crop, seed 2027, files v2w_NNNNN.
+
 Design (docs/history/0013-dataset-v2-plan.md, zoomed 640x640 revision: 0016-zoomed-640-dataset.md):
   * Output: 640x640 NATIVE crop of the 1920x1080 scene (OUTPUT_CROP; no resize), all mines inside the crop, YOLO labels
     normalised to the crop; SCENE_ZOOM_COUPLING on (debris / soil sizes x mine scale / 0.2, counts x (0.2 / scale)^2,
@@ -47,36 +55,64 @@ from features import background, camera, colour, mesh, soil, sun as sunmod, zoom
 
 # ------------------------------------------------------------------------------------------------ design constants
 N_IMAGES = 3000
-BASE_SEED = 2026            # image k uses render_scene(seed=BASE_SEED, index=k); showcase / samples use seed 0
 SPARE_INDEX0 = 100000       # retries: row k, attempt a -> index SPARE_INDEX0 + 10 k + a (never overlaps 0..2999)
-PLAN_SEED = 20261020        # RNG of the design itself (bucket assignment, swap search)
 VAL_COUNT = 300
-OUT_DEFAULT = os.path.join(REPO, "output_dataset", "v2_3000")
-
-# mines per image 0-4 (user decision, ADR 0016): 600 empty (20 %), 600 each for 1..4
-N_MINES_LEVELS = list(range(5))
-N_MINES_QUOTA = [600] * 5
-SCALE_EDGES = [float(x) for x in np.linspace(0.25, 0.40, 5)]     # 4 LINEAR bins of MINE_SCALE (user decision, ADR 0016)
-OUTPUT_CROP = (640, 640)                                           # native crop of the 1920x1080 render (no resize)
 BURIAL_EDGES = [0.05, 0.2, 0.3, 0.4, 0.5]                          # 4 bins of the target burial fraction
 ELEV_EDGES = [float(x) for x in np.linspace(15.0, 70.0, 7)]        # 6 bins of sun elevation
 SHADOW_EDGES = [float(x) for x in np.linspace(0.25, 0.65, 5)]      # 4 bins of direct-sun shadow strength
 OVERCAST_COUNT = 450                                               # exactly 15 %
 PSF_EDGES = [0.0, 0.5, 1.0, 1.5]                                   # 3 bins of lens-blur sigma
 FAMILY_QUOTA = {"grass": 1950, "non_grass": 1050}                  # exactly 65 / 35 %
-
-# factor name -> (levels, quota); "light" level 0 = overcast, 1..4 = shadow-strength bins
-_direct = N_IMAGES - OVERCAST_COUNT
-FACTORS = {
-    "n_mines": (N_MINES_LEVELS, N_MINES_QUOTA),
-    "scale_bin": (list(range(4)), [750] * 4),
-    "burial_bin": (list(range(4)), [750] * 4),
-    "elev_bin": (list(range(6)), [500] * 6),
-    "light": (list(range(5)), [OVERCAST_COUNT] + [_direct // 4 + (1 if i < _direct % 4 else 0) for i in range(4)]),
-    "family": ([0, 1], [FAMILY_QUOTA["grass"], FAMILY_QUOTA["non_grass"]]),
-    "psf_bin": (list(range(3)), [1000] * 3),
-}
 FAMILY_NAMES = ["grass", "non_grass"]
+
+# Dataset variants (--variant). Everything not listed here is shared (sun, light, burial, background family / files,
+# PSF, randomized factors, split). "zoom640" is the default and reproduces output_dataset/v2_3000 bit for bit.
+VARIANTS = {
+    # ADR 0016: 640x640 native crop, scale 0.25-0.40 in 4 linear bins, scene zoom coupling on, 0-4 mines
+    "zoom640": {"out": "v2_3000", "prefix": "v2_", "base_seed": 2026, "plan_seed": 20261020,
+                "n_mines_levels": list(range(5)), "n_mines_quota": [600] * 5,
+                "scale_edges": [float(x) for x in np.linspace(0.25, 0.40, 5)], "scale_rule": "linear",
+                "output_crop": (640, 640), "zoom_coupling": True, "adr": "0016-zoomed-640-dataset.md"},
+    # ADR 0018: the original 0013 plan ("zoomed out"): scale 0.1-0.4 in 5 LOG bins, 0-8 mines, no zoom coupling,
+    # baked 960x960 native crop of the full 1920x1080 render (trained at imgsz 960). Own seed namespace + file prefix.
+    "wide": {"out": "v2_3000_wide", "prefix": "v2w_", "base_seed": 2027, "plan_seed": 20261021,
+             "n_mines_levels": list(range(9)), "n_mines_quota": [600] + [300] * 8,
+             "scale_edges": [float(x) for x in np.geomspace(0.1, 0.4, 6)], "scale_rule": "log",
+             "output_crop": (960, 960), "zoom_coupling": False, "adr": "0018-wide-dataset.md"},
+}
+DEFAULT_VARIANT = "zoom640"
+
+
+def set_variant(name):
+    """Bind the module-level design constants to one variant (also called in every spawned render worker)."""
+    global VARIANT, BASE_SEED, PLAN_SEED, OUT_DEFAULT, PREFIX, N_MINES_LEVELS, N_MINES_QUOTA, SCALE_EDGES
+    global OUTPUT_CROP, ZOOM_COUPLING, FACTORS
+    v = VARIANTS[name]
+    VARIANT = name
+    BASE_SEED = v["base_seed"]      # image k uses render_scene(seed=BASE_SEED, index=k); showcase / samples use seed 0
+    PLAN_SEED = v["plan_seed"]      # RNG of the design itself (bucket assignment, swap search)
+    OUT_DEFAULT = os.path.join(REPO, "output_dataset", v["out"])
+    PREFIX = v["prefix"]
+    N_MINES_LEVELS, N_MINES_QUOTA = list(v["n_mines_levels"]), list(v["n_mines_quota"])
+    SCALE_EDGES = list(v["scale_edges"])
+    OUTPUT_CROP = tuple(v["output_crop"])     # native crop of the 1920x1080 render (no resize)
+    ZOOM_COUPLING = bool(v["zoom_coupling"])
+    nsb = len(SCALE_EDGES) - 1
+    direct = N_IMAGES - OVERCAST_COUNT
+    # factor name -> (levels, quota); "light" level 0 = overcast, 1..4 = shadow-strength bins
+    FACTORS = {
+        "n_mines": (N_MINES_LEVELS, N_MINES_QUOTA),
+        "scale_bin": (list(range(nsb)), [N_IMAGES // nsb] * nsb),
+        "burial_bin": (list(range(4)), [750] * 4),
+        "elev_bin": (list(range(6)), [500] * 6),
+        "light": (list(range(5)), [OVERCAST_COUNT] + [direct // 4 + (1 if i < direct % 4 else 0) for i in range(4)]),
+        "family": ([0, 1], [FAMILY_QUOTA["grass"], FAMILY_QUOTA["non_grass"]]),
+        "psf_bin": (list(range(3)), [1000] * 3),
+    }
+    assert sum(N_MINES_QUOTA) == N_IMAGES and N_IMAGES % nsb == 0
+
+
+set_variant(DEFAULT_VARIANT)
 
 
 def bucket_range(edges, b):
@@ -217,7 +253,7 @@ def row_overrides(r):
           "BG_FAMILY_WEIGHTS": {fam: 1.0},
           "BG_WEIGHT_OVERRIDES": {**base, **force},
           "PSF_SIGMA": bucket_range(PSF_EDGES, r["psf_bin"]),
-          "SCENE_ZOOM_COUPLING": True,
+          "SCENE_ZOOM_COUPLING": ZOOM_COUPLING,
           "OUTPUT_CROP": OUTPUT_CROP}
     if r["light"] > 0:
         ov["SHADOW_STRENGTH"] = bucket_range(SHADOW_EDGES, r["light"] - 1)
@@ -244,9 +280,14 @@ def plan_values(r, index=None):
     image_scale = float(R(9).uniform(cfg.MINE_SCALE_MIN, cfg.MINE_SCALE_MAX))
     px_mm = float(cfg.MINE_PX_PER_UNIT * image_scale / cfg.MINE_LENGTH_MM)
     cam = camera.sample_camera_params(R(7), cfg)
-    z = zoommod.zoom_factor(image_scale, cfg)
     x0, y0, cw, ch = zoommod.crop_window(R(11), cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT, *cfg.OUTPUT_CROP)
-    bg_zoom, bzi = zoommod.zoom_background(bgp, z, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT, _src_hw(bgp["file"]), cfg)
+    if cfg.SCENE_ZOOM_COUPLING:
+        z = zoommod.zoom_factor(image_scale, cfg)
+        bg_zoom, bzi = zoommod.zoom_background(bgp, z, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT, _src_hw(bgp["file"]), cfg)
+    else:   # wide variant: no coupling, the background keeps its sampled zoom (magnification for information only)
+        z = 1.0
+        _, bzi = zoommod.zoom_background(bgp, 1.0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT, _src_hw(bgp["file"]), cfg)
+        bg_zoom = bgp["zoom"]
     img = {"sun_azimuth": s["azimuth"], "sun_elevation": s["elevation"], "overcast": s["overcast"],
            "shadow_strength": s["shadow_strength"], "shadow_tint": s["shadow_tint"],
            "bg_file_sampled": os.path.basename(bgp["file"]), "bg_flip_h": bgp["flip_h"], "bg_flip_v": bgp["flip_v"],
@@ -322,7 +363,10 @@ def make_plan(out):
     counts = {n: {str(l): int(sum(1 for r in design if r[n] == l)) for l in FACTORS[n][0]} for n in FACTORS}
     val_counts = {n: {str(l): int(sum(1 for r in design if r[n] == l and r["split"] == "val")) for l in FACTORS[n][0]}
                   for n in FACTORS}
-    meta = {"n_images": N_IMAGES, "base_seed": BASE_SEED, "plan_seed": PLAN_SEED, "spare_index0": SPARE_INDEX0,
+    # the default variant's plan.json keeps its original keys (byte-identical regeneration apart from plan_seconds)
+    vmeta = {} if VARIANT == DEFAULT_VARIANT else {"variant": VARIANT, "output_crop": list(OUTPUT_CROP),
+                                                   "scene_zoom_coupling": ZOOM_COUPLING, "file_prefix": PREFIX}
+    meta = {**vmeta, "n_images": N_IMAGES, "base_seed": BASE_SEED, "plan_seed": PLAN_SEED, "spare_index0": SPARE_INDEX0,
             "edges": {"scale": SCALE_EDGES, "burial_fraction": BURIAL_EDGES, "sun_elevation": ELEV_EDGES,
                       "shadow_strength": SHADOW_EDGES, "psf_sigma": PSF_EDGES},
             "factors": {n: {"levels": FACTORS[n][0], "quota": FACTORS[n][1]} for n in FACTORS},
@@ -353,6 +397,11 @@ def write_readme(out, meta, rendered):
     status = ("RENDERED" if rendered else
               "PLAN ONLY: images not generated yet (awaiting the user's confirmation of the plan)")
     c = meta["counts"]
+    if VARIANT == "wide":
+        txt = _readme_wide(meta, status)
+        with open(os.path.join(out, "README.md"), "w") as f:
+            f.write(txt)
+        return
     txt = f"""# IARC synthetic PFM-1 dataset v2 (3000 images)
 
 Status: {status}.
@@ -394,6 +443,55 @@ Planned mines: {meta['n_mines_planned']} ({meta['n_buried_planned']} buried).
         f.write(txt)
 
 
+def _readme_wide(meta, status):
+    c, pc = meta["counts"], meta.get("placement_check") or {}
+    pl = (f"Placement check (exact replication of the generator's rejection sampling, {pc.get('rows')} rows with >= 2 "
+          f"mines): {pc.get('dropped')} of {pc.get('planned')} planned mines cannot be placed "
+          f"({pc.get('dropped_pct')} %), in {pc.get('rows_with_drop')} images; see plan/placement_check.json."
+          if pc else "Placement check: not run yet (`--placement-check`).")
+    return f"""# IARC synthetic PFM-1 dataset v2, "wide" variant (3000 images, 960x960)
+
+Status: {status}.
+
+The "zoomed out" original plan of ADR 0013 (mine scale 0.1-0.4 in 5 log bins, 0-8 mines per image, no scene zoom
+coupling), saved as a 960x960 native crop of the full 1920x1080 render; to be trained at imgsz 960. Companion of the
+zoomed 640x640 dataset in `output_dataset/v2_3000` (left unchanged). Rationale: `docs/history/0018-wide-dataset.md`
+(original plan `docs/history/0013-dataset-v2-plan.md`).
+
+Made by `scripts/generate_dataset.py --variant wide` (plan: `--plan-only`; images: `--render --workers 4`).
+
+- Images: 960x960 RGB JPEG, a NATIVE crop (no resize / resampling) of the 1920x1080 render. The window position is
+  uniform (stream R(11), drawn before the mines); every mine's unclipped silhouette box is placed fully inside it with
+  an 8 px margin, so no box crosses the edge. Labels are normalised to the crop. JPEG quality sampled 70-95 per image.
+- No zoom coupling: rocks, clippings, dirt, debris counts and the background texture are as in the generator defaults
+  (the 0013 look); grass blades are sized in mm and follow the ground px/mm of the image's scale bucket.
+- Mines never overlap: the generator's rejection sampling (50 attempts per mine, boxes inflated by 10 px) drops a mine
+  it cannot place. {pl}
+- Seeds: image k = `render_scene(seed={meta['base_seed']}, index=k)` (own namespace; the zoom640 set uses 2026);
+  retries use index {meta['spare_index0']} + 10 k + attempt. File names `{meta.get('file_prefix', 'v2w_')}NNNNN`.
+- Split: train {meta['split']['train']} / val {meta['split']['val']} (val indices in plan/plan.json), balanced on every stratified factor.
+- Layout after rendering: images/{{train,val}}/v2w_NNNNN.jpg, labels/{{train,val}}/v2w_NNNNN.txt (YOLO: class xc yc w h,
+  normalised), meta/v2w_NNNNN.json (generator sidecar + "plan" block), manifest.csv, render_log.json, data.yaml.
+- plan/: plan_images.csv, plan_mines.csv, plan.json (edges, quotas, counts, balance), plan_design.json,
+  placement_check.json.
+
+## Stratified factors (equal-count buckets; value drawn uniformly inside the bucket)
+
+| factor | buckets | counts |
+|---|---|---|
+| mines per image (N_MINES) | 0..8 | {list(c['n_mines'].values())} |
+| mine scale (MINE_SCALE_MIN/MAX), LOG bins {[round(e, 4) for e in meta['edges']['scale']]} | 5 | {list(c['scale_bin'].values())} |
+| burial target fraction of buried mines (BURIAL_FRACTION) {meta['edges']['burial_fraction']} | 4 | {list(c['burial_bin'].values())} |
+| sun elevation (SUN_ELEVATION) {[round(e, 2) for e in meta['edges']['sun_elevation']]} | 6 | {list(c['elev_bin'].values())} |
+| light: overcast / shadow strength bins {meta['edges']['shadow_strength']} | 1 + 4 | {list(c['light'].values())} |
+| background family grass / non_grass (+ per-file quotas by weight, grass1.png / grass2.png excluded) | 2 | {list(c['family'].values())} |
+| lens blur PSF_SIGMA {meta['edges']['psf_sigma']} | 3 | {list(c['psf_bin'].values())} |
+
+Everything else is randomized with the controlPanel distributions.
+Planned mines: {meta['n_mines_planned']} ({meta['n_buried_planned']} buried).
+"""
+
+
 # ------------------------------------------------------------------------------------------------ render
 _OUT = None
 _JPEG_Q = None
@@ -408,8 +506,9 @@ def _low_priority(pid):
         os.system(f"taskpolicy -b -p {int(pid)} >/dev/null 2>&1")
 
 
-def _init_worker(out, jpeg_q):
+def _init_worker(out, jpeg_q, variant):
     global _OUT, _JPEG_Q
+    set_variant(variant)        # spawned workers re-import this module with the default variant
     import cv2
     cv2.setNumThreads(1)
     _OUT, _JPEG_Q = out, jpeg_q
@@ -420,7 +519,7 @@ def render_row(r):
     """Render one plan row with retries -> summary dict. Retry on exception or burial cap exceeded."""
     from scene import render_scene
     out = _OUT
-    name = f"v2_{r['index']:05d}"
+    name = f"{PREFIX}{r['index']:05d}"
     last_err = None
     for attempt in range(5):
         index = r["index"] if attempt == 0 else SPARE_INDEX0 + 10 * r["index"] + attempt
@@ -453,7 +552,7 @@ def render_row(r):
 def build_manifest(out, design):
     rows = []
     for r in design:
-        p = os.path.join(out, "meta", f"v2_{r['index']:05d}.json")
+        p = os.path.join(out, "meta", f"{PREFIX}{r['index']:05d}.json")
         if not os.path.isfile(p):
             continue
         with open(p) as f:
@@ -484,7 +583,7 @@ def render(out, design, workers, limit, jpeg_q):
     t0 = time.time()
     results = []
     from multiprocessing import get_context
-    pool = get_context("spawn").Pool(workers, initializer=_init_worker, initargs=(out, jpeg_q))
+    pool = get_context("spawn").Pool(workers, initializer=_init_worker, initargs=(out, jpeg_q, VARIANT))
     try:
         for k, res in enumerate(pool.imap_unordered(render_row, rows, chunksize=2)):
             results.append(res)
@@ -510,16 +609,130 @@ def render(out, design, workers, limit, jpeg_q):
           f"retried {sum(1 for r in results if r.get('attempt', 0) > 0)}; manifest rows {len(man)}")
 
 
+def simulate_placement(r, attempts=None, index=None):
+    """Exact replication of render_scene's mine placement for plan row r (same cfg, sun, crop window, per-mine
+    silhouettes from objects.Mine, same rejection sampling) without drawing anything. Placement only uses each mine's
+    own stream sub(0) and the silhouette boxes, so this equals the render. -> dict (placed j's, rects, crop)."""
+    from objects import Mine
+    cfg = make_config(row_overrides(r))
+    seed, index = BASE_SEED, r["index"] if index is None else index
+    R = lambda *k: np.random.default_rng([seed, int(index), *k])  # noqa: E731
+    W, H = cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT
+    sun = sunmod.sample_sun(R(0), cfg)
+    if cfg.SCENE_ZOOM_COUPLING:
+        cfg = zoommod.zoomed_config(cfg, zoommod.zoom_factor(float(R(9).uniform(cfg.MINE_SCALE_MIN, cfg.MINE_SCALE_MAX)), cfg))
+    crop = zoommod.crop_window(R(11), W, H, *cfg.OUTPUT_CROP)
+    mg = int(cfg.CROP_MINE_MARGIN)
+    region = (crop[0] + mg, crop[1] + mg, crop[0] + crop[2] - mg, crop[1] + crop[3] - mg)
+    scene = {"sun": sun, "px_per_mm": 1.0, "blade_budget": [0]}
+    n_att = int(attempts or cfg.MINE_PLACEMENT_ATTEMPTS)
+    placed, tries = [], []
+    for j in range(r["n_mines"]):
+        m = Mine(cfg, [int(seed), int(index), 10, j], scene)
+        for a in range(n_att):
+            m.set_position(W, H, region=region)
+            if not any(m.collides(o, cfg.MINE_PLACEMENT_MARGIN) for _, o in placed):
+                placed.append((j, m))
+                tries.append(a + 1)
+                break
+    return {"crop": crop, "placed": [j for j, _ in placed], "rects": [list(map(int, m.rect)) for _, m in placed],
+            "tries": tries}
+
+
+def _placement_task(r):
+    a = simulate_placement(r)
+    b = simulate_placement(r, attempts=500)
+    cw, ch = a["crop"][2], a["crop"][3]
+    return {"index": r["index"], "n_mines": r["n_mines"], "scale_bin": r["scale_bin"], "placed": len(a["placed"]),
+            "placed_500": len(b["placed"]), "max_tries": max(a["tries"] or [0]),
+            "box_area_frac": round(sum(w * h for _, _, w, h in a["rects"]) / (cw * ch), 4),
+            "max_box_side": max([max(w, h) for _, _, w, h in a["rects"]] or [0])}
+
+
+def _init_check_worker(variant):
+    set_variant(variant)
+    import cv2
+    cv2.setNumThreads(1)
+    _low_priority(os.getpid())
+
+
+def placement_check(out, design, workers):
+    """Run simulate_placement on every row with >= 2 mines (1 mine always fits) -> plan/placement_check.json,
+    and the summary into plan.json / README."""
+    rows = [r for r in design if r["n_mines"] >= 2]
+    t0 = time.time()
+    from multiprocessing import get_context
+    pool = get_context("spawn").Pool(workers, initializer=_init_check_worker, initargs=(VARIANT,))
+    try:
+        res = sorted(pool.imap_unordered(_placement_task, rows, chunksize=8), key=lambda x: x["index"])
+        pool.close()
+    except BaseException:
+        pool.terminate()
+        raise
+    finally:
+        pool.join()
+    planned = sum(x["n_mines"] for x in res)
+    dropped = sum(x["n_mines"] - x["placed"] for x in res)
+    by_n = {str(n): {"rows": sum(1 for x in res if x["n_mines"] == n),
+                     "dropped": sum(x["n_mines"] - x["placed"] for x in res if x["n_mines"] == n),
+                     "rows_with_drop": sum(1 for x in res if x["n_mines"] == n and x["placed"] < n),
+                     "mean_box_area_frac": round(float(np.mean([x["box_area_frac"] for x in res if x["n_mines"] == n])), 4)}
+            for n in sorted({x["n_mines"] for x in res})}
+    by_s = {str(b): {"planned": sum(x["n_mines"] for x in res if x["scale_bin"] == b),
+                     "dropped": sum(x["n_mines"] - x["placed"] for x in res if x["scale_bin"] == b),
+                     "rows_with_drop": sum(1 for x in res if x["scale_bin"] == b and x["placed"] < x["n_mines"])}
+            for b in sorted({x["scale_bin"] for x in res})}
+    summ = {"rows": len(res), "planned": planned, "dropped": dropped,
+            "dropped_pct": round(100.0 * dropped / max(planned, 1), 2),
+            "rows_with_drop": sum(1 for x in res if x["placed"] < x["n_mines"]),
+            "dropped_with_500_attempts": sum(x["n_mines"] - x["placed_500"] for x in res),
+            "max_tries_needed": max(x["max_tries"] for x in res), "attempts": int(make_config().MINE_PLACEMENT_ATTEMPTS),
+            "max_box_area_frac": max(x["box_area_frac"] for x in res),
+            "max_box_side_px": max(x["max_box_side"] for x in res),
+            "by_n_mines": by_n, "by_scale_bin": by_s, "seconds": round(time.time() - t0, 1)}
+    with open(os.path.join(out, "plan", "placement_check.json"), "w") as f:
+        json.dump({"summary": summ, "rows": res}, f, indent=0)
+    with open(os.path.join(out, "plan", "plan.json")) as f:
+        meta = json.load(f)
+    meta["placement_check"] = {k: summ[k] for k in ("rows", "planned", "dropped", "dropped_pct", "rows_with_drop",
+                                                    "dropped_with_500_attempts", "max_box_area_frac")}
+    with open(os.path.join(out, "plan", "plan.json"), "w") as f:
+        json.dump(meta, f, indent=1)
+    write_readme(out, meta, rendered=False)
+    print(f"placement check: {len(res)} rows, {dropped} / {planned} planned mines not placed ({summ['dropped_pct']} %) "
+          f"in {summ['rows_with_drop']} images; with 500 attempts {summ['dropped_with_500_attempts']}; max tries needed "
+          f"{summ['max_tries_needed']}; box area <= {summ['max_box_area_frac']:.3f} of the crop; {summ['seconds']} s")
+    for n, v in by_n.items():
+        print(f"  n_mines {n}: {v['rows']} rows, dropped {v['dropped']} in {v['rows_with_drop']} rows, "
+              f"mean box area {v['mean_box_area_frac']:.3f} of the crop")
+    return summ
+
+
+def verify_pick(design, k):
+    """k rows that mix mine counts (extremes first) and scale bins (the most mines with the largest bin first)."""
+    nb = len(SCALE_EDGES) - 1
+    lv = N_MINES_LEVELS
+    order_n = [lv[-1], lv[0]] + [lv[i] for i in sorted(range(1, len(lv) - 1), key=lambda i: (-(i % 2), -i))]
+    order_b = [nb - 1, 0] + list(range(1, nb - 1))
+    picks, used = [], set()
+    for t in range(k):
+        n, b = order_n[t % len(order_n)], order_b[t % len(order_b)]
+        cand = [r for r in design if r["n_mines"] == n and r["scale_bin"] == b and r["index"] not in used] or \
+               [r for r in design if r["n_mines"] == n and r["index"] not in used]
+        picks.append(cand[0])
+        used.add(cand[0]["index"])
+    return picks
+
+
 def verify_plan(design, k):
-    """Render k rows in memory (no files) and compare the replicated plan values with the render's sidecar."""
+    """Render k rows in memory (no files) and compare the replicated plan values (and the replicated placement) with
+    the render's sidecar."""
     from scene import render_scene
-    picks = []
-    for b in range(len(SCALE_EDGES) - 1):          # spread over the scale bins
-        picks += [r for r in design if r["n_mines"] >= 2 and r["scale_bin"] == b][: -(-k // (len(SCALE_EDGES) - 1))]
-    picks = picks[:k]
-    for r in picks:
+    total_bad = 0
+    for r in verify_pick(design, k):
         t = time.time()
         img, mines = plan_values(r)
+        sim = simulate_placement(r)
         _, labels, meta = render_scene(BASE_SEED, compact_overrides(r), index=r["index"],
                                        cfg=make_config(row_overrides(r)))
         dt = time.time() - t
@@ -527,25 +740,44 @@ def verify_plan(design, k):
         ok = [abs(s["elevation"] - img["sun_elevation"]) < 1e-9, abs(s["azimuth"] - img["sun_azimuth"]) < 1e-9,
               os.path.basename(meta["background"]["file"]) == r["bg_file"],
               abs(meta["post"]["psf_sigma"] - img["psf_sigma"]) < 1e-9,
-              abs(meta["zoom"]["factor"] - img["zoom"]) < 1e-9,
+              (abs(meta["zoom"]["factor"] - img["zoom"]) < 1e-9) if ZOOM_COUPLING else ("zoom" not in meta),
               abs(meta["background"]["zoom"] - img["bg_zoom_coupled"]) < 1e-9,
-              meta["crop"]["x0"] == img["crop_x0"] and meta["crop"]["y0"] == img["crop_y0"]]
+              meta["crop"]["x0"] == img["crop_x0"] and meta["crop"]["y0"] == img["crop_y0"],
+              [meta["crop"]["w"], meta["crop"]["h"]] == list(OUTPUT_CROP),
+              abs(meta["post"]["jpeg_quality"] - img["jpeg_quality"]) < 1e-9,
+              # placement: same mines dropped, same full-frame rectangles
+              len(meta["mines"]) == len(sim["placed"]),
+              [m["rect_full"] for m in meta["mines"]] == sim["rects"]]
         # labels: inside [0, 1] of the crop, one per labelled mine, matching the full-frame pixel box
         cx, cy = meta["crop"]["x0"], meta["crop"]["y0"]
         for l, m in zip(labels, [m for m in meta["mines"] if m["labelled"]]):
             x0, y0, bw, bh = m["box_px_full"]
             ok += [all(0 <= v <= 1 for v in (l[1] - l[3] / 2, l[2] - l[4] / 2, l[1] + l[3] / 2, l[2] + l[4] / 2)),
                    abs(l[1] * OUTPUT_CROP[0] - (x0 - cx + bw // 2)) < 1e-6 and abs(l[3] * OUTPUT_CROP[0] - bw) < 1e-6]
-        for m, pm in zip(meta["mines"], mines):
+        # every placed mine's silhouette box lies inside the crop
+        for m in meta["mines"]:
+            x, y, w, h = m["rect_full"]
+            ok.append(cx <= x and cy <= y and x + w <= cx + OUTPUT_CROP[0] and y + h <= cy + OUTPUT_CROP[1])
+        placed_j = sim["placed"]
+        for m, pm in zip(meta["mines"], [mines[j] for j in placed_j]):
             ok += [abs(m["scale"] - pm["scale"]) < 1e-9, abs(m["yaw"] - pm["yaw"]) < 1e-9,
                    m["face_down"] == pm["face_down"], m["burial"]["buried"] == pm["buried"]]
+        total_bad += len(ok) - sum(ok)
         print(f"row {r['index']}: scale bin {r['scale_bin']} (zoom {img['zoom']:.2f}), {r['n_mines']} planned, "
-              f"{len(meta['mines'])} placed, {len(labels)} labels, checks {sum(ok)}/{len(ok)} match, {dt:.2f} s")
+              f"{len(meta['mines'])} placed (replicated {len(sim['placed'])}), {len(labels)} labels, "
+              f"checks {sum(ok)}/{len(ok)} match, {dt:.2f} s")
+    print(f"verify-plan: {total_bad} mismatches")
+    return total_bad
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default=OUT_DEFAULT)
+    ap.add_argument("--variant", choices=sorted(VARIANTS), default=DEFAULT_VARIANT,
+                    help="zoom640 (default: output_dataset/v2_3000, ADR 0016) or wide (output_dataset/v2_3000_wide, "
+                         "ADR 0018: 960x960 crop, scale 0.1-0.4 log bins, 0-8 mines, no zoom coupling)")
+    ap.add_argument("--out", default=None, help="dataset folder (default: output_dataset/<the variant's folder>)")
+    ap.add_argument("--placement-check", action="store_true",
+                    help="replicate the mine placement of every row with >= 2 mines (no rendering) -> plan/placement_check.json")
     ap.add_argument("--plan-only", action="store_true", help="write plan/ + README, render nothing")
     ap.add_argument("--verify-plan", type=int, default=0, help="render N rows in memory and check plan == render")
     ap.add_argument("--render", action="store_true", help="render the dataset (writes images)")
@@ -554,7 +786,8 @@ def main():
     ap.add_argument("--jpeg-quality", default="sampled",
                     help="'sampled' = the generator's per-image JPEG_QUALITY_RANGE (70-95), or a fixed int e.g. 95")
     args = ap.parse_args()
-    out = os.path.abspath(args.out)
+    set_variant(args.variant)
+    out = os.path.abspath(args.out or OUT_DEFAULT)
     if args.render and sys.platform == "darwin" and not os.environ.get("_GEN_CAFFEINATED"):
         os.environ["_GEN_CAFFEINATED"] = "1"
         os.execvp("caffeinate", ["caffeinate", "-i", sys.executable, os.path.abspath(__file__)] + sys.argv[1:])
@@ -564,6 +797,8 @@ def main():
         design, _ = make_plan(out)
     else:
         design = load_design(out)
+    if args.placement_check:
+        placement_check(out, design, args.workers)
     if args.verify_plan:
         verify_plan(design, args.verify_plan)
     if args.render:

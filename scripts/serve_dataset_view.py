@@ -4,12 +4,18 @@
     python3 scripts/serve_dataset_view.py                       # http://127.0.0.1:8765/showcase.html#dataset
     python3 scripts/serve_dataset_view.py --port 8800 --dataset-dir /path/to/other_dataset
 
+Datasets: every folder under --datasets-root (default output_dataset/) that has plan/plan.json or images/ is selectable
+in the tab without restarting (rescanned on each /api/datasets call); the default is the newest (plan.json mtime).
+--dataset-dir alone serves just that folder (as before); with --datasets-root as well it is added and is the default.
+
 Binds 127.0.0.1 only and is read-only. Routes:
   /                          -> redirect to /showcase.html#dataset
   /<file>                    -> static files of docs/showcase/ (html/json/images only, no dotfiles, no '..')
   /dataset/images/{train,val}/<name>.jpg, /dataset/labels/{train,val}/<name>.txt, /dataset/meta/<name>.json
                              -> dataset files (strict regex, nothing else of the dataset dir is reachable)
   /thumb/{train,val}/<name>.jpg -> 960 px wide JPEG, cached under output_dataset/.thumb_cache/ (gitignored)
+  /api/datasets              -> registry of selectable datasets {default, datasets: [{id, dir, variant, crop, ...}]}
+  (every dataset route below takes ?ds=<id>; without it the default dataset is used; unknown id -> 404)
   /api/dataset-info          -> counts, storage size, timestamps, rate / ETA, status, resolution, label counts, failures
   /api/sample?n=24&seed=S    -> random sample of finished images with YOLO boxes and key sidecar parameters
   /api/training/runs         -> YOLO run folders in --training-dir, newest first, with status (training tab)
@@ -42,7 +48,8 @@ from urllib.parse import parse_qs, urlsplit
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOWCASE = os.path.join(REPO, "docs", "showcase")
-DATASET_DEFAULT = os.path.join(REPO, "output_dataset", "v2_3000")
+DATASETS_ROOT_DEFAULT = os.path.join(REPO, "output_dataset")
+DS_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}$")
 CACHE_DEFAULT = os.path.join(REPO, "output_dataset", ".thumb_cache")
 SPLITS = ("train", "val")
 NAME = r"[A-Za-z0-9][A-Za-z0-9_\-]{0,63}"
@@ -517,8 +524,9 @@ class Training:
 class Dataset:
     """Scans the dataset dir on demand (results cached for a couple of seconds; safe to call from many threads)."""
 
-    def __init__(self, root, cache_dir, target=None):
+    def __init__(self, root, cache_dir, target=None, ds_id=None):
         self.root, self.cache_dir, self.target_arg = root, cache_dir, target
+        self.id = ds_id or os.path.basename(root.rstrip(os.sep))
         self.lock = threading.Lock()
         self.scan_at, self.scan_res = 0.0, None
         self.size_at, self.size_res = 0.0, None
@@ -698,7 +706,8 @@ class Dataset:
         status = ("missing" if not os.path.isdir(self.root) else "generating" if active
                   else "complete" if complete else "empty" if n == 0 else "idle")
         planned_split = plan.get("split") or {}
-        return {"dataset_dir": self.root, "server_time": now, "status": status, "active": active,
+        return {"dataset_dir": self.root, "dataset_id": self.id, "variant": plan.get("variant") or _guess_variant(plan),
+                "server_time": now, "status": status, "active": active,
                 "count": n, "pending": pending, "target": target,
                 "split": split_counts,
                 "split_target": {"train": planned_split.get("train"), "val": planned_split.get("val")},
@@ -723,11 +732,115 @@ class Dataset:
         for i in order:      # skip entries that vanished / are unreadable since the scan
             if len(out) >= n:
                 break
-            rec = describe(items[i])
+            rec = describe(items[i], self.id)
             if rec is not None:
                 out.append(rec)
         out.sort(key=lambda r: r["name"])
-        return {"seed": seed, "n": n, "available": len(items), "items": out, "server_time": time.time()}
+        return {"seed": seed, "n": n, "available": len(items), "items": out, "server_time": time.time(),
+                "dataset_id": self.id}
+
+
+def _guess_variant(plan):
+    """Plans written before --variant existed (output_dataset/v2_3000) have no "variant" key."""
+    if not plan:
+        return None
+    return "zoom640" if plan.get("base_seed") == 2026 and len((plan.get("counts") or {}).get("n_mines") or {}) == 5 else None
+
+
+class Registry:
+    """Selectable datasets: explicit --dataset-dir folders plus every dataset-like folder under --datasets-root
+    (rescanned at most every 2 s, so new folders appear without restarting). One Dataset object per folder."""
+
+    def __init__(self, roots_dir, explicit, cache_dir, target=None):
+        self.roots_dir, self.cache_dir, self.target = roots_dir, cache_dir, target
+        self.explicit = [os.path.abspath(d) for d in explicit]
+        self.lock = threading.Lock()
+        self.objs = {}            # realpath -> Dataset
+        self.at, self.res = 0.0, None
+
+    def _dirs(self):
+        out = list(self.explicit)
+        if self.roots_dir:
+            try:
+                ents = sorted(e.path for e in os.scandir(self.roots_dir) if e.is_dir() and not e.name.startswith("."))
+            except OSError:
+                ents = []
+            for d in ents:
+                if os.path.isfile(os.path.join(d, "plan", "plan.json")) or os.path.isdir(os.path.join(d, "images")):
+                    out.append(os.path.abspath(d))
+        seen, uniq = set(), []
+        for d in out:
+            r = os.path.realpath(d)
+            if r not in seen:
+                seen.add(r)
+                uniq.append(d)
+        return uniq
+
+    def _newest_key(self, d):
+        for f in (os.path.join(d, "plan", "plan.json"), d):
+            s = _st(f)
+            if s:
+                return s[0]
+        return 0
+
+    def scan(self):
+        """-> (ordered {id: Dataset}, default id)."""
+        with self.lock:
+            now = time.time()
+            if self.res is not None and now - self.at < 2.0:
+                return self.res
+            dsets, used = {}, set()
+            for d in self._dirs():
+                base = os.path.basename(d.rstrip(os.sep)) or "dataset"
+                base = base if DS_ID_RE.match(base) else "dataset"
+                i, k = base, 2
+                while i in used:
+                    i, k = "%s-%d" % (base, k), k + 1
+                used.add(i)
+                r = os.path.realpath(d)
+                if r not in self.objs or self.objs[r].id != i:
+                    self.objs[r] = Dataset(d, self.cache_dir, self.target, ds_id=i)
+                dsets[i] = self.objs[r]
+            if self.explicit and dsets:
+                default = next(iter(dsets))          # an explicit --dataset-dir is the default
+            elif dsets:
+                default = max(dsets, key=lambda i: (self._newest_key(dsets[i].root), i))
+            else:
+                default = None
+            self.at, self.res = now, (dsets, default)
+            return self.res
+
+    def get(self, ds_id):
+        """'' -> default dataset; unknown id -> None. With no dataset at all, a placeholder on the default path."""
+        dsets, default = self.scan()
+        if not ds_id:
+            if default is None:
+                return Dataset(os.path.join(self.roots_dir or REPO, "v2_3000"), self.cache_dir, self.target)
+            return dsets[default]
+        return dsets.get(ds_id) if DS_ID_RE.match(ds_id) else None
+
+    def listing(self):
+        dsets, default = self.scan()
+        out = []
+        for i, ds in dsets.items():
+            plan = ds.plan()
+            crop = plan.get("output_crop") or ([640, 640] if _guess_variant(plan) == "zoom640" else None)
+            img_any = False
+            for sp in SPLITS:
+                try:
+                    with os.scandir(os.path.join(ds.root, "images", sp)) as it:
+                        img_any = img_any or any(e.name.endswith(".jpg") for e in it)
+                except OSError:
+                    pass
+            edges = (plan.get("edges") or {}).get("scale")
+            nm = list(((plan.get("counts") or {}).get("n_mines") or {}).keys())
+            out.append({"id": i, "dir": ds.root, "name": os.path.basename(ds.root.rstrip(os.sep)),
+                        "variant": plan.get("variant") or _guess_variant(plan), "crop": crop,
+                        "zoom_coupling": plan.get("scene_zoom_coupling", True if _guess_variant(plan) == "zoom640" else None),
+                        "n_images": plan.get("n_images"), "mines_per_image": [int(nm[0]), int(nm[-1])] if nm else None,
+                        "scale_range": [edges[0], edges[-1]] if edges else None, "scale_bins": len(edges) - 1 if edges else None,
+                        "has_images": img_any, "default": i == default})
+        return {"default": default, "datasets": out, "server_time": time.time()}
 
 
 def read_labels(path):
@@ -753,8 +866,9 @@ def _r(v, d=3):
     return round(float(v), d) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
 
 
-def describe(it):
-    """Finished image -> card record (boxes + key sidecar parameters); None if its files are not readable."""
+def describe(it, ds_id=None):
+    """Finished image -> card record (boxes + key sidecar parameters); None if its files are not readable.
+    URLs carry &ds=<id> so the right dataset is served whichever one is the server's default."""
     boxes = read_labels(it["label"])
     try:
         with open(it["meta"]) as f:
@@ -787,13 +901,15 @@ def describe(it):
         "blades_on_mine": sum(int(m.get("blades_on_mine") or 0) for m in mines),
         "psf_sigma": _r(post.get("psf_sigma"), 2), "jpeg_q": plan.get("saved_jpeg_quality", post.get("jpeg_quality")),
     }
-    v = "?v=%d" % (it["img_mtime_ns"] // 1_000_000)
+    d = "&ds=%s" % ds_id if ds_id else ""
+    v = "?v=%d%s" % (it["img_mtime_ns"] // 1_000_000, d)
+    q = "?ds=%s" % ds_id if ds_id else ""
     return {"id": it["name"], "name": it["name"], "split": it["split"], "boxes": boxes, "params": params,
             "mtime": it["mtime"], "bytes": it["img_bytes"],
             "thumb": "/thumb/%s/%s.jpg%s" % (it["split"], it["name"], v),
             "image": "/dataset/images/%s/%s.jpg%s" % (it["split"], it["name"], v),
-            "meta_url": "/dataset/meta/%s.json" % it["name"],
-            "label_url": "/dataset/labels/%s/%s.txt" % (it["split"], it["name"])}
+            "meta_url": "/dataset/meta/%s.json%s" % (it["name"], q),
+            "label_url": "/dataset/labels/%s/%s.txt%s" % (it["split"], it["name"], q)}
 
 
 def make_thumb(src, dst, width):
@@ -828,7 +944,7 @@ def make_thumb(src, dst, width):
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "DatasetView/1"
-    ds = None
+    reg = None
     tr = None
     verbose = False
     port = 8765
@@ -877,10 +993,19 @@ class Handler(BaseHTTPRequestHandler):
         path, q = u.path, parse_qs(u.query)
         if "%" in path or "\\" in path or "/." in path or "\0" in path:
             return self._err(404, "not found")
-        ds = self.ds
         try:
             if path == "/":
                 return self._send(302, b"", "text/plain", extra={"Location": "/showcase.html#dataset"})
+            if path == "/api/datasets":
+                return self._json(self.reg.listing())
+            ds = None
+            if path.startswith("/api/dataset-info") or path.startswith("/api/sample") or path.startswith("/dataset/") \
+                    or path.startswith("/thumb/"):
+                ds = self.reg.get(q.get("ds", [""])[0])
+                if ds is None:
+                    return self._json({"error": "unknown dataset"}, 404) if path.startswith("/api/") else \
+                        self._err(404, "not found")
+            self.ds = ds
             if path == "/api/dataset-info":
                 return self._json(ds.info())
             if path == "/api/sample":
@@ -1057,7 +1182,12 @@ class Server(ThreadingHTTPServer):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--dataset-dir", default=DATASET_DEFAULT, help="dataset root (default output_dataset/v2_3000)")
+    ap.add_argument("--dataset-dir", action="append", default=[],
+                    help="serve this dataset folder (repeatable). Alone: only these folders; default: none, i.e. every "
+                         "dataset under --datasets-root")
+    ap.add_argument("--datasets-root", default=None,
+                    help="folder whose sub-folders are the selectable datasets (default output_dataset/ when no "
+                         "--dataset-dir is given)")
     ap.add_argument("--cache-dir", default=CACHE_DEFAULT, help="thumbnail cache (default output_dataset/.thumb_cache)")
     ap.add_argument("--target", type=int, default=None, help="planned image count (default: plan/plan.json n_images)")
     ap.add_argument("--training-dir", default=TRAIN_DEFAULT,
@@ -1067,12 +1197,16 @@ def main():
                          "repeatable")
     ap.add_argument("--verbose", action="store_true", help="log every request")
     args = ap.parse_args()
-    Handler.ds = Dataset(os.path.abspath(args.dataset_dir), os.path.abspath(args.cache_dir), args.target)
+    roots = args.datasets_root or (None if args.dataset_dir else DATASETS_ROOT_DEFAULT)
+    Handler.reg = Registry(os.path.abspath(roots) if roots else None, args.dataset_dir, os.path.abspath(args.cache_dir),
+                           args.target)
     Handler.tr = Training(os.path.abspath(args.training_dir), args.console_log)
     Handler.verbose, Handler.port = args.verbose, args.port
     srv = Server(("127.0.0.1", args.port), Handler)
-    print("serving docs/showcase + %s + %s\n  open http://127.0.0.1:%d/showcase.html#dataset   (training: #training;"
-          " Ctrl-C to stop)" % (Handler.ds.root, Handler.tr.root, args.port), flush=True)
+    dsets, default = Handler.reg.scan()
+    print("serving docs/showcase + datasets %s (default %s) + %s\n  open http://127.0.0.1:%d/showcase.html#dataset   "
+          "(training: #training; Ctrl-C to stop)" % (", ".join(dsets) or "none", default, Handler.tr.root, args.port),
+          flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

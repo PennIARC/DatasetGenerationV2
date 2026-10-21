@@ -66,6 +66,11 @@ with their YOLO boxes, and live render progress. A file:// page cannot read the 
     python3 scripts/serve_dataset_view.py            # then open http://127.0.0.1:8765/showcase.html#dataset
     python3 scripts/serve_dataset_view.py --port 8800 --dataset-dir /other/dataset   # also --cache-dir, --target, --verbose
 
+- Several datasets (ADR 0018): every folder under `--datasets-root` (default `output_dataset/`, e.g. `v2_3000` and
+  `v2_3000_wide`) with `plan/plan.json` or `images/` is listed by `/api/datasets` and picked in the tab's "Dataset"
+  dropdown without restarting (default: newest plan). Dataset routes take `?ds=<id>`. `--dataset-dir` alone serves
+  only that folder. Test: `test_fixture/dataset_switch_test.py WORK_DIR`.
+
 - Server: stdlib `http.server`, binds 127.0.0.1 only, read-only, rejects other Host headers. Serves docs/showcase/
   (html/json/images, no dotfiles) and only `/dataset/images|labels/{train,val}/<name>` and `/dataset/meta/<name>.json`.
 - `/api/dataset-info`: finished count / target (plan.json), pending, train/val (+ planned), storage on disk (by folder),

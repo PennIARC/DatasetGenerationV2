@@ -764,10 +764,69 @@ def caption_for(c):
     return PLANNED + extra
 
 
+WIDE_TABLE_TITLE = "Two datasets: zoom640 (this page) vs wide (ADR 0018)"
+
+
+def variant_table():
+    """Side-by-side of the two dataset variants of scripts/generate_dataset.py, read from both plan.json files
+    (no rendering). This page's cards and graphs describe zoom640 only."""
+    def load(name):
+        try:
+            with open(os.path.join(REPO, "output_dataset", name, "plan", "plan.json")) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+    z, w = load("v2_3000"), load("v2_3000_wide")
+
+    def cnt(m, k):
+        return " ".join(str(v) for v in m["counts"][k].values()) if m else "plan missing"
+
+    def edges(m):
+        return ", ".join(f"{e:.3g}" for e in m["edges"]["scale"]) if m else "plan missing"
+    rows = [
+        ["Folder", "output_dataset/v2_3000", "output_dataset/v2_3000_wide"],
+        ["Command", "generate_dataset.py (default --variant zoom640)", "generate_dataset.py --variant wide"],
+        ["Image", "640x640 native crop of the 1920x1080 render", "960x960 native crop of the 1920x1080 render (train at imgsz 960)"],
+        ["Mine scale", f"4 linear bins, edges {edges(z)} (length ~107-171 px)",
+         f"5 log bins, edges {edges(w)} (length ~43-171 px)"],
+        ["Mines per image", f"0-4: {cnt(z, 'n_mines')}", f"0-8: {cnt(w, 'n_mines')}"],
+        ["Scene zoom coupling", "on (debris / soil sizes x scale/0.2, counts x z^-2, background magnified, cap 1.5)",
+         "off (generator defaults: the original zoomed-out look of ADR 0013)"],
+        ["Planned mines (buried)", f"{z['n_mines_planned']} ({z['n_buried_planned']})" if z else "-",
+         f"{w['n_mines_planned']} ({w['n_buried_planned']})" if w else "-"],
+        ["Seeds / file names", "render_scene(seed=2026, index=k), v2_NNNNN", "render_scene(seed=2027, index=k), v2w_NNNNN"],
+        ["Shared", "sun, light, burial, background family + file quotas (grass1/grass2 excluded), PSF bins, JPEG q70-95, "
+                   "soft grains, 2700 / 300 balanced split", "same"],
+        ["Mine placement", "all placed", (f"{w['placement_check']['dropped']} of {w['placement_check']['planned']} mines "
+                                          "dropped (exact placement replication), never overlapping")
+         if w and w.get("placement_check") else "-"],
+    ]
+    return {"title": WIDE_TABLE_TITLE, "columns": ["", "zoom640 (v2_3000)", "wide (v2_3000_wide)"], "rows": rows,
+            "note": "The user asked to go back to the zoomed-out original as a second dataset after the zoom640 set "
+                    "proved easy to learn; the cards below describe zoom640 only. Sheet: docs/wide_look.png."}
+
+
+def patch_variant_table():
+    """Insert / replace the comparison table in the existing manifest_params.json (no renders)."""
+    p = os.path.join(SHOW, "manifest_params.json")
+    with open(p) as f:
+        m = json.load(f)
+    tabs = [t for t in m["pages"][0].get("tables", []) if t.get("title") != WIDE_TABLE_TITLE]
+    tabs.insert(1, variant_table())
+    m["pages"][0]["tables"] = tabs
+    with open(p, "w") as f:
+        json.dump(m, f, indent=1)
+    print("patched", p)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-render", action="store_true")
+    ap.add_argument("--patch-variant-table", action="store_true",
+                    help="only insert the zoom640 vs wide table into the existing manifest_params.json")
     args = ap.parse_args()
+    if args.patch_variant_table:
+        return patch_variant_table()
     os.makedirs(IMG, exist_ok=True)
     imgs, mines = read_csv("plan_images.csv"), read_csv("plan_mines.csv")
     with open(os.path.join(PLAN, "plan.json")) as f:
@@ -886,6 +945,7 @@ def main():
             "tables": [
                 {"title": "Decisions", "columns": ["decision", "plan", "status"],
                  "rows": decisions},
+                variant_table(),
                 {"title": "Overview: parameters", "columns": ["parameter", "type", "buckets", "range", "override / config"],
                  "rows": overview,
                  "note": f"Balance: pairwise chi-square over all {len(b['chi2_per_pair'])} factor pairs "
