@@ -59,6 +59,7 @@ details.glossary summary{cursor:pointer;font-weight:600;padding:4px 0}
 details.glossary dl{margin:8px 0 4px;display:grid;grid-template-columns:max-content 1fr;gap:6px 16px}
 details.glossary dt{font-weight:600}
 details.glossary dd{margin:0;color:var(--muted)}
+details.glossary dt,details.glossary dd{min-width:0;overflow-wrap:anywhere}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:22px;box-shadow:var(--shadow)}
 .card h2{margin:0 0 6px;font-size:1.4rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .card h3{margin:20px 0 8px;font-size:1.05rem}
@@ -133,7 +134,7 @@ details.glossary dd{margin:0;color:var(--muted)}
   .brand{display:none}
   .sbs{grid-template-columns:1fr}
   .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
-  details.glossary dl{grid-template-columns:1fr}
+  details.glossary dl{grid-template-columns:minmax(0,1fr)}
   .pagehead h1{font-size:1.5rem}
 }
 
@@ -253,10 +254,56 @@ main:has(.trview){max-width:1600px}
 .chart .nodata{font-size:.85rem;color:var(--muted);padding:30px 0;text-align:center}
 .trview h2.sec{font-size:1.15rem;margin:18px 0 8px}
 .trview tr.best td{font-weight:700}
-.trview table.gt td.num{text-align:right;font-variant-numeric:tabular-nums}
+table th.num,table td.num{text-align:right;font-variant-numeric:tabular-nums}
+table{font-variant-numeric:tabular-nums}
+.stat .v,.stat .s{overflow-wrap:break-word}
+/* toolbars: labelled fields (label above the control) and buttons share one baseline and one control height */
+.grow{align-items:flex-end}
+.grow>.gstatus{min-height:34px;display:inline-flex;align-items:center}
+.fld input,.fld select{min-height:34px;box-sizing:border-box}
 .rgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:14px}
 .trview pre.log{font:.78rem var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);padding:8px;border-radius:8px;margin:6px 0}
 .trview .empty code{background:var(--surface);padding:2px 6px;border-radius:4px}
+/* training: live test examples */
+.lpstatus{font-size:.88rem;color:var(--muted);margin:0 0 8px}
+.lpstatus.empty{color:var(--text)}
+.lpstatus code{background:var(--surface);padding:2px 6px;border-radius:4px;overflow-wrap:anywhere}
+.lpwait{margin-top:6px;color:var(--text)}
+.lpbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:0 0 6px}
+.lpctl{display:inline-flex;align-items:center;gap:6px;font-size:.88rem;flex-wrap:wrap;min-width:0;max-width:100%}
+.lpctl input[type=range]{min-width:0;width:140px;max-width:40vw}
+.lpctl .btn{min-height:32px;box-sizing:border-box}
+.lpk{color:var(--muted)}
+.lpval{font-variant-numeric:tabular-nums;min-width:4ch}
+.lplegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.8rem;margin:0 0 6px;align-items:center}
+.lplegend>span{display:inline-flex;align-items:center;gap:5px}
+.lpsw{display:inline-block;width:18px;height:11px;border:1.5px solid #22e05a;box-sizing:border-box}
+.lpsw.fn{border-style:dashed}
+.lpsw.pr{border:2px solid #ff3b3b}
+.lpsw.pr.fp{border-style:dashed}
+.lpsum{font-size:.9rem;margin:0 0 8px;font-variant-numeric:tabular-nums}
+.lpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:10px;margin:0 0 12px}
+.lpcard{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:0}
+.lpopen{all:unset;cursor:zoom-in;display:block;width:100%}
+.lpopen:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.lpimg{position:relative;line-height:0;background:#111;width:100%}
+.lpimg img{width:100%;height:100%;display:block;object-fit:contain}
+.lb .lpimg img{max-width:none;max-height:none;min-width:0;min-height:0}
+.lpimg svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.lpimg .lpgt{fill:none;stroke:#22e05a;stroke-width:1.25;vector-effect:non-scaling-stroke}
+.lpimg .lpgt.fn{stroke-dasharray:4 3;stroke-width:2}
+.lpimg .lppr{fill:none;stroke:#ff3b3b;stroke-width:2;vector-effect:non-scaling-stroke}
+.lpimg .lppr.fp{stroke-dasharray:5 3}
+.lpimg .lpconf{fill:#fff;stroke:#000;paint-order:stroke;font-family:var(--mono);font-weight:700}
+.lpcap{padding:5px 8px;font-size:.78rem;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.lpname{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 100%;min-width:0}
+.lpn{color:var(--muted)}
+.lpb{font:600 .72rem var(--mono);padding:1px 6px;border-radius:99px;border:1px solid var(--border);font-variant-numeric:tabular-nums}
+.lpb.tp{color:#1f8f4e;border-color:#1f8f4e}
+.lpb.fp{color:var(--bad);border-color:var(--bad)}
+.lpb.fn{color:#b07800;border-color:#d49a00}
+.lpb.none{color:var(--muted)}
+.lpcharts{grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr))}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
@@ -300,6 +347,13 @@ function el(tag, attrs, kids){
 function store(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){} return null; }
 function str(v){ return (typeof v === "string" && v.trim()) ? v : ""; }
 function arr(v){ return Array.isArray(v) ? v : []; }
+/* stat tiles: keep "box 0.779", "12.0 s", "mAP50-95" on one line; lines break only between items */
+function nbsp(t){ return typeof t === "string" ? t.replace(/([A-Za-z0-9.]) (?=[0-9–≈%]|s\b|min\b|h\b|GB\b|MB\b|px\b)/g, "$1\u00a0").replace(/([A-Za-z0-9])-(?=[0-9])/g, "$1\u2011") : t; }
+/* table alignment: a column whose cells are all numbers (optionally with a unit, or blank / dash) is right-aligned,
+   header included (class "num"); every other column stays left-aligned, header included */
+var NUM_RE = /^[-+\u2212]?(\d[\d,]*(\.\d*)?|\.\d+)(e[-+]?\d+)?\s*(%|s|px|ms|GB|MB|KB|B|°|x|×)?$/i;
+function isNumText(s){ s = String(s === null || s === undefined ? "" : s).trim(); return s === "" || s === "–" || s === "-" || NUM_RE.test(s); }
+function numCol(values){ var any = false; for (var i = 0; i < values.length; i++){ var v = String(values[i] === null || values[i] === undefined ? "" : values[i]).trim(); if (!isNumText(v)) return false; if (v && v !== "–" && v !== "-") any = true; } return any; }
 
 /* ---------- images ---------- */
 function placeholder(label, cls, why){
@@ -332,7 +386,8 @@ var lb = {items: [], idx: 0, opener: null};
 function lbShow(){
   var it = lb.items[lb.idx]; if (!it) return;
   var st = $("lbStage"); st.textContent = "";
-  if (it.boxes){   /* dataset page: image + YOLO boxes overlay (b toggles) */
+  if (it.render) st.appendChild(it.render());   /* training live test examples: image + GT / prediction overlay */
+  else if (it.boxes){   /* dataset page: image + YOLO boxes overlay (b toggles) */
     var bw = el("div", {"class": "lbwrap" + (it.boxesOn() ? " showbox" : "")}, [img(it.image, it.label, "")]);
     it.boxes.forEach(function(b){ bw.appendChild(boxDiv(b)); });
     st.appendChild(bw);
@@ -727,11 +782,16 @@ function renderGrid(page){
     if (S.sort === k) S.dir = -S.dir; else { S.sort = k; S.dir = 1; }
     sortSel.value = k; dirBtn.textContent = S.dir > 0 ? "↑ asc" : "↓ desc"; refresh();
   }
+  var numKeys = null;   /* columns whose values are all numbers -> right-aligned (header too) */
+  function isNumKey(k){
+    if (!numKeys){ numKeys = {}; keys.forEach(function(kk){ numKeys[kk] = numCol(items.map(function(v){ return fmt(v.meta[kk]); })); }); }
+    return !!numKeys[k];
+  }
   function tableShell(){
     var cols = [["id", "id"]].concat(keys.map(function(k){ return [k, k]; }));
     var tr0 = el("tr", null, [el("th", {text: "Flag", scope: "col"}), el("th", {text: "Image", scope: "col"})]);
     cols.forEach(function(c){
-      var th = el("th", {scope: "col", "aria-sort": S.sort === c[0] ? (S.dir > 0 ? "ascending" : "descending") : "none"});
+      var th = el("th", {scope: "col", "class": c[0] !== "id" && isNumKey(c[0]) ? "num" : null, "aria-sort": S.sort === c[0] ? (S.dir > 0 ? "ascending" : "descending") : "none"});
       th.appendChild(el("button", {type: "button", text: c[1] + (S.sort === c[0] ? (S.dir > 0 ? " ▲" : " ▼") : ""),
         onclick: function(){ sortBy(c[0]); }}));
       tr0.appendChild(th);
@@ -747,7 +807,7 @@ function renderGrid(page){
       el("td", null, [el("button", {"class": "thumb", type: "button", tabindex: "-1", "aria-label": "Enlarge " + v.id,
         onclick: function(ev){ openAt(i, ev.currentTarget.closest("tr")); }}, [img(v.thumb || v.image, v.id, "")])]),
       el("td", {text: v.id})]);
-    keys.forEach(function(k){ tr.appendChild(el("td", {text: fmt(v.meta[k])})); });
+    keys.forEach(function(k){ tr.appendChild(el("td", {"class": isNumKey(k) ? "num" : null, text: fmt(v.meta[k])})); });
     tr.appendChild(el("td", null, [noteCtl(v.id)]));
     nodes.push({id: v.id, root: tr, cb: fc.cb});
     return tr;
@@ -1002,7 +1062,7 @@ function renderDataset(page){
   gridResize = applyCls;
   function say(t){ status.textContent = t; }
 
-  function stat(k, v, s){ return el("div", {"class": "stat"}, [el("div", {"class": "k", text: k}), el("div", {"class": "v", text: v}), s ? el("div", {"class": "s", text: s}) : null]); }
+  function stat(k, v, s){ return el("div", {"class": "stat"}, [el("div", {"class": "k", text: k}), el("div", {"class": "v", text: nbsp(v)}), s ? el("div", {"class": "s", text: nbsp(s)}) : null]); }
   function showInfo(d){
     S.info = d;
     var now = d.server_time, tgt = d.target;
@@ -1217,6 +1277,258 @@ function lineChart(spec){
     draw();
   }};
 }
+/* live test examples: 16 fixed val images predicted after each epoch by live_predict.py (<run>/live_preds/) */
+function lpIoU(a, b){
+  var ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  var inter = ix * iy, u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter;
+  return u > 0 ? inter / u : 0;
+}
+/* greedy one-to-one matching, highest confidence first (same rule as live_predict.py) */
+function lpMatch(preds, gts, conf, thr){
+  var ps = preds.map(function(p, i){ return {p: p, i: i}; }).filter(function(o){ return o.p[4] >= conf; })
+    .sort(function(a, b){ return b.p[4] - a.p[4]; });
+  var free = gts.map(function(_, j){ return j; }), pst = {}, tp = 0;
+  ps.forEach(function(o){
+    var best = thr, bj = -1;
+    free.forEach(function(j){ var v = lpIoU(o.p, gts[j]); if (v >= best){ best = v; bj = j; } });
+    if (bj >= 0){ free.splice(free.indexOf(bj), 1); tp++; pst[o.i] = "tp"; } else pst[o.i] = "fp";
+  });
+  var missed = {}; free.forEach(function(j){ missed[j] = true; });
+  return {tp: tp, fp: ps.length - tp, fn: free.length, pst: pst, missed: missed};
+}
+function livePredsView(getJSON){
+  var IOU = 0.5;
+  var L = {name: null, run: null, index: null, setKey: "", cache: {}, keys: [], pos: -1, follow: true, conf: 0.25,
+    gt: true, pred: true, loading: {}, cards: [], cardKey: ""};
+  var sec = el("section", {"class": "lpsec", "aria-label": "Live test examples"});
+  var head = el("h2", {"class": "sec", text: "Live test examples"});
+  var intro = el("p", {"class": "meta", text: "16 val images picked at random once per run (uniform sample of the val split, seed recorded) and kept fixed, so every epoch is judged on the same pictures. After each epoch, live_predict.py runs the newest weights (last.pt; best.pt once training ends = 'final') on them on the CPU and stores every box with conf ≥ 0.1; the threshold slider filters them here."});
+  var status = el("div", {"class": "lpstatus", role: "status", "aria-live": "polite"});
+  /* controls */
+  var epPrev = el("button", {"class": "btn", type: "button", "aria-label": "previous epoch", text: "◀"});
+  var epNext = el("button", {"class": "btn", type: "button", "aria-label": "next epoch", text: "▶"});
+  var epLatest = el("button", {"class": "btn", type: "button", "aria-pressed": "true", text: "Latest"});
+  var epSlider = el("input", {type: "range", min: "0", max: "0", step: "1", value: "0", "aria-label": "epoch with predictions"});
+  var epLabel = el("span", {"class": "lpval", text: "–"});
+  var confSlider = el("input", {type: "range", min: "0.1", max: "0.95", step: "0.05", value: "0.25", "aria-label": "confidence threshold"});
+  var confLabel = el("span", {"class": "lpval", text: "0.25"});
+  var gtBox = el("input", {type: "checkbox", checked: true}), prBox = el("input", {type: "checkbox", checked: true});
+  var resBtn = el("button", {"class": "btn", type: "button", text: "Resample 16",
+    title: "Draw a new random 16 val images and predict them with the current weights (the old set is archived; its history ends here)"});
+  var resMsg = el("span", {"class": "gstatus"});
+  var ctrls = el("div", {"class": "lpbar"}, [
+    el("div", {"class": "lpctl"}, [el("span", {"class": "lpk", text: "Epoch"}), epPrev, epSlider, epNext, epLatest, epLabel]),
+    el("label", {"class": "lpctl"}, [el("span", {"class": "lpk", text: "Confidence ≥"}), confSlider, confLabel]),
+    el("label", {"class": "lpctl"}, [gtBox, "ground truth"]), el("label", {"class": "lpctl"}, [prBox, "predictions"]),
+    el("div", {"class": "lpctl"}, [resBtn, resMsg])]);
+  var legend = el("div", {"class": "lplegend"}, [
+    el("span", null, [el("span", {"class": "lpsw gt"}), "ground truth (GT) box"]),
+    el("span", null, [el("span", {"class": "lpsw gt fn"}), "GT box missed (FN, dashed)"]),
+    el("span", null, [el("span", {"class": "lpsw pr"}), "prediction, label = conf"]),
+    el("span", null, [el("span", {"class": "lpsw pr fp"}), "prediction matching no mine (FP, dashed)"]),
+    el("span", null, [el("span", {"class": "lpb tp", text: "TP"}), el("span", {"class": "lpb fp", text: "FP"}), el("span", {"class": "lpb fn", text: "FN"}), " per image at the current threshold, IoU ≥ 0.5"])]);
+  var summary = el("p", {"class": "lpsum"});
+  var grid = el("div", {"class": "lpgrid"});
+  var chart = lineChart({title: "Precision and recall on these 16 images", sub: "at the confidence threshold above, IoU ≥ 0.5; one point per epoch with predictions",
+    yLabel: "fraction (0-1)", clamp: [0, 1], fmt: function(v){ return v.toFixed(2); },
+    series: [{key: "precision", name: "precision", color: "var(--s1)"}, {key: "recall", name: "recall", color: "var(--s2)", dash: "6 4"}]});
+  var chartWrap = el("div", {"class": "charts lpcharts"}, [chart.el]);
+  var body = el("div", null, [ctrls, legend, summary, grid, chartWrap]);
+  [head, intro, status, body].forEach(function(n){ sec.appendChild(n); });
+
+  function epochName(k, d){
+    if (k === "final") return "final (best.pt" + (d && d.best_epoch ? ", epoch " + d.best_epoch : "") + ")";
+    return "epoch " + k;
+  }
+  function planned(){ return L.run && L.run.epochs_total; }
+  function cur(){ return L.pos >= 0 ? L.cache[L.keys[L.pos]] : null; }
+  function boxesSvg(im, d, big){
+    var w = im.w || 640, h = im.h || 640, fs = Math.max(w, h) * (big ? 0.022 : 0.034);
+    var s = sv("svg", {viewBox: "0 0 " + w + " " + h, preserveAspectRatio: "none", "aria-hidden": "true"});
+    var p = d ? (d.images || []).filter(function(x){ return x.id === im.id; })[0] : null;
+    var preds = p ? p.pred || [] : [], gts = im.gt || [];
+    var m = lpMatch(preds, gts, L.conf, IOU);
+    if (L.gt) gts.forEach(function(b, j){
+      s.appendChild(sv("rect", {"class": "lpgt" + (p && m.missed[j] ? " fn" : ""), x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1]}));
+    });
+    if (L.pred) preds.forEach(function(b, i){
+      if (b[4] < L.conf) return;
+      s.appendChild(sv("rect", {"class": "lppr" + (m.pst[i] === "fp" ? " fp" : ""), x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1]}));
+      var ty = b[1] - fs * 0.25 < fs ? b[3] + fs : b[1] - fs * 0.25;
+      s.appendChild(sv("text", {"class": "lpconf", x: b[0], y: ty, "font-size": fs.toFixed(1), "stroke-width": (fs * 0.22).toFixed(1)}, [b[4].toFixed(2)]));
+    });
+    return {svg: s, m: m, has: !!p};
+  }
+  function imgBox(im, d, big){
+    var o = boxesSvg(im, d, big);
+    var src = im.img + (big ? "&full=1" : "");
+    var box = el("div", {"class": "lpimg", style: "aspect-ratio:" + (im.w || 1) + " / " + (im.h || 1)}, [img(src, "val image " + im.rel, ""), o.svg]);
+    if (big) box.style.width = "min(92vw, " + (58 * (im.w || 1) / (im.h || 1)).toFixed(1) + "vh)";
+    return {el: box, m: o.m, has: o.has};
+  }
+  function badges(o){
+    if (!o.has) return [el("span", {"class": "lpb none", text: "no predictions yet"})];
+    return [el("span", {"class": "lpb tp", title: "true positives: predictions matching a mine", text: "TP " + o.m.tp}),
+      el("span", {"class": "lpb fp", title: "false positives: predictions matching no mine", text: "FP " + o.m.fp}),
+      el("span", {"class": "lpb fn", title: "false negatives: mines with no matching prediction", text: "FN " + o.m.fn})];
+  }
+  function lbItems(){
+    var set = L.index && L.index.set;
+    return (set ? set.images : []).map(function(im){
+      var name = im.rel.split("/").pop();
+      return {label: name, image: im.img, render: function(){ return imgBox(im, cur(), true).el; },
+        caption: (L.pos >= 0 ? epochName(L.keys[L.pos], cur()) + " · conf ≥ " + L.conf.toFixed(2) + " · " : "") + im.n_gt + " GT box" + (im.n_gt === 1 ? "" : "es") + " · " + (im.w + "×" + im.h + " px"),
+        params: (function(){ var o = imgBox(im, cur(), false); return o.has ? "TP " + o.m.tp + " · FP " + o.m.fp + " · FN " + o.m.fn : "no predictions yet"; })()};
+    });
+  }
+  function renderCards(){   /* cards are built once per set; later renders only swap the box overlay and badges */
+    var set = L.index && L.index.set;
+    if (!set || !set.images.length){ grid.textContent = ""; L.cards = []; L.cardKey = ""; return; }
+    var d = cur();
+    if (L.cardKey !== L.setKey){
+      grid.textContent = ""; L.cards = []; L.cardKey = L.setKey;
+      set.images.forEach(function(im, i){
+        var o = imgBox(im, d, false), name = im.rel.split("/").pop();
+        var cap = el("figcaption", {"class": "lpcap"});
+        var btn = el("button", {type: "button", "class": "lpopen", "aria-label": "Enlarge " + name, onclick: function(ev){ lbOpen(lbItems(), i, ev.currentTarget); }}, [o.el]);
+        grid.appendChild(el("figure", {"class": "lpcard"}, [btn, cap]));
+        L.cards.push({im: im, box: o.el, cap: cap, name: name});
+      });
+    }
+    L.cards.forEach(function(c){
+      var o = boxesSvg(c.im, d, false), old = c.box.querySelector("svg");
+      if (old) c.box.replaceChild(o.svg, old); else c.box.appendChild(o.svg);
+      c.cap.textContent = "";
+      [el("span", {"class": "lpname", title: c.im.rel, text: c.name}), el("span", {"class": "lpn", text: c.im.n_gt + " GT"})].concat(badges(o))
+        .forEach(function(n){ c.cap.appendChild(n); });
+    });
+  }
+  function setStats(d){
+    var set = L.index.set, t = {tp: 0, fp: 0, fn: 0};
+    set.images.forEach(function(im){
+      var p = (d.images || []).filter(function(x){ return x.id === im.id; })[0];
+      var m = lpMatch(p ? p.pred || [] : [], im.gt || [], L.conf, IOU);
+      t.tp += m.tp; t.fp += m.fp; t.fn += m.fn;
+    });
+    t.precision = t.tp + t.fp ? t.tp / (t.tp + t.fp) : null; t.recall = t.tp + t.fn ? t.tp / (t.tp + t.fn) : null;
+    return t;
+  }
+  function renderSummary(){
+    var d = cur(), N = planned();
+    epSlider.max = String(Math.max(0, L.keys.length - 1)); epSlider.value = String(Math.max(0, L.pos));
+    epSlider.disabled = L.keys.length < 2; epPrev.disabled = L.pos <= 0; epNext.disabled = L.pos < 0 || L.pos >= L.keys.length - 1;
+    epLatest.setAttribute("aria-pressed", String(L.follow));
+    epLatest.textContent = L.follow ? "Latest (following)" : "Latest";
+    epLabel.textContent = L.pos < 0 ? "no epoch yet" :
+      (L.keys[L.pos] === "final" ? epochName("final", d) + (N ? " of " + N : "") : "epoch " + L.keys[L.pos] + (N ? " of " + N : "")) +
+      " · snapshot " + (L.pos + 1) + "/" + L.keys.length;
+    confLabel.textContent = L.conf.toFixed(2);
+    if (!d){ summary.textContent = L.pos >= 0 ? "loading predictions…" : ""; return; }
+    var t = setStats(d), s = d.summary || {};
+    summary.textContent = "At conf ≥ " + L.conf.toFixed(2) + " and IoU ≥ 0.5 on these " + L.index.set.images.length + " images: precision " +
+      (t.precision === null ? "–" : t.precision.toFixed(3)) + " (" + t.tp + " TP of " + (t.tp + t.fp) + " predictions) · recall " +
+      (t.recall === null ? "–" : t.recall.toFixed(3)) + " (" + t.tp + " of " + (t.tp + t.fn) + " mines found) · weights " + (d.weights || "?") +
+      (typeof s.inference_seconds === "number" ? " · inference " + s.inference_seconds.toFixed(1) + " s on " + (d.device || "cpu") : "") +
+      (d.created ? " · predicted " + d.created.replace("T", " ") : "");
+  }
+  function renderChart(){
+    var rows = [], N = planned() || 1;
+    var nums = L.keys.filter(function(k){ return k !== "final"; });
+    L.keys.forEach(function(k){
+      var d = L.cache[k]; if (!d) return;
+      if (k === "final" && nums.length) return;          /* final = best.pt, already one of the epochs */
+      var t = setStats(d), x = k === "final" ? (d.best_epoch || d.results_csv_rows || N) : +k;
+      rows.push({epoch: x, precision: t.precision, recall: t.recall});
+    });
+    rows.sort(function(a, b){ return a.epoch - b.epoch; });
+    chart.update(rows, N, null);
+  }
+  function render(){
+    var idx = L.index, set = idx && idx.set, r = L.run;
+    status.textContent = ""; status.className = "lpstatus";
+    body.hidden = !set;
+    if (!idx){ status.textContent = L.name ? "Loading live test examples…" : ""; return; }
+    var running = r && r.status === "running";
+    if (!set){
+      status.className = "lpstatus empty";
+      if (running) status.appendChild(el("span", null, [el("b", {text: "Waiting for the first epoch to finish. "}),
+        idx.predictor_running ? "live_predict.py is watching this run; the 16 images appear when it picks them, predictions after the next epoch." :
+        "No predictor is watching this run. Start one: ", idx.predictor_running ? null : el("code", {text: "cd kernelBashing/baselines/yolo11n && nohup nice -n 10 .venv/bin/python scripts/live_predict.py runs/" + L.name + " &"})]));
+      else status.appendChild(el("span", null, [el("b", {text: "No live test examples for this run. "}), "Make them (best.pt, CPU, a few seconds) with ",
+        el("code", {text: "cd kernelBashing/baselines/yolo11n && .venv/bin/python scripts/live_predict.py runs/" + L.name + " --once"})]));
+      return;
+    }
+    var bits = ["Set: " + set.images.length + " of " + (set.n_val || "?") + " val images, uniform random (seed " + set.seed + ", picked " + String(set.created || "").replace("T", " ") + ")",
+      "image size " + (set.images[0] ? set.images[0].w + "×" + set.images[0].h : "?") + " px, inference at imgsz " + set.imgsz];
+    if (idx.archived_sets) bits.push(idx.archived_sets + " earlier set" + (idx.archived_sets === 1 ? "" : "s") + " archived in live_preds/archive/ (history of this set starts at the resample)");
+    bits.push(idx.predictor_running ? "predictor: watching" : (running ? "predictor: not running" : "predictor: idle (run finished)"));
+    if (idx.resample_pending) bits.push("resample requested, waiting for the predictor…");
+    status.appendChild(el("span", {text: bits.join(" · ")}));
+    if (!L.keys.length) status.appendChild(el("div", {"class": "lpwait"}, [el("b", {text: "Waiting for the first epoch to finish"}), " — the ground-truth boxes are shown; predictions appear when last.pt is next saved."]));
+    resBtn.disabled = !!idx.resample_pending;
+    renderSummary(); renderCards(); renderChart();
+  }
+  function fetchEpochs(){
+    var name = L.name;
+    L.keys.forEach(function(k){
+      if (L.cache[k] || L.loading[k]) return;
+      L.loading[k] = true;
+      getJSON("/api/training/preds?name=" + encodeURIComponent(name) + "&epoch=" + encodeURIComponent(k)).then(function(d){
+        delete L.loading[k];
+        if (name !== L.name) return;
+        L.cache[k] = d; render();
+      }).catch(function(){ delete L.loading[k]; });
+    });
+  }
+  function setIndex(idx){
+    if (!idx || idx.run !== L.name) return;
+    var set = idx.set, key = set ? idx.run + "|" + set.seed + "|" + set.created : "";
+    if (key !== L.setKey){ L.setKey = key; L.cache = {}; L.loading = {}; L.follow = true; }
+    var prevKey = L.keys[L.pos];
+    L.index = idx; L.keys = idx.epochs || [];
+    /* a changed epoch file (same key, newer 'created') is refetched */
+    (idx.history || []).forEach(function(h){ var c = L.cache[h.epoch]; if (c && c.created !== h.created) delete L.cache[h.epoch]; });
+    L.pos = L.follow ? L.keys.length - 1 : Math.max(0, L.keys.indexOf(prevKey));
+    fetchEpochs(); render();
+  }
+  function loadIndex(){
+    if (!L.name) return;
+    var name = L.name;
+    getJSON("/api/training/preds?name=" + encodeURIComponent(name)).then(function(d){ if (name === L.name) setIndex(d); }).catch(function(){
+      if (name === L.name && !L.index){ status.textContent = "Live test examples need the updated server (restart serve_dataset_view.py)."; }
+    });
+  }
+  function go(pos, follow){
+    L.follow = !!follow; L.pos = Math.max(0, Math.min(L.keys.length - 1, pos)); render();
+  }
+  epSlider.addEventListener("input", function(){ go(+epSlider.value, +epSlider.value === L.keys.length - 1 && L.follow); });
+  epPrev.addEventListener("click", function(){ go(L.pos - 1, false); });
+  epNext.addEventListener("click", function(){ go(L.pos + 1, false); });
+  epLatest.addEventListener("click", function(){ go(L.keys.length - 1, true); });
+  confSlider.addEventListener("input", function(){ L.conf = +confSlider.value; render(); });
+  gtBox.addEventListener("change", function(){ L.gt = gtBox.checked; render(); });
+  prBox.addEventListener("change", function(){ L.pred = prBox.checked; render(); });
+  resBtn.addEventListener("click", function(){
+    if (!L.name) return;
+    resBtn.disabled = true; resMsg.textContent = "requesting…";
+    fetch("/api/training/resample?name=" + encodeURIComponent(L.name), {method: "POST"}).then(function(r){
+      return r.json().then(function(j){
+        resMsg.textContent = r.ok ? "new set requested (seed " + j.seed + "); " + (j.watcher_running ? "the watcher" : j.spawned_predictor ? "a one-off predictor" : "the next predictor run") + " will pick it up" : (j.error || ("HTTP " + r.status));
+        if (!r.ok) resBtn.disabled = false;
+        loadIndex();
+      });
+    }).catch(function(e){ resMsg.textContent = "request failed: " + e.message; resBtn.disabled = false; });
+  });
+  render();
+  return {el: sec, setRun: function(r){
+    var name = r ? r.name : null;
+    L.run = r;
+    if (name !== L.name){
+      L.name = name; L.index = null; L.setKey = ""; L.cardKey = ""; L.cache = {}; L.loading = {}; L.keys = []; L.pos = -1; L.follow = true; resMsg.textContent = "";
+      render(); loadIndex();
+    }
+  }, setIndex: setIndex, refresh: loadIndex};
+}
 function renderTraining(page){
   var port = page.port || 8765, cmd = str(page.server_cmd) || "python3 scripts/serve_dataset_view.py";
   var url = "http://127.0.0.1:" + port + "/showcase.html#" + page.id;
@@ -1244,7 +1556,7 @@ function renderTraining(page){
   function fx(v, d){ return typeof v === "number" ? v.toFixed(d) : "–"; }
   function fexp(v){ return typeof v === "number" ? v.toExponential(2) : "–"; }
   function pct(v){ return typeof v === "number" ? (v * 100).toFixed(1) + " %" : "–"; }
-  function stat(k, v, s){ return el("div", {"class": "stat"}, [el("div", {"class": "k", text: k}), el("div", {"class": "v", text: v}), s ? el("div", {"class": "s", text: s}) : null]); }
+  function stat(k, v, s){ return el("div", {"class": "stat"}, [el("div", {"class": "k", text: k}), el("div", {"class": "v", text: nbsp(v)}), s ? el("div", {"class": "s", text: nbsp(s)}) : null]); }
 
   /* header + controls */
   var sel = el("select", {"aria-label": "training run"});
@@ -1304,6 +1616,8 @@ function renderTraining(page){
   var tableSec = el("div"), gallerySec = el("div"), cfgSec = el("div");
   body.appendChild(el("h2", {"class": "sec", text: "Curves"})); body.appendChild(chartsSec);
   body.appendChild(el("p", {"class": "meta", text: "Hover a chart for exact values. Hollow circle = the epoch in progress (train loss running mean from the progress bar). The x axis spans the planned epochs, so the curves fill in as training runs."}));
+  var LPV = livePredsView(getJSON);
+  body.appendChild(LPV.el);
   body.appendChild(gallerySec);
   body.appendChild(el("h2", {"class": "sec", text: "Per-epoch metrics"})); body.appendChild(tableSec);
   body.appendChild(cfgSec);
@@ -1334,6 +1648,7 @@ function renderTraining(page){
   }
   function showRun(r){
     S.run = r; S.got = Date.now();
+    LPV.setRun(r);
     var runs = S.runs ? S.runs.runs || [] : [];
     if (!r){
       big.textContent = runs.length ? "…" : "No runs yet";
@@ -1409,7 +1724,7 @@ function renderTraining(page){
       ["train_box", "train box", f3], ["train_cls", "train cls", f3], ["train_dfl", "train dfl", f3],
       ["val_box", "val box", f3], ["val_cls", "val cls", f3], ["val_dfl", "val dfl", f3], ["lr0", "lr", fexp],
       ["epoch_s", "epoch s", function(v){ return fx(v, 1); }], ["images_per_s", "img/s", function(v){ return fx(v, 1); }], ["gpu_gb", "GPU GB", function(v){ return fx(v, 2); }]];
-    var head = el("tr", null, cols.map(function(c){ return el("th", {scope: "col", text: c[1]}); }));
+    var head = el("tr", null, cols.map(function(c){ return el("th", {scope: "col", "class": "num", text: c[1]}); }));
     var tb = el("tbody");
     rows.slice().reverse().forEach(function(r){
       tb.appendChild(el("tr", {"class": r.epoch === bestEp ? "best" : null, title: r.epoch === bestEp ? "best mAP50-95" : null},
@@ -1477,7 +1792,7 @@ function renderTraining(page){
     getJSON("/api/training/runs").then(function(d){
       if (!S.alive || S.paused) return;
       showRuns(d);
-      return getJSON("/api/training/run" + qs()).then(function(x){ if (S.mode !== "live") setMode("polling"); onData(x); });
+      return getJSON("/api/training/run" + qs()).then(function(x){ if (S.mode !== "live") setMode("polling"); onData(x); LPV.refresh(); });
     }).catch(fail);
   }
   function startPolling(){
@@ -1501,6 +1816,7 @@ function renderTraining(page){
       try { onData(JSON.parse(e.data)); } catch(x){}
     });
     es.addEventListener("heartbeat", function(){ S.errs = 0; setMode("live"); });
+    es.addEventListener("preds", function(e){ if (S.paused) return; try { LPV.setIndex(JSON.parse(e.data)); } catch(x){} });
     es.onerror = function(){
       if (S.es !== es) return;
       S.errs++;
@@ -1523,9 +1839,11 @@ function renderTraining(page){
 /* ---------- tables / figures (optional: page.tables, feature.facts, feature.figure) ---------- */
 function dataTable(cols, rows){
   var t = el("table");
-  if (cols.length) t.appendChild(el("thead", null, [el("tr", null, cols.map(function(c){ return el("th", {scope: "col", text: String(c)}); }))]));
+  var nc = Math.max(cols.length, rows.reduce(function(m, r){ return Math.max(m, arr(r).length); }, 0)), isNum = [];
+  for (var j = 0; j < nc; j++) isNum.push(numCol(rows.map(function(r){ return arr(r)[j]; })));
+  if (cols.length) t.appendChild(el("thead", null, [el("tr", null, cols.map(function(c, j){ return el("th", {scope: "col", "class": isNum[j] ? "num" : null, text: String(c)}); }))]));
   var tb = el("tbody");
-  rows.forEach(function(r){ tb.appendChild(el("tr", null, arr(r).map(function(c){ return el("td", {text: c === null || c === undefined ? "" : String(c)}); }))); });
+  rows.forEach(function(r){ tb.appendChild(el("tr", null, arr(r).map(function(c, j){ return el("td", {"class": isNum[j] ? "num" : null, text: c === null || c === undefined ? "" : String(c)}); }))); });
   t.appendChild(tb);
   return t;
 }

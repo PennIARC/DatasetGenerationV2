@@ -118,7 +118,52 @@ started before this tab existed; the tab says so):
 - Test: `python3 test_fixture/training_view_test.py WORK_DIR [--port 8821] [--live-run-dir RUNS --console-log FILE]`
   makes fake runs (`make_fake_training.py`: finished with report, crashed, and a live 10-epoch run that writes tqdm
   lines / results.csv / timing.json every few seconds), starts servers on PORT and PORT+1 (empty folder), checks the
-  API, SSE, 40 concurrent streams, and the page in headless Chromium (playwright), then stops everything.
+  API, SSE, 40 concurrent streams, and the page in headless Chromium (playwright), then stops everything. The fake runs
+  also carry `live_preds/` (finished run: 960 px set, final only; live run: 640 px set, one epoch file per epoch) and
+  the server under test uses `test_fixture/fake_live_predict.py` for Resample, so no ultralytics is needed.
+
+### Live test examples (Training tab)
+
+16 val images of the run's dataset, picked once per run by a uniform random draw (seed recorded in `set.json`) and kept
+fixed so every epoch is judged on the same pictures, predicted after every epoch. ADR
+[0019](../history/0019-training-live-predictions.md).
+
+- Predictor: `kernelBashing/baselines/yolo11n/scripts/live_predict.py <run>` (the venv's ultralytics, CPU only, 2 torch
+  threads; run it with `nice -n 10`). It reads imgsz and the data yaml from the run's `config.json`, writes
+  `<run>/live_preds/set.json` (paths relative to the dataset root, image size, GT boxes in pixels), and every time
+  `ultra/weights/last.pt` changes (size / mtime stable, copied to a temp file first) runs inference (conf >= 0.1 stored,
+  ultralytics' default NMS) and writes `epoch_<NN>.json` + `latest.json` (boxes with confidence, GT, per-image TP/FP/FN at
+  conf 0.25 / IoU 0.5, set precision / recall, inference seconds). When training ends (final status in `config.json`,
+  `report.md`, `--parent-pid` gone, or `--idle-exit`) it does a last pass with `best.pt` (`epoch_final.json`) and exits.
+  `--once` = only that final pass (finished runs). `train_yolo.py` starts it as a low-priority child by default
+  (`--no-live-preds` to skip). For a run started without it:
+
+      cd kernelBashing/baselines/yolo11n
+      OMP_NUM_THREADS=2 nohup nice -n 10 .venv/bin/python scripts/live_predict.py runs/<run> > /dev/null 2>&1 &
+      .venv/bin/python scripts/live_predict.py runs/<finished run> --once
+
+- Endpoints: `GET /api/training/preds?name=R` (set + epochs + per-epoch summary + predictor state),
+  `GET /api/training/preds?name=R&epoch=<n|latest|final>`, `GET /training-img/<run>/<k>.jpg[?full=1]` (only image k of
+  that run's `set.json`, only inside the dataset named in the run's `config.json`, only `images/<split>/<name>.jpg|png`;
+  640 px thumbnails cached like the dataset tab), and `POST /api/training/resample?name=R` (Host + Origin checked,
+  one request per run per 20 s, `--resample-gap`). Resample writes `live_preds/resample_request.json` with a new seed;
+  the watcher archives the current set and its epochs to `live_preds/archive/`, samples a new 16 and predicts them with
+  the current weights. If no watcher is running (finished run) the server starts
+  `nice -n 10 <venv python> live_predict.py <run> --handle-request` (`--predictor-dir`, `--no-spawn-predictor`); the
+  server itself never imports ultralytics. The SSE stream sends a `preds` event whenever `live_preds/` changes.
+- Page: grid of 16 cards (GT green thin, missed GT dashed; predictions red with confidence, unmatched ones dashed),
+  confidence slider (client-side filter, default 0.25), GT / prediction toggles, epoch slider + buttons ("Latest" follows
+  new epochs until you scrub), "epoch k of N", per-card TP/FP/FN badges and the summary line computed in the browser at
+  the current threshold (IoU 0.5, greedy matching by confidence like the predictor), precision / recall vs epoch chart,
+  click a card to enlarge. Empty states: waiting for the first epoch, no predictor watching, no predictions (with the
+  `--once` command). Works with 640 px and 960 px datasets.
+
+### Table alignment
+
+Every table column is aligned as one unit, header included: a column whose cells are all numbers (optionally with a
+unit, blank or "–") gets class `num` (right-aligned, tabular figures) on the `th` and every `td`; all other columns stay
+left-aligned (`dataTable`, the review table view, the per-epoch metrics table). `training_view_test.py` checks that
+`th` and `td` alignment match for every column on the training, parameters and review (table view) tabs.
 
 ## Tests
 

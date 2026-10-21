@@ -8,7 +8,7 @@ Datasets: every folder under --datasets-root (default output_dataset/) that has 
 in the tab without restarting (rescanned on each /api/datasets call); the default is the newest (plan.json mtime).
 --dataset-dir alone serves just that folder (as before); with --datasets-root as well it is added and is the default.
 
-Binds 127.0.0.1 only and is read-only. Routes:
+Binds 127.0.0.1 only and is read-only (except the resample request file, see below). Routes:
   /                          -> redirect to /showcase.html#dataset
   /<file>                    -> static files of docs/showcase/ (html/json/images only, no dotfiles, no '..')
   /dataset/images/{train,val}/<name>.jpg, /dataset/labels/{train,val}/<name>.txt, /dataset/meta/<name>.json
@@ -22,6 +22,11 @@ Binds 127.0.0.1 only and is read-only. Routes:
   /api/training/run?name=R   -> one run: config summary, timing, results.csv per epoch, live progress, ETA, report links
   /api/training/stream?name=R -> Server-Sent Events: "run" event whenever the run's files change, "runs" event when the
                                 run list changes, a heartbeat comment every 15 s
+  /api/training/preds?name=R  -> live test examples: {set (16 val images, GT boxes), epochs, history, predictor state}
+  /api/training/preds?name=R&epoch=<n|latest|final> -> predictions of that epoch (written by live_predict.py)
+  /training-img/<run>/<k>.jpg[?full=1] -> image k of the run's live_preds/set.json only (640 px thumb, or original)
+  POST /api/training/resample?name=R -> ask the predictor for a new random 16 (request file; rate-limited)
+  (the stream also sends a "preds" event with the preds index whenever live_preds/ changes)
   /training-files/<run>/{report.png,report.html,report.md,report/<name>.png} -> report artifacts (whitelist only)
 
 An image counts as finished only when its label file and its sidecar (meta/<name>.json, written last by
@@ -80,6 +85,12 @@ RATE_RE = re.compile(r"([\d.]+)\s*(it/s|s/it)")
 TIMES_RE = re.compile(r"([\d:.]+)s?<([\d:.]+)s?")
 ACTIVE_TRAIN_S = 90        # minimum "no file activity" window before a run without a final status counts as failed
 FIRST_EPOCH_S = 900        # window while no epoch has finished yet (startup + first epoch, no timing to scale by)
+PRED_FILE_RE = re.compile(r"^epoch_(\d{1,4}|final)\.json$")
+PRED_IMG_REL_RE = re.compile(r"^images/(?:train|val)/%s\.(?:jpg|jpeg|png)$" % NAME)
+PRED_IMG_RE = re.compile(r"^/training-img/(%s)/(\d{1,4})\.jpg$" % RUN_NAME)
+PRED_THUMB_W = 640
+RESAMPLE_MIN_GAP_S = 20    # at most one 'Resample 16' request per run per 20 s
+PREDICTOR_DEFAULT = os.path.join(os.path.dirname(REPO), "kernelBashing", "baselines", "yolo11n")
 STREAM_POLL_S = 1.0
 STREAM_MIN_GAP_S = 1.5     # at most one "run" event per 1.5 s per client
 HEARTBEAT_S = 15.0
@@ -203,6 +214,11 @@ class Training:
         self.tail_cache = {}     # log path -> ((mtime_ns, size), progress)
         self.csv_cache = {}      # path -> ((mtime_ns, size), rows)
         self.streams = 0
+        self.last_resample = {}  # run name -> time of the last accepted resample request
+        self.children = []       # --handle-request predictor processes started for finished runs
+        self.predictor_cmd = None   # (python, live_predict.py) or None: never spawn
+        self.cache_dir = CACHE_DEFAULT
+        self.resample_gap = RESAMPLE_MIN_GAP_S
 
     # ---- folders
     def run_names(self):
@@ -327,6 +343,136 @@ class Training:
         return [ln.rstrip() for ln in lines if ln.strip()][-n:]
 
     # ---- API
+    # ---- live test examples (written by kernelBashing/baselines/yolo11n/scripts/live_predict.py into <run>/live_preds/)
+    def _preds_dir(self, name):
+        d = self.run_dir(name)
+        return (d, os.path.join(d, "live_preds")) if d else (None, None)
+
+    def preds_fingerprint(self, name):
+        d, p = self._preds_dir(name)
+        if p is None or not os.path.isdir(p):
+            return None
+        try:
+            names = sorted(e.name for e in os.scandir(p) if PRED_FILE_RE.match(e.name) or e.name in
+                           ("set.json", "latest.json", "resample_request.json", "predictor.pid"))
+        except OSError:
+            return None
+        return tuple((n, _st(os.path.join(p, n))) for n in names)
+
+    def predictor_pid(self, p):
+        try:
+            with open(os.path.join(p, "predictor.pid")) as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)
+            return pid
+        except (OSError, ValueError):
+            return None
+
+    def preds_set(self, name):
+        """set.json, validated: its dataset_root must be the run's own dataset (config.json) and every image path must
+        be images/<split>/<name>.<ext>; anything else -> None (so the image route can only serve these files)."""
+        d, p = self._preds_dir(name)
+        if p is None:
+            return None, None
+        sset = _read_json(os.path.join(p, "set.json"))
+        if not isinstance(sset, dict) or not isinstance(sset.get("images"), list):
+            return None, None
+        cfg = _read_json(os.path.join(d, "config.json")) or {}
+        ds = cfg.get("dataset") or {}
+        root = ds.get("root") or (os.path.dirname(ds["data_yaml"]) if ds.get("data_yaml") else None)
+        if not root or os.path.realpath(root) != os.path.realpath(sset.get("dataset_root") or ""):
+            return None, None
+        ok = [im for im in sset["images"] if isinstance(im, dict) and PRED_IMG_REL_RE.match(str(im.get("rel", "")))]
+        sset["images"] = ok
+        return sset, os.path.realpath(root)
+
+    def preds_index(self, name):
+        d, p = self._preds_dir(name)
+        if p is None:
+            return None
+        sset, _ = self.preds_set(name)
+        epochs = []
+        try:
+            for e in os.scandir(p):
+                m = PRED_FILE_RE.match(e.name)
+                if m:
+                    epochs.append(m.group(1))
+        except OSError:
+            pass
+        nums = sorted(int(x) for x in epochs if x != "final")
+        keys = [str(n) for n in nums] + (["final"] if "final" in epochs else [])
+        history = []
+        for k in keys:   # small per-epoch summary for the chart (files are a few KB each)
+            j = _read_json(os.path.join(p, "epoch_%s.json" % (k if k == "final" else "%02d" % int(k))))
+            if isinstance(j, dict):
+                history.append({"epoch": k, "summary": j.get("summary"), "weights": j.get("weights"),
+                                "best_epoch": j.get("best_epoch"), "created": j.get("created")})
+        req = _st(os.path.join(p, "resample_request.json"))
+        arch = os.path.join(p, "archive")
+        try:
+            n_arch = sum(1 for e in os.scandir(arch) if e.is_dir())
+        except OSError:
+            n_arch = 0
+        if sset:
+            for im in sset["images"]:
+                im["img"] = "/training-img/%s/%d.jpg?s=%s" % (name, int(im.get("id", 0)), int(sset.get("seed") or 0))
+            sset.pop("dataset_root", None)
+            sset.pop("data_yaml", None)
+        return {"run": name, "set": sset, "epochs": keys, "history": history,
+                "predictor_running": self.predictor_pid(p) is not None, "resample_pending": req is not None,
+                "archived_sets": n_arch, "server_time": time.time()}
+
+    def preds_epoch(self, name, epoch):
+        d, p = self._preds_dir(name)
+        if p is None:
+            return None
+        if epoch == "latest":
+            f = "latest.json"
+        elif epoch == "final":
+            f = "epoch_final.json"
+        elif re.fullmatch(r"\d{1,4}", epoch or ""):
+            f = "epoch_%02d.json" % int(epoch)
+        else:
+            return None
+        return _read_json(os.path.join(p, f))
+
+    def request_resample(self, name):
+        """Write live_preds/resample_request.json {seed}; start a --handle-request predictor child when no watcher is
+        running. Returns (http code, payload)."""
+        d, p = self._preds_dir(name)
+        if p is None:
+            return 404, {"error": "unknown run"}
+        now = time.time()
+        with self.lock:
+            if now - self.last_resample.get(name, 0) < self.resample_gap:
+                return 429, {"error": "resampled %ds ago; wait %ds" % (now - self.last_resample[name],
+                                                                       self.resample_gap)}
+            reqf = os.path.join(p, "resample_request.json")
+            st = _st(reqf)
+            if st and now - st[0] / 1e9 < 300:
+                return 409, {"error": "a resample request is already pending"}
+            self.last_resample[name] = now
+        os.makedirs(p, exist_ok=True)
+        seed = random.randrange(1, 10 ** 9)
+        tmp = reqf + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"seed": seed, "requested": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
+        os.replace(tmp, reqf)
+        spawned = False
+        if self.predictor_pid(p) is None and self.predictor_cmd:
+            py, script = self.predictor_cmd
+            if os.path.isfile(py) and os.path.isfile(script):
+                import subprocess
+                env = dict(os.environ, OMP_NUM_THREADS="2", MKL_NUM_THREADS="2")
+                cmd = ["nice", "-n", "10", py, script, d, "--handle-request", "--threads", "2"]
+                with self.lock:
+                    self.children = [c for c in self.children if c.poll() is None]   # reap finished children
+                    self.children.append(subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                                          stderr=subprocess.DEVNULL, env=env, start_new_session=True))
+                spawned = True
+        return 202, {"queued": True, "seed": seed, "spawned_predictor": spawned,
+                     "watcher_running": self.predictor_pid(p) is not None}
+
     def run_list(self):
         out = []
         now = time.time()
@@ -1028,7 +1174,8 @@ class Handler(BaseHTTPRequestHandler):
             m = THUMB_RE.match(path)
             if m:
                 return self._thumb(m.group(1), m.group(2))
-            if path.startswith("/api/training/") or path.startswith("/training-files/"):
+            if path.startswith("/api/training/") or path.startswith("/training-files/") or \
+                    path.startswith("/training-img/"):
                 return self._training(path, q)
             return self._static(path)
         except (BrokenPipeError, ConnectionResetError):
@@ -1081,6 +1228,20 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 return self._json({"error": err}, 404)
             return self._stream(name, bool(q.get("name", [""])[0]))
+        if path == "/api/training/preds":
+            name, err = self._run_name(q)
+            if err or not name:
+                return self._json({"error": err or "no runs"}, 404)
+            ep = q.get("epoch", [""])[0]
+            if not ep:
+                return self._json(tr.preds_index(name))
+            j = tr.preds_epoch(name, ep)
+            if j is None:
+                return self._json({"error": "no predictions for epoch %s" % ep[:12]}, 404)
+            return self._json(j)
+        m = PRED_IMG_RE.match(path)
+        if m:
+            return self._pred_img(m.group(1), int(m.group(2)), q.get("full", [""])[0] == "1")
         m = TFILE_RE.match(path)
         if m:
             d = tr.run_dir(m.group(1))
@@ -1101,6 +1262,58 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(404, "not found")
             return self._send(200, body, ctype, "no-cache", extra)
         return self._err(404, "not found")
+
+    def _pred_img(self, name, idx, full):
+        """Only the images listed in the run's live_preds/set.json (by position), inside the run's own dataset."""
+        tr = self.tr
+        sset, root = tr.preds_set(name)
+        if not sset:
+            return self._err(404, "not found")
+        im = next((i for i in sset["images"] if i.get("id") == idx), None)
+        if im is None:
+            return self._err(404, "not found")
+        src = os.path.realpath(os.path.join(root, *im["rel"].split("/")))
+        if not src.startswith(root + os.sep) or not os.path.isfile(src):
+            return self._err(404, "not found")
+        ctype = "image/png" if src.lower().endswith(".png") else "image/jpeg"
+        if full:
+            return self._file(src, ctype, "max-age=300")
+        split, base = im["rel"].split("/")[1], os.path.splitext(os.path.basename(src))[0]
+        dst = os.path.join(tr.cache_dir, "_training", os.path.basename(root), split, "%s_%d.jpg" % (base, PRED_THUMB_W))
+        try:
+            if os.stat(dst).st_mtime_ns >= os.stat(src).st_mtime_ns:
+                return self._file(dst, "image/jpeg", "max-age=300")
+        except OSError:
+            pass
+        try:
+            body = make_thumb(src, dst, PRED_THUMB_W)
+        except Exception:  # noqa: BLE001
+            return self._err(503, "thumbnail not ready")
+        self._send(200, body, "image/jpeg" if body[:2] == b"\xff\xd8" else ctype, "max-age=300")
+
+    def do_POST(self):
+        host = (self.headers.get("Host") or "").lower()
+        if host not in ("127.0.0.1:%d" % self.port, "localhost:%d" % self.port):
+            return self._err(403, "forbidden host")
+        origin = self.headers.get("Origin")
+        if origin and origin.lower() not in ("http://127.0.0.1:%d" % self.port, "http://localhost:%d" % self.port):
+            return self._err(403, "forbidden origin")       # cross-site form posts
+        u = urlsplit(self.path)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            if n > 0:
+                self.rfile.read(min(n, 4096))                # body ignored: the run name is the only input
+            if u.path != "/api/training/resample":
+                return self._err(404, "not found")
+            name = parse_qs(u.query).get("name", [""])[0]
+            if not name or not RUN_RE.match(name) or self.tr.run_dir(name) is None:
+                return self._json({"error": "unknown run"}, 404)
+            code, obj = self.tr.request_resample(name)
+            return self._json(obj, code)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:  # noqa: BLE001
+            return self._err(500, "error: %s" % type(e).__name__)
 
     def _stream(self, name, pinned):
         """Server-Sent Events. 'run' = full run payload (on file change, and when the status flips by time alone),
@@ -1133,6 +1346,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(b"retry: 3000\n\n")
             t0 = last_beat = last_sent = time.time()
             last_fp = last_runs = last_state = None
+            last_pfp = False
             while time.time() - t0 < STREAM_MAX_S:
                 now = time.time()
                 runs_fp = tr.runs_fingerprint()
@@ -1149,6 +1363,11 @@ class Handler(BaseHTTPRequestHandler):
                     if state != last_state or beat:
                         send("run", {"run": info, "server_time": now})
                         last_fp, last_state, last_sent = fp, state, now
+                pfp = tr.preds_fingerprint(name) if name else None
+                if pfp != last_pfp:
+                    if last_pfp is not False or pfp is not None:
+                        send("preds", tr.preds_index(name) if name else None)
+                    last_pfp = pfp
                 if beat:
                     self.wfile.write((": heartbeat %d\n\n" % now).encode())
                     send("heartbeat", {"server_time": now})
@@ -1195,12 +1414,26 @@ def main():
     ap.add_argument("--console-log", action="append", default=[], metavar="FILE",
                     help="console output of a running train_yolo.py (tqdm progress bars), attached to the newest run; "
                          "repeatable")
+    ap.add_argument("--predictor-dir", default=PREDICTOR_DEFAULT,
+                    help="folder with .venv/bin/python and scripts/live_predict.py; 'Resample 16' on a run without a "
+                         "running watcher starts '<venv python> live_predict.py <run> --handle-request' (CPU, nice 10)")
+    ap.add_argument("--predictor-python", default=None, help="override the predictor's python")
+    ap.add_argument("--predictor-script", default=None, help="override the predictor script")
+    ap.add_argument("--no-spawn-predictor", action="store_true", help="only write the request file, never start a child")
+    ap.add_argument("--resample-gap", type=float, default=RESAMPLE_MIN_GAP_S,
+                    help="minimum seconds between two 'Resample 16' requests for one run (default %(default)s)")
     ap.add_argument("--verbose", action="store_true", help="log every request")
     args = ap.parse_args()
     roots = args.datasets_root or (None if args.dataset_dir else DATASETS_ROOT_DEFAULT)
     Handler.reg = Registry(os.path.abspath(roots) if roots else None, args.dataset_dir, os.path.abspath(args.cache_dir),
                            args.target)
     Handler.tr = Training(os.path.abspath(args.training_dir), args.console_log)
+    Handler.tr.cache_dir = os.path.abspath(args.cache_dir)
+    Handler.tr.resample_gap = max(0.0, args.resample_gap)
+    if not args.no_spawn_predictor:
+        Handler.tr.predictor_cmd = (
+            os.path.abspath(args.predictor_python or os.path.join(args.predictor_dir, ".venv", "bin", "python")),
+            os.path.abspath(args.predictor_script or os.path.join(args.predictor_dir, "scripts", "live_predict.py")))
     Handler.verbose, Handler.port = args.verbose, args.port
     srv = Server(("127.0.0.1", args.port), Handler)
     dsets, default = Handler.reg.scan()

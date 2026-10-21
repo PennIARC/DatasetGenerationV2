@@ -27,15 +27,24 @@ REPO = SC.parent.parent
 MANIFESTS = ["manifest_v1.json", "manifest_v2.json", "manifest_review.json", "manifest_params.json",
              "manifest_dataset.json", "manifest_training.json"]
 R = []
+# every column of every table with a header row: header text-align == text-align of all its body cells
+ALIGN_JS = """() => { const bad = [];
+  document.querySelectorAll('main table').forEach(t => { const hr = t.querySelector('thead tr'); if (!hr) return;
+    [...hr.children].forEach((th, j) => { const a = getComputedStyle(th).textAlign;
+      t.querySelectorAll('tbody tr').forEach(r => { const c = r.children[j];
+        if (c && getComputedStyle(c).textAlign !== a) bad.push(th.textContent.trim() + ': th ' + a + ' / td ' + getComputedStyle(c).textAlign); }); }); });
+  return [...new Set(bad)]; }"""
 
 
 def ok(name, cond, info=None):
     R.append(("PASS " if cond else "FAIL ") + name + ("" if info is None else " [%s]" % (info,)))
 
 
-def get(port, path, host=None):
+def get(port, path, host=None, method="GET", headers=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    c.request("GET", path, headers={"Host": host or "127.0.0.1:%d" % port})
+    h = {"Host": host or "127.0.0.1:%d" % port}
+    h.update(headers or {})
+    c.request(method, path, headers=h)
     r = c.getresponse()
     body = r.read()
     c.close()
@@ -139,6 +148,94 @@ def api_checks(port, fake):
     ok("40 concurrent streams + %d requests, 0 errors" % cnt[0], not errs and cnt[0] >= 50, errs[:3])
     st, _, _ = get(port, "/api/dataset-info")
     ok("dataset endpoint still works", st == 200)
+    preds_api_checks(port, fake, by)
+
+
+def preds_api_checks(port, fake, by):
+    """live test examples: /api/training/preds, /training-img whitelist, SSE 'preds' events, POST resample."""
+    import io
+    from PIL import Image
+    fin, live, crash = by["fake-finished"]["name"], by["fake-live"]["name"], by["fake-crashed"]["name"]
+    st, _, b = get(port, "/api/training/preds?name=" + fin)
+    ix = json.loads(b)
+    ok("preds index (finished run): 16-image set, epochs = [final]", st == 200 and ix["set"]["n"] == 16 and
+       len(ix["set"]["images"]) == 16 and ix["epochs"] == ["final"], (st, ix.get("epochs")))
+    ok("preds index hides dataset paths, gives image urls", "dataset_root" not in ix["set"] and
+       ix["set"]["images"][0]["img"].startswith("/training-img/%s/0.jpg" % fin))
+    st, _, b = get(port, "/api/training/preds?name=%s&epoch=final" % fin)
+    d = json.loads(b)
+    ok("preds epoch=final: boxes + per-image TP/FP/FN + summary", st == 200 and d["epoch"] == "final" and
+       len(d["images"]) == 16 and "precision" in d["summary"] and all(len(p) == 5 for im in d["images"] for p in im["pred"]))
+    st, _, b = get(port, "/api/training/preds?name=%s&epoch=latest" % fin)
+    ok("preds epoch=latest", st == 200 and json.loads(b)["epoch"] == "final")
+    for bad in ("99", "../set", "x", "-1", "1e3"):
+        st, _, _ = get(port, "/api/training/preds?name=%s&epoch=%s" % (fin, bad))
+        ok("preds bad epoch refused: %s" % bad, st == 404, st)
+    st, _, b = get(port, "/api/training/preds?name=" + crash)
+    ix_c = json.loads(b)
+    ok("run without live_preds: set null, no epochs", st == 200 and ix_c["set"] is None and ix_c["epochs"] == [])
+    st, _, _ = get(port, "/api/training/preds?name=../" + fin)
+    ok("preds bad run name refused", st == 404, st)
+    st, ct, b = get(port, "/training-img/%s/0.jpg" % fin)
+    w0 = Image.open(io.BytesIO(b)).size if st == 200 else None
+    ok("set image served as a 640 px thumbnail (960 px source)", st == 200 and ct == "image/jpeg" and w0 and w0[0] == 640, (st, w0))
+    st, ct, b = get(port, "/training-img/%s/0.jpg?full=1" % fin)
+    ok("?full=1 serves the original 960 px image", st == 200 and Image.open(io.BytesIO(b)).size == (960, 960))
+    st, _, b = get(port, "/training-img/%s/3.jpg" % live)
+    ok("live run (640 px dataset) image served as is", st == 200 and Image.open(io.BytesIO(b)).size == (640, 640))
+    for path in ("/training-img/%s/16.jpg" % fin, "/training-img/%s/0.jpg" % crash, "/training-img/../%s/0.jpg" % fin,
+                 "/training-img/%s/0.png" % fin, "/training-img/%s/a.jpg" % fin, "/training-img/%s/%%2e%%2e.jpg" % fin):
+        st, _, _ = get(port, path)
+        ok("image route refuses %s" % path.split("/training-img/")[1][-24:], st == 404, st)
+    # a tampered set.json (path outside images/, or another dataset root) serves nothing
+    tam = fake / "2026-01-03_100000_fake-tamper"
+    (tam / "live_preds").mkdir(parents=True, exist_ok=True)
+    cfg = json.loads((fake / fin / "config.json").read_text())
+    (tam / "config.json").write_text(json.dumps(cfg))
+    good = json.loads((fake / fin / "live_preds" / "set.json").read_text())
+    bad = dict(good, images=[dict(good["images"][0], id=0, rel="images/val/../../../config.json"),
+                             dict(good["images"][1], id=1, rel="labels/val/" + good["images"][1]["rel"].split("/")[-1])])
+    (tam / "live_preds" / "set.json").write_text(json.dumps(bad))
+    st0, _, _ = get(port, "/training-img/%s/0.jpg" % tam.name)
+    st1, _, _ = get(port, "/training-img/%s/1.jpg" % tam.name)
+    (tam / "live_preds" / "set.json").write_text(json.dumps(dict(good, dataset_root="/")))
+    st2, _, _ = get(port, "/training-img/%s/2.jpg" % tam.name)
+    ok("tampered set.json: traversal / non-image / foreign dataset root refused", (st0, st1, st2) == (404, 404, 404), (st0, st1, st2))
+    shutil.rmtree(tam)
+    # live run: epochs grow while it trains, and the stream says so
+    st, _, b = get(port, "/api/training/preds?name=" + live)
+    e0 = json.loads(b)["epochs"]
+    st, ct, ev = sse_events(port, "/api/training/stream?name=" + live, 4.5)
+    pk = [json.loads(dd) for e, dd in ev if e == "preds"]
+    ok("SSE: 'preds' event with the preds index", pk and pk[0]["run"] == live and pk[0]["set"]["n"] == 16, [e for e, _ in ev][:6])
+    st, _, b = get(port, "/api/training/preds?name=" + live)
+    e1 = json.loads(b)["epochs"]
+    ok("live run: epoch files appear as epochs finish", len(e1) > len(e0) and all(k.isdigit() for k in e1), (e0, e1))
+    ok("live run: predictor shown as watching", json.loads(b)["predictor_running"] is True)
+    # resample: POST only, origin + run checked, rate-limited, handled by the predictor
+    st, _, _ = get(port, "/api/training/resample?name=" + fin)
+    ok("GET resample is not a route", st == 404, st)
+    st, _, _ = get(port, "/api/training/resample?name=nope", method="POST")
+    ok("POST resample unknown run -> 404", st == 404, st)
+    st, _, _ = get(port, "/api/training/resample?name=" + fin, method="POST", headers={"Origin": "http://evil.example"})
+    ok("POST resample from a foreign Origin -> 403", st == 403, st)
+    st, _, _ = get(port, "/api/training/resample?name=" + fin, method="POST", host="evil.example:%d" % port)
+    ok("POST resample with a foreign Host -> 403", st == 403, st)
+    seed0 = ix["set"]["seed"]
+    st, _, b = get(port, "/api/training/resample?name=" + fin, method="POST", headers={"Origin": "http://127.0.0.1:%d" % port})
+    rr = json.loads(b)
+    ok("POST resample (finished run) -> 202 + one-off predictor started", st == 202 and rr["queued"] and rr["spawned_predictor"], rr)
+    st2, _, _ = get(port, "/api/training/resample?name=" + fin, method="POST")
+    ok("second resample within the gap -> 429 (rate limit)", st2 == 429, st2)
+    ix2 = None
+    for _ in range(50):
+        time.sleep(0.2)
+        ix2 = json.loads(get(port, "/api/training/preds?name=" + fin)[2])
+        if ix2["set"] and ix2["set"]["seed"] != seed0 and ix2["epochs"] and not ix2["resample_pending"]:
+            break
+    ok("resample: new seed, new set predicted, old set archived", ix2["set"]["seed"] == rr["seed"] and ix2["epochs"] == ["final"]
+       and ix2["archived_sets"] == 1, (ix2["set"]["seed"], rr["seed"], ix2["epochs"], ix2["archived_sets"]))
+    ok("resample: dataset untouched (still 24 val images)", len(list((fake / "_fake_ds960" / "images" / "val").glob("*.jpg"))) == 24)
 
 
 def page_checks(port, page_name, work, empty_port, file_url):
@@ -160,8 +257,9 @@ def page_checks(port, page_name, work, empty_port, file_url):
             big1 = pg.locator(".trview .big").inner_text()
             ok("big progress 'Epoch k / 10'", big1.startswith("Epoch ") and big1.endswith("/ 10"), big1)
             ok("glossary explains mAP / dfl / cls / box loss", all(t in pg.locator("details.glossary").first.text_content() for t in ("mAP50-95", "dfl loss", "cls loss", "box loss")))
-            ok("8 charts with titles, legends and axis labels", pg.locator(".chart").count() == 8 and pg.locator(".chart .legend").count() == 8
-               and pg.locator(".chart svg text", has_text="epoch (1 = first").count() == 8, pg.locator(".chart").count())
+            C8 = ".charts:not(.lpcharts) .chart"
+            ok("8 charts with titles, legends and axis labels", pg.locator(C8).count() == 8 and pg.locator(C8 + " .legend").count() == 8
+               and pg.locator(C8 + " svg text", has_text="epoch (1 = first").count() == 8, pg.locator(C8).count())
             ok("stat tiles (elapsed, ETA, s/epoch, img/s, GPU, losses)", pg.locator(".trview .stat").count() >= 9 and
                "GB" in pg.locator("[data-k=gpu]").inner_text(), pg.locator(".trview .stat").count())
             pg.wait_for_function("/iteration \\d+ \\/ 169/.test(document.querySelectorAll('.trview .plabel')[1].textContent)", timeout=8000)
@@ -184,6 +282,48 @@ def page_checks(port, page_name, work, empty_port, file_url):
             pg.wait_for_timeout(200)
             ok("hover tooltip", pg.locator(".chart .tip:not([hidden])").count() == 1 and "epoch" in pg.locator(".chart .tip").first.inner_text())
             pg.screenshot(path=str(work / "tr_live.png"), full_page=True)
+            # live test examples
+            pg.wait_for_function("document.querySelectorAll('.lpcard').length === 16 && document.querySelector('.lpsum').textContent.indexOf('precision') >= 0", timeout=15000)
+            ok("live test examples: 16 cards, summary line", True, pg.locator(".lpsum").inner_text()[:90])
+            ok("legend + GT/prediction boxes drawn", pg.locator(".lplegend").count() == 1 and pg.locator(".lpcard .lpgt").count() > 10
+               and pg.locator(".lpcard .lppr").count() > 5, (pg.locator(".lpcard .lpgt").count(), pg.locator(".lpcard .lppr").count()))
+            ok("per-card TP/FP/FN badges", pg.locator(".lpcard .lpb.tp").count() == 16 and pg.locator(".lpcard .lpb.fn").count() == 16)
+            ok("epoch label 'epoch k of 10' + following latest", " of 10" in pg.locator(".lpbar .lpval").first.inner_text()
+               and pg.locator(".lpbar button[aria-pressed='true']").count() == 1, pg.locator(".lpbar .lpval").first.inner_text())
+            ok("set-level precision/recall chart with axis labels", pg.locator(".lpcharts .chart svg text", has_text="fraction (0-1)").count() == 1
+               and pg.locator(".lpcharts .chart svg text", has_text="epoch (1 = first").count() == 1)
+            ok("glossary explains TP / FP / FN, IoU, conf", all(t in pg.locator("details.glossary").first.text_content() for t in ("TP / FP / FN", "IoU", "conf", "GT")))
+            lab0 = pg.locator(".lpbar .lpval").first.inner_text()
+            pg.wait_for_function("document.querySelector('.lpbar .lpval').textContent !== %s" % json.dumps(lab0), timeout=15000)
+            ok("epoch auto-advances as new epochs arrive", True, "%s -> %s" % (lab0, pg.locator(".lpbar .lpval").first.inner_text()))
+            ok("client-side TP/FP/FN equal the predictor's at conf 0.25", pg.evaluate("""() => fetch('/api/training/preds?epoch=latest&name=' + encodeURIComponent(document.querySelector('.trview select option:nth-child(2)').value)).then(r => r.json()).then(d => {
+                 const t = d.images.reduce((a, i) => [a[0] + i.tp, a[1] + i.fp, a[2] + i.fn], [0, 0, 0]);
+                 return t[0] === d.summary.tp && t[1] === d.summary.fp && t[2] === d.summary.fn; })"""))
+            n_pr = pg.locator(".lpcard .lppr").count()
+            pg.locator(".lpbar input[type=range]").nth(1).fill("0.9")
+            n_pr9 = pg.locator(".lpcard .lppr").count()
+            ok("confidence slider filters boxes client-side", n_pr9 < n_pr and "0.90" in pg.locator(".lpsum").inner_text(), (n_pr, n_pr9))
+            pg.locator(".lpbar input[type=range]").nth(1).fill("0.25")
+            sums = pg.evaluate("""() => { const n = c => [...document.querySelectorAll('.lpcard .lpb.' + c)].reduce((a, b) => a + +b.textContent.split(' ')[1], 0);
+                 const m = document.querySelector('.lpsum').textContent.match(/\\((\\d+) TP of (\\d+) predictions\\).*\\((\\d+) of (\\d+) mines/);
+                 return [n('tp'), n('tp') + n('fp'), n('tp') + n('fn'), m && +m[1], m && +m[2], m && +m[4]]; }""")
+            ok("summary line = sum of the card badges (TP, predictions, mines)", sums[:3] == sums[3:], sums)
+            pg.get_by_label("ground truth", exact=True).uncheck()
+            ok("GT toggle hides green boxes", pg.locator(".lpcard .lpgt").count() == 0)
+            pg.get_by_label("ground truth", exact=True).check()
+            pg.get_by_role("button", name="previous epoch").click()
+            lab_s = pg.locator(".lpbar .lpval").first.inner_text()
+            ok("scrubbing back stops following latest", pg.locator(".lpbar button[aria-pressed='true']").count() == 0, lab_s)
+            pg.wait_for_timeout(3500)
+            ok("scrubbed epoch stays while new epochs arrive", pg.locator(".lpbar .lpval").first.inner_text().split(" · ")[0] == lab_s.split(" · ")[0])
+            pg.get_by_role("button", name="Latest").click()
+            pg.locator(".lpopen").first.click()
+            pg.wait_for_timeout(300)
+            ok("card enlarges in the lightbox with the box overlay", pg.locator("#lb.open .lpimg svg").count() == 1
+               and pg.locator("#lb.open .lpimg img").count() == 1, pg.locator("#lb.open").count())
+            pg.keyboard.press("Escape")
+            pg.locator(".lpsec").screenshot(path=str(work / "tr_live_preds.png"))
+            ok("th / td alignment match in every training table column", pg.evaluate(ALIGN_JS) == [], pg.evaluate(ALIGN_JS)[:3])
             # pause
             pg.get_by_role("button", name="Pause updates").click()
             ok("pause -> indicator paused", pg.locator(".conn").inner_text() == "paused")
@@ -203,6 +343,14 @@ def page_checks(port, page_name, work, empty_port, file_url):
             ok("finished run: 6 report images with captions", pg.locator(".rgal figcaption").count() == 6)
             href = pg.locator("a", has_text="Open report.html").get_attribute("href")
             ok("report.html link", href.endswith("/report.html"), href)
+            pg.wait_for_function("document.querySelectorAll('.lpcard').length === 16 && /final/.test(document.querySelector('.lpbar .lpval').textContent)", timeout=8000)
+            ok("finished run: final-only predictions, 'final (best.pt, epoch 5) of 5'", "final (best.pt, epoch 5) of 5" in pg.locator(".lpbar .lpval").first.inner_text(),
+               pg.locator(".lpbar .lpval").first.inner_text())
+            ok("finished run: 960 px images, square cards", pg.locator(".lpimg").first.get_attribute("style").startswith("aspect-ratio:960 / 960"))
+            seed_txt = pg.locator(".lpstatus").inner_text()
+            pg.get_by_role("button", name="Resample 16").click()
+            pg.wait_for_function("(t => t !== %s && /seed \\d+/.test(t) && /archived/.test(t))(document.querySelector('.lpstatus').textContent) && document.querySelectorAll('.lpcard').length === 16" % json.dumps(seed_txt), timeout=15000)
+            ok("Resample 16 -> new set shown, old one archived", pg.locator(".lpstatus").inner_text() != seed_txt, pg.locator(".lpstatus").inner_text()[:100])
             ok("finished run: 5 table rows, best row bold", pg.locator(".trview table.gt tbody tr").count() == 5 and pg.locator("tr.best").count() == 1)
             pg.locator(".rgal button").first.click()
             ok("report image opens in lightbox", pg.locator("#lb.open").count() == 1)
@@ -211,6 +359,8 @@ def page_checks(port, page_name, work, empty_port, file_url):
             crash = [o for o in pg.locator(".trview select option").evaluate_all("o => o.map(x => x.value)") if o.endswith("fake-crashed")][0]
             pg.locator(".trview select").select_option(crash)
             pg.wait_for_function("document.querySelector('.trview .badge').textContent === 'failed'", timeout=8000)
+            pg.wait_for_function("/No live test examples/.test(document.querySelector('.lpstatus').textContent)", timeout=8000)
+            ok("run without predictions: '--once' hint", "--once" in pg.locator(".lpstatus").inner_text())
             ok("crashed run: failed + reason + log tail", "probably crashed" in pg.locator(".trview .dfail").inner_text() and "RuntimeError" in pg.locator(".trview pre.log").first.inner_text())
             pg.locator(".trview select").select_option("")
             pg.wait_for_function("document.querySelector('.trview .badge').textContent !== 'failed'", timeout=8000)
@@ -224,6 +374,14 @@ def page_checks(port, page_name, work, empty_port, file_url):
             pg.evaluate("location.hash='#v1'")
             pg.wait_for_selector("main .card", timeout=5000)
             ok("other tabs still render (v1 cards), training view gone", pg.locator(".trview").count() == 0)
+            for tab in ("params", "burial_review_2"):
+                pg.evaluate("location.hash='#%s'" % tab)
+                pg.wait_for_timeout(800)
+                if tab == "burial_review_2" and pg.get_by_role("button", name="Table").count():
+                    pg.get_by_role("button", name="Table").first.click()
+                    pg.wait_for_timeout(300)
+                bad = pg.evaluate(ALIGN_JS)
+                ok("th / td alignment match in every table column (%s, %d tables)" % (tab, pg.locator("main table").count()), bad == [], bad[:3])
             pg.evaluate("location.hash='#training'")
             pg.wait_for_selector(".conn.live", timeout=8000)
             ok("back to training tab reconnects", True)
@@ -303,7 +461,8 @@ def main():
         writer = subprocess.Popen([sys.executable, str(HERE / "make_fake_training.py"), str(fake), "--no-static",
                                    "--live", "10", "--step", "3"], stdout=subprocess.DEVNULL)
         procs.append(writer)
-        procs.append(start(a.port, fake))
+        procs.append(start(a.port, fake, ["--predictor-python", sys.executable,
+                                          "--predictor-script", str(HERE / "fake_live_predict.py"), "--resample-gap", "3"]))
         procs.append(start(a.port + 1, empty))
         time.sleep(2.5)                     # live run folder exists and has a progress line
         R.append("-- API (fake runs)")

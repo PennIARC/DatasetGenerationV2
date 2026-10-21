@@ -5,7 +5,10 @@
     python3 test_fixture/make_fake_training.py OUT_DIR --live 6 --step 4  # + a live run: 6 epochs, ~4 s train each
 
 Static runs: <..>_fake-finished (5 epochs, status finished, report.png + report/*.png + report.html/md, notes.md) and
-<..>_fake-crashed (2 epochs, no final status, files 1 h old). The live run writes tqdm progress lines (carriage
+<..>_fake-crashed (2 epochs, no final status, files 1 h old, no live_preds). Live test examples (live_preds/, as
+written by kernelBashing/baselines/yolo11n/scripts/live_predict.py) use fake val sets in OUT_DIR/_fake_ds960 (finished
+run: 960x960 images, epoch_final.json only) and OUT_DIR/_fake_ds640 (live run: 640x640, one epoch_NN.json per epoch,
+honours resample_request.json at the next epoch, final at the end). The live run writes tqdm progress lines (carriage
 returns + ANSI escapes, like the ultralytics console) to train.log, appends one ultra/results.csv row and rewrites
 timing.json per epoch, then writes the final status and the report files, like the real script.
 """
@@ -13,6 +16,7 @@ import argparse
 import json
 import math
 import os
+import random
 import time
 from datetime import datetime
 from pathlib import Path
@@ -43,11 +47,11 @@ def write_json(p, obj):
     os.replace(tmp, p)
 
 
-def config(name, epochs, notes):
-    return {"args": {"epochs": epochs, "imgsz": 640, "batch": 16, "device": "mps", "fraction": 1.0, "name": name,
+def config(name, epochs, notes, ds_root="/fake/v2_3000", imgsz=640):
+    return {"args": {"epochs": epochs, "imgsz": imgsz, "batch": 16, "device": "mps", "fraction": 1.0, "name": name,
                      "scratch": False, "notes": notes},
             "argv": ["--epochs", str(epochs), "--name", name],
-            "dataset": {"root": "/fake/v2_3000", "names": {"0": "pfm1"}, "n_train_images": 2700, "n_val_images": 300},
+            "dataset": {"root": str(ds_root), "names": {"0": "pfm1"}, "n_train_images": 2700, "n_val_images": 300},
             "env": {"python": "3.14.0", "torch": "2.x", "ultralytics": "8.x"},
             "ultralytics_train_kwargs": {"epochs": epochs, "imgsz": 640, "batch": 16, "device": "mps", "close_mosaic": 2,
                                          "patience": 50, "seed": 0, "flipud": 0.5, "pretrained": True}}
@@ -82,11 +86,117 @@ def report(d, name):
                                    "<img src='report.png' width=400><img src='report/pr_f1.png' width=400>" % name)
 
 
+# ---- fake live test examples (same files as kernelBashing/baselines/yolo11n/scripts/live_predict.py)
+def fake_dataset(root, size, n=24, prefix="fk"):
+    """n val images (size x size JPEG, 0-5 drawn 'mines') + YOLO labels; image k has k % 6 mines (0 = empty)."""
+    from PIL import Image, ImageDraw
+    root = Path(root)
+    if (root / "images" / "val").is_dir():
+        return root
+    (root / "images" / "val").mkdir(parents=True)
+    (root / "labels" / "val").mkdir(parents=True)
+    for k in range(n):
+        rng = random.Random(k)
+        im = Image.new("RGB", (size, size), (110 + k * 3 % 40, 120, 80))
+        dr = ImageDraw.Draw(im)
+        lines = []
+        for j in range(k % 6):
+            bw, bh = rng.uniform(0.05, 0.2), rng.uniform(0.05, 0.2)
+            cx, cy = rng.uniform(bw, 1 - bw), rng.uniform(bh, 1 - bh)
+            dr.ellipse([(cx - bw / 2) * size, (cy - bh / 2) * size, (cx + bw / 2) * size, (cy + bh / 2) * size], fill=(60, 50, 30))
+            lines.append("0 %.6f %.6f %.6f %.6f" % (cx, cy, bw, bh))
+        dr.text((10, 10), "%s_%05d %dpx" % (prefix, k, size), fill=(255, 255, 255))
+        im.save(root / "images" / "val" / ("%s_%05d.jpg" % (prefix, k)), quality=80)
+        (root / "labels" / "val" / ("%s_%05d.txt" % (prefix, k))).write_text("\n".join(lines) + ("\n" if lines else ""))
+    return root
+
+
+def fake_set(run, ds_root, size, seed, n=16):
+    ds_root = Path(ds_root)
+    files = sorted((ds_root / "images" / "val").glob("*.jpg"))
+    picked = random.Random(seed).sample(files, min(n, len(files)))
+    images = []
+    for i, f in enumerate(picked):
+        gt = []
+        for line in (ds_root / "labels" / "val" / (f.stem + ".txt")).read_text().split("\n"):
+            v = line.split()
+            if len(v) == 5:
+                cx, cy, bw, bh = (float(x) * size for x in v[1:])
+                gt.append([round(cx - bw / 2, 1), round(cy - bh / 2, 1), round(cx + bw / 2, 1), round(cy + bh / 2, 1)])
+        images.append({"id": i, "rel": f.relative_to(ds_root).as_posix(), "w": size, "h": size, "index": int(f.stem[-5:]),
+                       "n_gt": len(gt), "gt": gt})
+    sset = {"run": Path(run).name, "dataset_root": str(ds_root), "data_yaml": str(ds_root / "data.yaml"), "imgsz": size,
+            "seed": seed, "n": len(images), "n_val": len(files), "sampling": "uniform random from the val split",
+            "created": datetime.now().isoformat(timespec="seconds"), "conf_store": 0.1, "conf_eval": 0.25,
+            "iou_eval": 0.5, "box_format": "pixels x1,y1,x2,y2 in the original image", "images": images}
+    (Path(run) / "live_preds").mkdir(exist_ok=True)
+    write_json(Path(run) / "live_preds" / "set.json", sset)
+    return sset
+
+
+def _iou(a, b):
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - ix * iy
+    return ix * iy / u if u > 0 else 0.0
+
+
+def _match(preds, gts, conf=0.25, thr=0.5):
+    ps = sorted((p for p in preds if p[4] >= conf), key=lambda p: -p[4])
+    free, tp = list(range(len(gts))), 0
+    for p in ps:
+        best, bj = thr, -1
+        for j in free:
+            v = _iou(p, gts[j])
+            if v >= best:
+                best, bj = v, j
+        if bj >= 0:
+            free.remove(bj)
+            tp += 1
+    return tp, len(ps) - tp, len(free)
+
+
+def fake_preds(run, sset, epoch, epochs, best_epoch=None):
+    """Predictions that get better with the epoch: found mines get more confident, fewer misses / false positives."""
+    q = (epoch if epoch != "final" else epochs) / float(epochs)
+    imgs, T = [], [0, 0, 0]
+    for im in sset["images"]:
+        rng = random.Random("%s-%s-%s" % (sset["seed"], epoch, im["id"]))
+        pred = []
+        for b in im["gt"]:
+            if rng.random() < 0.35 * (1 - q) + 0.05:
+                continue                                    # missed
+            j = (b[2] - b[0]) * 0.08 * (1 - q)
+            pred.append([round(b[0] + rng.uniform(-j, j), 1), round(b[1] + rng.uniform(-j, j), 1), round(b[2] + rng.uniform(-j, j), 1),
+                         round(b[3] + rng.uniform(-j, j), 1), round(min(0.99, 0.3 + 0.6 * q + rng.uniform(-0.15, 0.1)), 4)])
+        if rng.random() < 0.6 * (1 - q) + 0.15:             # a false positive somewhere
+            x, y = rng.uniform(0, im["w"] * 0.8), rng.uniform(0, im["h"] * 0.8)
+            pred.append([round(x, 1), round(y, 1), round(x + im["w"] * 0.1, 1), round(y + im["h"] * 0.1, 1), round(rng.uniform(0.1, 0.5), 4)])
+        tp, fp, fn = _match(pred, im["gt"])
+        T[0] += tp; T[1] += fp; T[2] += fn
+        imgs.append({"id": im["id"], "rel": im["rel"], "pred": pred, "gt": im["gt"], "tp": tp, "fp": fp, "fn": fn})
+    tp, fp, fn = T
+    res = {"run": Path(run).name, "epoch": epoch, "weights": "best.pt" if epoch == "final" else "last.pt",
+           "weights_epoch": None if epoch == "final" else epoch, "results_csv_rows": epochs if epoch == "final" else epoch,
+           "best_epoch": best_epoch if epoch == "final" else None, "created": datetime.now().isoformat(timespec="seconds"),
+           "imgsz": sset["imgsz"], "device": "cpu", "conf_store": 0.1, "conf_eval": 0.25, "iou_eval": 0.5,
+           "summary": {"tp": tp, "fp": fp, "fn": fn, "precision": round(tp / (tp + fp), 4) if tp + fp else None,
+                       "recall": round(tp / (tp + fn), 4) if tp + fn else None, "inference_seconds": 1.23,
+                       "seconds_per_image": 0.077}, "images": imgs}
+    lp = Path(run) / "live_preds"
+    name = "epoch_final.json" if epoch == "final" else "epoch_%02d.json" % epoch
+    write_json(lp / name, res)
+    write_json(lp / "latest.json", res)
+    return res
+
+
 def static_runs(out):
     now = time.time()
     fin = out / "2026-01-01_100000_fake-finished"
     (fin / "ultra").mkdir(parents=True, exist_ok=True)
-    write_json(fin / "config.json", dict(config("fake-finished", 5, "fake finished run"), status="finished"))
+    ds960 = fake_dataset(out / "_fake_ds960", 960, prefix="fw")
+    write_json(fin / "config.json", dict(config("fake-finished", 5, "fake finished run", ds960, 960), status="finished"))
+    fake_preds(fin, fake_set(fin, ds960, 960, seed=0), "final", 5, best_epoch=5)      # finished run: final only
     ep = [{"epoch": e, "train_seconds": 95.0 + e, "val_seconds": 5.0, "epoch_seconds": 100.0 + e,
            "train_images_per_s": 27.0, "mps_driver_allocated_gb": 5.6} for e in range(1, 6)]
     write_json(fin / "timing.json", timing("2026-01-01T10:00:00", ep, "finished", 520.0))
@@ -110,7 +220,11 @@ def live_run(out, epochs, step, iters=169):
     start = datetime.now()
     d = out / ("%s_fake-live" % start.strftime("%Y-%m-%d_%H%M%S"))
     (d / "ultra").mkdir(parents=True)
-    write_json(d / "config.json", config("fake-live", epochs, "fake live run"))
+    ds640 = fake_dataset(out / "_fake_ds640", 640, prefix="fk")
+    write_json(d / "config.json", config("fake-live", epochs, "fake live run", ds640))
+    (d / "live_preds").mkdir()
+    write_json(d / "live_preds" / "predictor.pid", os.getpid())     # this writer plays the watcher
+    sset = fake_set(d, ds640, 640, seed=0)
     log = open(d / "train.log", "a", buffering=1)
     log.write("%s Ultralytics fake live\nStarting training for %d epochs...\n" % (start.strftime("%H:%M:%S"), epochs))
     (d / "ultra" / "results.csv").write_text(HEAD)
@@ -139,11 +253,23 @@ def live_run(out, epochs, step, iters=169):
         with open(d / "ultra" / "results.csv", "a") as f:
             f.write(row(e, epochs, time.time() - t0))
         write_json(d / "timing.json", timing(start.isoformat(timespec="seconds"), ep))
+        req = d / "live_preds" / "resample_request.json"
+        if req.exists():                                   # 'Resample 16' while running: new set from this epoch on
+            seed = json.loads(req.read_text())["seed"]
+            arch = d / "live_preds" / "archive" / ("set_seed%s" % sset["seed"])
+            arch.mkdir(parents=True, exist_ok=True)
+            for f in list((d / "live_preds").glob("epoch_*.json")) + [d / "live_preds" / "set.json"]:
+                os.replace(f, arch / f.name)
+            sset = fake_set(d, ds640, 640, seed)
+            req.unlink()
+        fake_preds(d, sset, e, epochs)
     log.write("%s %d epochs completed in 0.01 hours.\n" % (datetime.now().strftime("%H:%M:%S"), epochs))
     log.close()
     write_json(d / "timing.json", timing(start.isoformat(timespec="seconds"), ep, "finished", round(time.time() - t0, 1)))
-    write_json(d / "config.json", dict(config("fake-live", epochs, "fake live run"), status="finished"))
+    write_json(d / "config.json", dict(config("fake-live", epochs, "fake live run", ds640), status="finished"))
     (d / "notes.md").write_text("# Notes: fake-live\n\nfake live run\n")
+    fake_preds(d, sset, "final", epochs, best_epoch=epochs)
+    (d / "live_preds" / "predictor.pid").unlink(missing_ok=True)
     time.sleep(1.5)        # "making the report"
     report(d, d.name)
     return d

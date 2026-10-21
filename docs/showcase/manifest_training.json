@@ -5,7 +5,7 @@
       "tab": "Training: live",
       "type": "training",
       "title": "YOLO11n training: live progress",
-      "intro": "Live view of the YOLO11n baseline runs in kernelBashing/baselines/yolo11n/runs: epoch and within-epoch progress, elapsed time and ETA, losses and validation metrics per epoch, and the report figures once a run ends. Updates are pushed by the local server as the run's files change (Server-Sent Events, polling every 5 s as a fallback). Needs the local server: python3 scripts/serve_dataset_view.py, then open http://127.0.0.1:8765/showcase.html#training.",
+      "intro": "Live view of the YOLO11n baseline runs in kernelBashing/baselines/yolo11n/runs: epoch and within-epoch progress, elapsed time and ETA, losses and validation metrics per epoch, live test examples (16 fixed val images with ground truth and the newest predictions, scrubbable through the epochs), and the report figures once a run ends. Updates are pushed by the local server as the run's files change (Server-Sent Events, polling every 5 s as a fallback). Needs the local server: python3 scripts/serve_dataset_view.py, then open http://127.0.0.1:8765/showcase.html#training.",
       "glossary": {
         "epoch": "One full pass over the training split (2700 images). An epoch ends with validation on the 300 val images, which adds one row to ultra/results.csv.",
         "iteration / batch": "One optimiser step on one batch (16 images by default): 2700 / 16 = 169 iterations per epoch.",
@@ -24,7 +24,12 @@
         "ETA": "Estimated time left: rest of the current epoch (from the progress bar, or from the median epoch time) plus the remaining epochs x the median epoch time. It excludes the final best.pt validation and the report (about 1-2 min).",
         "status": "running = files changed recently (within 90 s, or 1.5 x the epoch time + 30 s, whichever is longer); finished / failed = the final status that train_yolo.py writes into timing.json and config.json; failed is also shown when nothing changed for that long and no final status was written (crashed or killed process).",
         "SSE": "Server-Sent Events: one long-lived HTTP response through which the server pushes an update whenever the run's files change (and a heartbeat every 15 s). live / polling / offline shows which transport is in use.",
-        "tqdm progress bar": "The per-iteration progress line ultralytics prints to the console. train.log in the run folder does not contain it; start the server with --console-log FILE pointing at the redirected console output to get exact within-epoch progress, otherwise it is estimated from time."
+        "tqdm progress bar": "The per-iteration progress line ultralytics prints to the console. train.log in the run folder does not contain it; start the server with --console-log FILE pointing at the redirected console output to get exact within-epoch progress, otherwise it is estimated from time.",
+        "live test examples": "16 val images picked once per run by a uniform random draw (seed shown) and kept fixed, so each epoch is judged on the same pictures. kernelBashing/baselines/yolo11n/scripts/live_predict.py predicts them on the CPU each time last.pt is saved (and with best.pt at the end, shown as 'final'). 'Resample 16' draws a new random set and predicts it with the current weights; the old set and its history move to live_preds/archive/.",
+        "GT": "Ground truth: the labelled box of a real mine in the image (green).",
+        "conf": "Confidence: the model's score (0-1) that a predicted box is a mine. Boxes below the threshold slider are hidden and not counted; boxes under 0.1 are not stored.",
+        "TP / FP / FN": "True positive = a prediction that overlaps a not-yet-matched GT box with IoU >= 0.5 (each GT box matches at most one prediction, highest confidence first). False positive = a prediction that matches no GT box (dashed red). False negative = a GT box no prediction matched, a missed mine (dashed green). Precision = TP / (TP + FP), recall = TP / (TP + FN).",
+        "NMS": "Non-maximum suppression: removes overlapping duplicate predictions of the same object, keeping the most confident one (ultralytics defaults, IoU 0.7)."
       },
       "port": 8765,
       "server_cmd": "python3 scripts/serve_dataset_view.py"
